@@ -38,7 +38,21 @@ Copy `.env.example` to `.env` and update the values as needed:
 cp .env.example .env
 ```
 
-### 4. Run the Development Server
+### 4. Generate Prisma Client
+
+#### Using npm
+
+```bash
+npm run db:push
+```
+
+#### Using Bun
+
+```bash
+bun run db:push
+```
+
+### 5. Run the Development Server
 
 #### Using npm
 
