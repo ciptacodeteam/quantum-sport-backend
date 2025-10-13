@@ -4,7 +4,7 @@
     "": {
       "name": "quantum-sport-backend",
       "dependencies": {
-        "hono": "^4.9.12",
+        "hono": "latest",
       },
       "devDependencies": {
         "@types/bun": "latest",
