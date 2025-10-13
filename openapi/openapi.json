@@ -1,0 +1,116 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Quantum Sport API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "tags": [
+    {
+      "name": "General Routes"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "API Home",
+        "responses": {
+          "default": {
+            "description": "Default fallback response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "oneOf": [
+                        {},
+                        {}
+                      ]
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "oneOf": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "msg"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Get API home information",
+        "tags": [
+          "General Routes"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "responses": {
+          "default": {
+            "description": "Default fallback response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "oneOf": [
+                        {},
+                        {}
+                      ]
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "up": {
+                              "oneOf": [
+                                {},
+                                {}
+                              ]
+                            },
+                            "ts": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "up",
+                            "ts"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "msg"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Get health information",
+        "tags": [
+          "General Routes"
+        ]
+      }
+    }
+  }
+}

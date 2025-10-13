@@ -1,2 +1,21 @@
 # deps
 node_modules/
+dist/
+coverage/
+build/
+tmp/
+generated/
+
+# IDEs and editors
+.cache/
+.vscode/
+.idea/
+.DS_Store
+
+test-results/
+
+*.log
+
+.env*
+!.env.example
+/prisma/generated/prisma
