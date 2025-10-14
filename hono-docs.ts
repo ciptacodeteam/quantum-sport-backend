@@ -55,6 +55,13 @@ export default defineConfig({
           description: 'Get OpenAPI specification in JSON format',
           summary: 'OpenAPI JSON',
         },
+        {
+          api: '/open-api/auth',
+          method: 'get',
+          description:
+            'Get OpenAPI specification for authentication in JSON format',
+          summary: 'OpenAPI Auth JSON',
+        },
       ],
     },
   ],

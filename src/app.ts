@@ -17,6 +17,7 @@ import docsRoute from './routes/docs-route'
 import healthRoute from './routes/health-route'
 import homeRoute from './routes/home-route'
 import { AppEnv } from './types'
+import { betterAuthMiddleware } from './middlewares/authentication'
 
 dayjs.locale('id')
 
@@ -27,6 +28,7 @@ app.use(corsMiddlewareOptions)
 app.use(trimTrailingSlash())
 app.use(requestId())
 app.use(logger())
+app.use(betterAuthMiddleware)
 app.use(timeout(5 * 60 * 1000, timeoutException)) // 5 minutes
 
 app.route('/', homeRoute)
