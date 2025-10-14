@@ -41,3 +41,25 @@ export const logger = () =>
           }),
     ),
   })
+
+export const log = pino(
+  env.nodeEnv === 'production'
+    ? {
+        level: env.logLevel || 'info',
+        transport: {
+          target: 'pino/file',
+          options: { destination: logFile },
+        },
+        formatters: {
+          level(label) {
+            return { level: label }
+          },
+        },
+      }
+    : pretty({
+        ignore: 'req.headers.cookie',
+        colorize: true,
+        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+        levelFirst: true,
+      }),
+)

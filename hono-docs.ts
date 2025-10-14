@@ -64,5 +64,24 @@ export default defineConfig({
         },
       ],
     },
+    {
+      name: 'Phone Routes',
+      apiPrefix: '/phone', // This will be prepended to all `api` values below
+      appTypePath: 'src/routes/phone-route.ts', // Path to your AppType export
+      api: [
+        {
+          api: '/send-otp',
+          method: 'post',
+          description: 'Send OTP to a phone number for verification',
+          summary: 'Send Phone OTP',
+        },
+        {
+          api: '/verify-otp',
+          method: 'post',
+          description: 'Verify the OTP code sent to the phone number',
+          summary: 'Verify Phone OTP',
+        },
+      ],
+    },
   ],
 })

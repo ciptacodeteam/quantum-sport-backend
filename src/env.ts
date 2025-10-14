@@ -27,4 +27,7 @@ export const env = {
   },
   webhookBaseUrl: req('WEBHOOK_BASE_URL', 'http://localhost:8787/webhooks'),
   ngrokToken: process.env.NGROK_AUTHTOKEN ?? '',
+  fazpassGatewayKey: process.env.FAZPASS_GATEWAY_KEY ?? '',
+  fazpassMerchantKey: process.env.FAZPASS_MERCHANT_KEY ?? '',
+  fazpassApiUrl: process.env.FAZPASS_API_URL ?? 'https://api.fazpass.com/v1',
 }

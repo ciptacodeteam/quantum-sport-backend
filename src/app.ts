@@ -18,6 +18,7 @@ import healthRoute from './routes/health-route'
 import homeRoute from './routes/home-route'
 import { AppEnv } from './types'
 import { betterAuthMiddleware } from './middlewares/authentication'
+import phoneRoute from './routes/phone-route'
 
 dayjs.locale('id')
 
@@ -35,6 +36,7 @@ app.route('/', homeRoute)
 app.route('/health', healthRoute)
 app.route('/docs', docsRoute)
 app.route('/auth', authRoute)
+app.route('/phone', phoneRoute)
 
 app.notFound(onNotFound)
 app.onError(onError)

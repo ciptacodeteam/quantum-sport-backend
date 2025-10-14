@@ -18,6 +18,9 @@
     },
     {
       "name": "Docs Routes"
+    },
+    {
+      "name": "Phone Routes"
     }
   ],
   "paths": {
@@ -167,7 +170,7 @@
     },
     "/docs/open-api/auth": {
       "get": {
-        "summary": "Auto-generated GET /open-api/auth",
+        "summary": "OpenAPI Auth JSON",
         "responses": {
           "default": {
             "description": "Default fallback response",
@@ -317,8 +320,91 @@
             }
           }
         },
+        "description": "Get OpenAPI specification for authentication in JSON format",
         "tags": [
           "Docs Routes"
+        ]
+      }
+    },
+    "/phone/send-otp": {
+      "post": {
+        "summary": "Send Phone OTP",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "phone"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "Default fallback response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "description": "Send OTP to a phone number for verification",
+        "tags": [
+          "Phone Routes"
+        ]
+      }
+    },
+    "/phone/verify-otp": {
+      "post": {
+        "summary": "Verify Phone OTP",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "requestId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "code",
+                  "requestId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "Default fallback response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "description": "Verify the OTP code sent to the phone number",
+        "tags": [
+          "Phone Routes"
         ]
       }
     }

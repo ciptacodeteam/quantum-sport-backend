@@ -80,3 +80,16 @@ model Verification {
 
   @@map("verification")
 }
+
+model PhoneVerification {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  code      String
+  expiresAt DateTime
+  requestId String
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("phone_verification")
+}
