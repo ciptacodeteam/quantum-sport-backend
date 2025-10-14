@@ -37,4 +37,7 @@ app.route('/auth', authRoute)
 app.notFound(onNotFound)
 app.onError(onError)
 
-export default app
+export default {
+  port: env.port,
+  fetch: app.fetch,
+}
