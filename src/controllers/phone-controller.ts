@@ -36,12 +36,14 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
       update: {
         requestId,
         code,
+        isUsed: false,
         expiresAt: dayjs().add(5, 'minute').toDate(),
       },
       create: {
         requestId,
         phone: formattedPhone,
         code,
+        isUsed: false,
         expiresAt: dayjs().add(5, 'minute').toDate(),
       },
     })
@@ -75,7 +77,6 @@ export async function verifyPhoneVerificationOtp(c) {
       where: {
         requestId,
         phone: phoneNumber,
-        isUsed: false,
       },
     })
 
@@ -85,6 +86,17 @@ export async function verifyPhoneVerificationOtp(c) {
       )
       return c.json(
         err('Invalid requestId or phone number', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    if (verificationRecord.isUsed) {
+      c.var.logger.error(
+        `OTP code already used for phone ${phoneNumber}, requestId: ${requestId}`,
+      )
+
+      return c.json(
+        err('OTP code has already been used', status.BAD_REQUEST),
         status.BAD_REQUEST,
       )
     }
