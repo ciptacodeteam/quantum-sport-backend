@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
+import { formatPhone } from '@/lib/utils'
 import dayjs from 'dayjs'
 import status from 'http-status'
 
@@ -9,18 +10,20 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
     const validated = c.req.valid('form')
     const phone = validated.body.phone
 
-    c.var.logger.info(`Sending phone OTP to ${phone}`)
+    const phoneNumber = await formatPhone(phone)
+
+    c.var.logger.info(`Sending phone OTP to ${phoneNumber}`)
 
     await auth.api.sendPhoneNumberOTP({
       headers: c.req.raw.headers,
       body: {
-        phoneNumber: phone,
+        phoneNumber,
       },
     })
 
     const requestId = await db.phoneVerification.findFirst({
       where: {
-        phone,
+        phone: phoneNumber,
       },
       orderBy: {
         createdAt: 'desc',
@@ -31,14 +34,21 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
     })
 
     if (!requestId) {
-      c.var.logger.error(`Failed to find OTP request ID for phone ${phone}`)
+      c.var.logger.error(
+        `Failed to find OTP request ID for phone ${phoneNumber}`,
+      )
       throw new Error('Failed to send OTP')
     }
 
-    c.var.logger.info(`OTP sent to ${phone}, requestId: ${requestId.requestId}`)
+    c.var.logger.info(
+      `OTP sent to ${phoneNumber}, requestId: ${requestId.requestId}`,
+    )
 
     return c.json(
-      ok({ phone, requestId: requestId.requestId }, 'OTP sent successfully'),
+      ok(
+        { phone: phoneNumber, requestId: requestId.requestId },
+        'OTP sent successfully',
+      ),
     )
   } catch (err) {
     c.var.logger.fatal(`Error sending phone OTP: ${err}`)
@@ -51,21 +61,23 @@ export async function verifyPhoneVerificationOtp(c) {
     const validated = c.req.valid('form')
     const { phone, code, requestId } = validated.body
 
+    const phoneNumber = await formatPhone(phone)
+
     c.var.logger.info(
-      `Verifying phone OTP for ${phone}, requestId: ${requestId}`,
+      `Verifying phone OTP for ${phoneNumber}, requestId: ${requestId}`,
     )
 
     const verificationRecord = await db.phoneVerification.findUnique({
       where: {
         requestId,
-        phone,
+        phone: phoneNumber,
         isUsed: false,
       },
     })
 
     if (!verificationRecord) {
       c.var.logger.error(
-        `No verification record found for phone ${phone} with requestId ${requestId}`,
+        `No verification record found for phone ${phoneNumber} with requestId ${requestId}`,
       )
       return c.json(
         err('Invalid requestId or phone number', status.BAD_REQUEST),
@@ -75,7 +87,7 @@ export async function verifyPhoneVerificationOtp(c) {
 
     if (verificationRecord.code !== code) {
       c.var.logger.error(
-        `Invalid OTP code for phone ${phone}, requestId: ${requestId}`,
+        `Invalid OTP code for phone ${phoneNumber}, requestId: ${requestId}`,
       )
 
       return c.json(
@@ -86,7 +98,7 @@ export async function verifyPhoneVerificationOtp(c) {
 
     if (verificationRecord.expiresAt < dayjs().toDate()) {
       c.var.logger.error(
-        `OTP code expired for phone ${phone}, requestId: ${requestId}`,
+        `OTP code expired for phone ${phoneNumber}, requestId: ${requestId}`,
       )
 
       return c.json(
@@ -98,7 +110,7 @@ export async function verifyPhoneVerificationOtp(c) {
     await auth.api.verifyPhoneNumber({
       headers: c.req.raw.headers,
       body: {
-        phoneNumber: phone,
+        phoneNumber: phoneNumber,
         code,
       },
     })
@@ -106,7 +118,7 @@ export async function verifyPhoneVerificationOtp(c) {
     await db.phoneVerification.update({
       where: {
         requestId,
-        phone,
+        phone: phoneNumber,
       },
       data: {
         isUsed: true,
@@ -114,7 +126,7 @@ export async function verifyPhoneVerificationOtp(c) {
     })
 
     c.var.logger.info(
-      `Phone OTP verified for ${phone}, requestId: ${requestId}`,
+      `Phone OTP verified for ${phoneNumber}, requestId: ${requestId}`,
     )
 
     return c.json(ok(null, 'Phone number verified successfully'))

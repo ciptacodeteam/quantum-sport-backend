@@ -17,7 +17,8 @@ export const auth = betterAuth({
         // Implement sending OTP code via SMS
         log.info(`Sending OTP ${code} to phone number ${phoneNumber}`)
 
-        const otpId = await sendPhoneOtp(phoneNumber, code)
+        const phone = await formatPhone(phoneNumber)
+        const otpId = await sendPhoneOtp(phone, code)
 
         if (!otpId) {
           throw new Error('Failed to send OTP')
@@ -26,7 +27,7 @@ export const auth = betterAuth({
         await db.phoneVerification.create({
           data: {
             requestId: otpId,
-            phone: await formatPhone(phoneNumber),
+            phone: await formatPhone(phone),
             code,
             expiresAt: dayjs().add(5, 'minute').toDate(),
           },
