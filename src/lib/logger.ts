@@ -33,6 +33,11 @@ export const logger = () =>
               },
             },
           }
-        : pretty(),
+        : pretty({
+            ignore: 'req.headers.cookie',
+            colorize: true,
+            translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+            levelFirst: true,
+          }),
     ),
   })

@@ -15,7 +15,7 @@ const onError: ErrorHandler = (err, c) => {
 
   const envMode = c.env?.NODE_ENV || env.nodeEnv
 
-  c.var.logger.error(`[Hono Error]: ${err}`)
+  c.var.logger?.error(`[Hono Error]: ${err}`)
 
   return c.json(
     errResFormatter(
