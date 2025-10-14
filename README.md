@@ -12,7 +12,7 @@ This project is a backend API built with [Hono](https://hono.dev/) for Quantum S
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/quantum-sport-backend.git
+git clone https://github.com/ciptacodeteam/quantum-sport-backend.git
 cd quantum-sport-backend
 ```
 
