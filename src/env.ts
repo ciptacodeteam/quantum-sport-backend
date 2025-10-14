@@ -14,6 +14,7 @@ export const env = {
   dbUrl: req('DATABASE_URL'),
   redisUrl: process.env.REDIS_URL,
   betterAuthSecret: req('BETTER_AUTH_SECRET'),
+  betterAuthUrl: req('BETTER_AUTH_URL', 'http://localhost:3000'),
   jwt: {
     issuer: req('JWT_ISSUER', 'booking-api'),
     audience: req('JWT_AUDIENCE', 'booking-client'),
