@@ -29,12 +29,10 @@ export async function sendPhoneOtp(
   try {
     const payload = new SendOTPPayload(phone, otp, FAZPASS_GATEWAY_KEY).toJson()
 
-    const header = {
-      Authorization: `Bearer ${FAZPASS_MERCHANT_KEY}`,
-    }
-
     const response = await axios.post(SEND_OTP_URL, payload, {
-      headers: header,
+      headers: {
+        authorization: `Bearer ${FAZPASS_MERCHANT_KEY}`,
+      },
     })
 
     log.info('OTP Generation Response:', response.data)
@@ -55,12 +53,10 @@ export async function verifyGeneratePhoneOtp(
   try {
     const payload = new VerifyOTPPayload(otpId, otp).toJson()
 
-    const header = {
-      Authorization: `Bearer ${FAZPASS_MERCHANT_KEY}`,
-    }
-
     const response = await axios.post(VERIFY_OTP_URL, payload, {
-      headers: header,
+      headers: {
+        authorization: `Bearer ${FAZPASS_MERCHANT_KEY}`,
+      },
     })
 
     log.info('OTP Verification Response:', response.data)

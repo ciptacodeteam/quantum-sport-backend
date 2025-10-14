@@ -1,52 +1,43 @@
-import { auth } from '@/lib/auth'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
-import { formatPhone } from '@/lib/utils'
+import { formatPhone, generateOtp } from '@/lib/utils'
+import { sendPhoneOtp } from '@/services/phone-service'
 import dayjs from 'dayjs'
 import status from 'http-status'
 
 export async function sendPhoneVerificationOtp(c): Promise<Response> {
   try {
-    const validated = c.req.valid('form')
-    const phone = validated.body.phone
+    const validated = c.req.valid('json')
+    const phone = validated.phone
 
-    const phoneNumber = await formatPhone(phone)
+    const formattedPhone = await formatPhone(phone)
 
-    c.var.logger.info(`Sending phone OTP to ${phoneNumber}`)
+    c.var.logger.info(`Sending phone OTP to ${formattedPhone}`)
 
-    await auth.api.sendPhoneNumberOTP({
-      headers: c.req.raw.headers,
-      body: {
-        phoneNumber,
-      },
-    })
-
-    const requestId = await db.phoneVerification.findFirst({
-      where: {
-        phone: phoneNumber,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        requestId: true,
-      },
-    })
+    const code = await generateOtp(4)
+    const requestId = await sendPhoneOtp(formattedPhone, code)
 
     if (!requestId) {
       c.var.logger.error(
-        `Failed to find OTP request ID for phone ${phoneNumber}`,
+        `Failed to find OTP request ID for phone ${formattedPhone}`,
       )
       throw new Error('Failed to send OTP')
     }
 
-    c.var.logger.info(
-      `OTP sent to ${phoneNumber}, requestId: ${requestId.requestId}`,
-    )
+    await db.phoneVerification.create({
+      data: {
+        requestId,
+        phone: await formatPhone(phone),
+        code: code,
+        expiresAt: dayjs().add(5, 'minute').toDate(),
+      },
+    })
+
+    c.var.logger.info(`OTP sent to ${formattedPhone}, requestId: ${requestId}`)
 
     return c.json(
       ok(
-        { phone: phoneNumber, requestId: requestId.requestId },
+        { phone: formattedPhone, requestId: requestId },
         'OTP sent successfully',
       ),
     )
@@ -58,8 +49,8 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
 
 export async function verifyPhoneVerificationOtp(c) {
   try {
-    const validated = c.req.valid('form')
-    const { phone, code, requestId } = validated.body
+    const validated = c.req.valid('json')
+    const { phone, code, requestId } = validated
 
     const phoneNumber = await formatPhone(phone)
 
@@ -106,14 +97,6 @@ export async function verifyPhoneVerificationOtp(c) {
         status.BAD_REQUEST,
       )
     }
-
-    await auth.api.verifyPhoneNumber({
-      headers: c.req.raw.headers,
-      body: {
-        phoneNumber: phoneNumber,
-        code,
-      },
-    })
 
     await db.phoneVerification.update({
       where: {

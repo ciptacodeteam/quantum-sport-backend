@@ -24,3 +24,9 @@ export async function formatPhone(phone: string) {
 
   return cleaned
 }
+
+export async function generateOtp(otpLength: number) {
+  const min = Math.pow(10, otpLength - 1)
+  const max = Math.pow(10, otpLength) - 1
+  return (Math.floor(Math.random() * (max - min + 1)) + min).toString()
+}
