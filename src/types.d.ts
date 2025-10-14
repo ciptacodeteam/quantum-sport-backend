@@ -1,11 +1,9 @@
-import type { Context } from 'hono'
-import type { Handler, MiddlewareHandler } from 'hono'
-import { auth } from '../lib/auth' // wherever you create your Better Auth instance
+import { User } from 'generated/prisma'
+import type { Context, Handler, MiddlewareHandler } from 'hono'
 import type { PinoLogger } from 'hono-pino'
 
 type AppVariables = {
-  user: typeof auth.$Infer.Session.user | null
-  session: typeof auth.$Infer.Session.session | null
+  user: User | null
   logger: PinoLogger
 }
 

@@ -14,12 +14,12 @@ export const env = {
   logLevel: process.env.LOG_LEVEL ?? 'info',
   dbUrl: req('DATABASE_URL'),
   redisUrl: process.env.REDIS_URL,
-  betterAuthSecret: req('BETTER_AUTH_SECRET'),
-  betterAuthUrl: req('BETTER_AUTH_URL', 'http://localhost:3000'),
   jwt: {
-    issuer: req('JWT_ISSUER', 'booking-api'),
-    audience: req('JWT_AUDIENCE', 'booking-client'),
-    expires: req('JWT_EXPIRES', '7d'),
+    secret: req('JWT_SECRET'),
+    issuer: req('JWT_ISSUER', 'quantum-sport-backend'),
+    audience: req('JWT_AUDIENCE', 'quantum-sport-frontend'),
+    expires: req('JWT_EXPIRES', '7'),
+    refreshExpires: req('JWT_REFRESH_EXPIRES', '30'),
   },
   xendit: {
     apiKey: process.env.XENDIT_API_KEY ?? '',

@@ -1,9 +1,8 @@
 // src/routes/docs.ts
-import { Hono } from 'hono'
 import { Scalar } from '@scalar/hono-api-reference'
+import { Hono } from 'hono'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { auth } from '@/lib/auth'
 
 // Refer to https://hono.dev/examples/hono-docs
 const docsRoute = new Hono()
@@ -29,10 +28,6 @@ const docsRoute = new Hono()
       'utf-8',
     )
     return c.json(JSON.parse(raw))
-  })
-  .get('/open-api/auth', async (c) => {
-    const openAPISchema = await auth.api.generateOpenAPISchema()
-    return c.json(openAPISchema)
   })
 
 export type AppType = typeof docsRoute

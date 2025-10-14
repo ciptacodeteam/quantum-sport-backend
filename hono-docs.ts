@@ -83,5 +83,37 @@ export default defineConfig({
         },
       ],
     },
+    {
+      name: 'Auth Routes',
+      apiPrefix: '/auth', // This will be prepended to all `api` values below
+      appTypePath: 'src/routes/auth-route.ts', // Path to your AppType export
+      api: [
+        {
+          api: '/login',
+          method: 'post',
+          description: 'User login with email and password',
+          summary: 'User Login',
+        },
+        {
+          api: '/register',
+          method: 'post',
+          description: 'Register a new user account',
+          summary: 'User Registration',
+        },
+        {
+          api: '/logout',
+          method: 'post',
+          description: 'Logout the current user and invalidate the session',
+          summary: 'User Logout',
+        },
+        {
+          api: '/refresh',
+          method: 'post',
+          description:
+            'Refresh the authentication token for the current user session',
+          summary: 'Refresh Token',
+        },
+      ],
+    },
   ],
 })

@@ -1,67 +1,92 @@
-import { auth } from '@/lib/auth'
+import { ForbiddenException, UnauthorizedException } from '@/exceptions'
+import { db } from '@/lib/prisma'
+import { validateToken } from '@/lib/token'
 import { AppEnv } from '@/types'
+import { Role } from 'generated/prisma'
 import { Context, Next } from 'hono'
+import { deleteCookie } from 'hono/cookie'
 
-export const betterAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+type SessionData = {
+  id: string
+  email: string
+  role: Role
+}
 
-  if (!session) {
+export const globalAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
+  const authorization = c.req.header('authorization') as string | undefined
+  const token = authorization?.replace('Bearer ', '')
+
+  if (!token) {
     c.set('user', null)
-    c.set('session', null)
+
+    deleteCookie(c, 'refreshToken')
+
     return next()
   }
 
-  c.set('user', session.user)
-  c.set('session', session.session)
+  const session = await validateToken(token)
+  const user = session?.data as SessionData | null
+
+  if (!user?.id) {
+    c.set('user', null)
+
+    deleteCookie(c, 'refreshToken')
+
+    return next()
+  }
+
+  const userData = await db.user.findUnique({
+    where: { id: user.id },
+  })
+
+  if (!userData) {
+    c.set('user', null)
+    return next()
+  }
+
+  c.set('user', userData)
 
   return next()
 }
 
 export const requireAuth = async (c: Context<AppEnv>, next: Next) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  const user = c.get('user')
 
-  if (!session) {
-    return c.json({ message: 'Unauthorized' }, 401)
+  if (!user) {
+    throw new UnauthorizedException()
   }
-
-  c.set('user', session.user)
-  c.set('session', session.session)
 
   return next()
 }
 
 export const requireAdmin = async (c: Context<AppEnv>, next: Next) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  return requireRole('ADMIN')(c, next)
+}
 
-  if (!session) {
-    return c.json({ message: 'Unauthorized' }, 401)
-  }
+export const requireUser = async (c: Context<AppEnv>, next: Next) => {
+  return requireRole('USER')(c, next)
+}
 
-  if (session.user.role !== 'admin') {
-    return c.json({ message: 'Forbidden' }, 403)
-  }
+export const requireCoach = async (c: Context<AppEnv>, next: Next) => {
+  return requireRole('COACH')(c, next)
+}
 
-  c.set('user', session.user)
-  c.set('session', session.session)
-
-  return next()
+export const requireBallboy = async (c: Context<AppEnv>, next: Next) => {
+  return requireRole('BALLBOY')(c, next)
 }
 
 // You can add more role-based middlewares as needed
-export const requireRole = (role) => {
+export const requireRole = (role: Role) => {
   return async (c: Context<AppEnv>, next: Next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers })
+    const user = c.get('user')
 
-    if (!session) {
-      return c.json({ message: 'Unauthorized' }, 401)
+    if (!user) {
+      throw new UnauthorizedException()
     }
 
-    if (session.user.role !== role) {
-      return c.json({ message: 'Forbidden' }, 403)
+    if (user.role !== role) {
+      throw new ForbiddenException()
     }
-
-    c.set('user', session.user)
-    c.set('session', session.session)
 
     return next()
   }
