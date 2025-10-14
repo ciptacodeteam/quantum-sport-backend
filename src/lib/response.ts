@@ -18,7 +18,6 @@ export function ok<T>(data: T, msg = 'Success'): ResponseSuccess<T> {
   let res: ResponseSuccess<T> = {
     success: true,
     msg,
-    data: null,
   }
 
   if (data) {
