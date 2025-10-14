@@ -1,11 +1,13 @@
+import { DEFAULT_OTP_CODE } from '@/constants'
+import { env } from '@/env'
+import { sendPhoneOtp } from '@/services/phone-service'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { admin, openAPI, phoneNumber } from 'better-auth/plugins'
-import { db } from './prisma'
-import { log } from './logger'
-import { sendPhoneOtp } from '@/services/phone-service'
-import { formatPhone } from './utils'
 import dayjs from 'dayjs'
+import { log } from './logger'
+import { db } from './prisma'
+import { formatPhone } from './utils'
 
 export const auth = betterAuth({
   database: prismaAdapter(db, { provider: 'postgresql' }),
@@ -18,17 +20,23 @@ export const auth = betterAuth({
         log.info(`Sending OTP ${code} to phone number ${phoneNumber}`)
 
         const phone = await formatPhone(phoneNumber)
-        const otpId = await sendPhoneOtp(phone, code)
+        let defaultCode = DEFAULT_OTP_CODE
+        let requestId = Math.random().toString(36).substring(2, 15)
 
-        if (!otpId) {
-          throw new Error('Failed to send OTP')
+        if (env.nodeEnv === 'production') {
+          requestId = await sendPhoneOtp(phone, code)
+
+          if (!requestId) {
+            throw new Error('Failed to send OTP')
+          }
+          defaultCode = code
         }
 
         await db.phoneVerification.create({
           data: {
-            requestId: otpId,
+            requestId,
             phone: await formatPhone(phone),
-            code,
+            code: defaultCode,
             expiresAt: dayjs().add(5, 'minute').toDate(),
           },
         })

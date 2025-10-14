@@ -1,7 +1,9 @@
+import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
+import { env } from '@/env'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { formatPhone, generateOtp } from '@/lib/utils'
-import { sendPhoneOtp } from '@/services/phone-service'
+import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone-service'
 import dayjs from 'dayjs'
 import status from 'http-status'
 
@@ -14,14 +16,19 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
 
     c.var.logger.info(`Sending phone OTP to ${formattedPhone}`)
 
-    const code = await generateOtp(4)
-    const requestId = await sendPhoneOtp(formattedPhone, code)
+    let code = DEFAULT_OTP_CODE
+    let requestId = Math.random().toString(36).substring(2, 15)
 
-    if (!requestId) {
-      c.var.logger.error(
-        `Failed to find OTP request ID for phone ${formattedPhone}`,
-      )
-      throw new Error('Failed to send OTP')
+    if (env.nodeEnv === 'production') {
+      code = await generateOtp(OTP_LENGTH)
+      requestId = await sendPhoneOtp(formattedPhone, code)
+
+      if (!requestId) {
+        c.var.logger.error(
+          `Failed to find OTP request ID for phone ${formattedPhone}`,
+        )
+        throw new Error('Failed to send OTP')
+      }
     }
 
     await db.phoneVerification.upsert({
@@ -102,6 +109,21 @@ export async function verifyPhoneVerificationOtp(c) {
         err('OTP code has expired', status.BAD_REQUEST),
         status.BAD_REQUEST,
       )
+    }
+
+    if (env.nodeEnv === 'production') {
+      const success = await verifyPhoneOtp(requestId, code)
+
+      if (!success) {
+        c.var.logger.error(
+          `Failed to verify OTP with external service for phone ${phoneNumber}, requestId: ${requestId}`,
+        )
+
+        return c.json(
+          err('Failed to verify OTP', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
     }
 
     await db.phoneVerification.update({

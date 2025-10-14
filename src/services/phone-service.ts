@@ -50,7 +50,7 @@ export async function sendPhoneOtp(
   }
 }
 
-export async function verifyGeneratePhoneOtp(
+export async function verifyPhoneOtp(
   otpId: string,
   otp: string,
 ): Promise<boolean> {
