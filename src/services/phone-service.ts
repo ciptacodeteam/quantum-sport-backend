@@ -35,13 +35,17 @@ export async function sendPhoneOtp(
       },
     })
 
-    log.info('OTP Generation Response:', response.data)
+    if (!response.status) {
+      log.error(`Failed to send OTP: ${response}`)
+      throw new Error('Failed to send OTP')
+    }
 
     const responseData = SendOTPResponse.fromJson(response.data)
+    log.info(`OTP Generation Response: ${responseData}`)
 
     return responseData.getId()
   } catch (error) {
-    log.error(`Error generating OTP: ${error}`)
+    log.error(`Error sending OTP: ${error}`)
     throw error
   }
 }

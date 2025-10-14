@@ -24,11 +24,17 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
       throw new Error('Failed to send OTP')
     }
 
-    await db.phoneVerification.create({
-      data: {
+    await db.phoneVerification.upsert({
+      where: { phone: formattedPhone },
+      update: {
         requestId,
-        phone: await formatPhone(phone),
-        code: code,
+        code,
+        expiresAt: dayjs().add(5, 'minute').toDate(),
+      },
+      create: {
+        requestId,
+        phone: formattedPhone,
+        code,
         expiresAt: dayjs().add(5, 'minute').toDate(),
       },
     })
