@@ -12,6 +12,12 @@
   "tags": [
     {
       "name": "General Routes"
+    },
+    {
+      "name": "Health Routes"
+    },
+    {
+      "name": "Docs Routes"
     }
   ],
   "paths": {
@@ -28,7 +34,9 @@
                   "properties": {
                     "success": {
                       "oneOf": [
-                        {},
+                        {
+                          "type": "number"
+                        },
                         {}
                       ]
                     },
@@ -56,7 +64,7 @@
     },
     "/health": {
       "get": {
-        "summary": "Health Check",
+        "summary": "API Health",
         "responses": {
           "default": {
             "description": "Default fallback response",
@@ -67,7 +75,9 @@
                   "properties": {
                     "success": {
                       "oneOf": [
-                        {},
+                        {
+                          "type": "number"
+                        },
                         {}
                       ]
                     },
@@ -106,9 +116,52 @@
             }
           }
         },
-        "description": "Get health information",
+        "description": "Get API health status",
         "tags": [
-          "General Routes"
+          "Health Routes"
+        ]
+      }
+    },
+    "/docs": {
+      "get": {
+        "summary": "API Docs",
+        "responses": {
+          "default": {
+            "description": "Default fallback response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {},
+                    {}
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Get API documentation",
+        "tags": [
+          "Docs Routes"
+        ]
+      }
+    },
+    "/docs/open-api": {
+      "get": {
+        "summary": "OpenAPI JSON",
+        "responses": {
+          "default": {
+            "description": "Default fallback response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "description": "Get OpenAPI specification in JSON format",
+        "tags": [
+          "Docs Routes"
         ]
       }
     }

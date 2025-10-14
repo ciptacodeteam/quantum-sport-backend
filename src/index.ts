@@ -1,63 +1,40 @@
+import dayjs from 'dayjs'
+import 'dayjs/locale/id'
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { timeout } from 'hono/timeout'
 import { trimTrailingSlash } from 'hono/trailing-slash'
 import { env } from './env'
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-  timeoutException,
-  UnauthorizedException,
-} from './exceptions'
+import { timeoutException } from './exceptions'
 import { corsMiddlewareOptions } from './lib/cors'
 
-import dayjs from 'dayjs'
-import 'dayjs/locale/id'
-import { HTTPException } from 'hono/http-exception'
-import { StatusCode } from 'hono/utils/http-status'
-import status from 'http-status'
+import { requestId } from 'hono/request-id'
 import { logger } from './lib/logger'
-import docsRoute from './routes/docs'
-import homeRoute from './routes/home'
+import onError from './middlewares/error'
+import onNotFound from './middlewares/not-found'
+import authRoute from './routes/auth-route'
+import docsRoute from './routes/docs-route'
+import healthRoute from './routes/health-route'
+import homeRoute from './routes/home-route'
+import { AppEnv } from './types'
 
 dayjs.locale('id')
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
-app.use('*', csrf({ origin: env.corsOrigins }))
-app.use('*', corsMiddlewareOptions)
-app.use('*', trimTrailingSlash())
-app.use('*', timeout(5 * 60 * 1000, timeoutException)) // 5 minutes
+app.use(csrf({ origin: env.corsOrigins }))
+app.use(corsMiddlewareOptions)
+app.use(trimTrailingSlash())
+app.use(requestId())
+app.use(logger())
+app.use(timeout(5 * 60 * 1000, timeoutException)) // 5 minutes
 
-app.route('/', homeRoute).route('/docs', docsRoute)
+app.route('/', homeRoute)
+app.route('/health', healthRoute)
+app.route('/docs', docsRoute)
+app.route('/auth', authRoute)
 
-app.notFound((c) => {
-  throw new NotFoundException(c)
-})
-
-app.onError((err, c) => {
-  logger.fatal(err)
-  console.error('[Hono Error]', err)
-
-  let statusCode: StatusCode = status.INTERNAL_SERVER_ERROR
-  let message = 'Internal Server Error'
-
-  if (
-    err instanceof NotFoundException ||
-    err instanceof HTTPException ||
-    err instanceof UnauthorizedException ||
-    err instanceof ForbiddenException ||
-    err instanceof BadRequestException
-  ) {
-    statusCode = (err.status as StatusCode) ?? status.INTERNAL_SERVER_ERROR
-    message = err.message
-  } else if (err instanceof Error) {
-    message = err.message
-  }
-
-  c.status(statusCode)
-  return c.json({ status: false, msg: message })
-})
+app.notFound(onNotFound)
+app.onError(onError)
 
 export default app

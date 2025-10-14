@@ -8,9 +8,9 @@ export const timeoutException = (c) =>
   })
 
 export class NotFoundException extends HTTPException {
-  constructor(c) {
+  constructor(msg?: string) {
     super(404, {
-      message: `Resource not found: ${c.req.path}`,
+      message: msg || `Resource not found. Please check the URL and try again.`,
     })
   }
 }

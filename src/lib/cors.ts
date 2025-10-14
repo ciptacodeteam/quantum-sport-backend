@@ -8,7 +8,7 @@ const getOrigin = (origin: string) => {
 
 export const corsMiddlewareOptions = cors({
   origin: getOrigin,
-  allowHeaders: ['X-Custom-Header', 'Upgrade-Insecure-Requests'],
+  allowHeaders: ['Content-Type', 'Upgrade-Insecure-Requests', 'Authorization'],
   allowMethods: ['POST', 'GET', 'OPTIONS', 'PUT', 'DELETE', 'PATCH'],
   exposeHeaders: ['Content-Length'],
   maxAge: 600,

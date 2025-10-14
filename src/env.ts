@@ -11,6 +11,7 @@ export const env = {
   port: Number(process.env.PORT ?? 3000),
   baseUrl: req('BASE_URL', `http://localhost:3000`),
   corsOrigins: (process.env.CORS_ORIGINS ?? '').split(',').filter(Boolean),
+  logLevel: process.env.LOG_LEVEL ?? 'info',
   dbUrl: req('DATABASE_URL'),
   redisUrl: process.env.REDIS_URL,
   betterAuthSecret: req('BETTER_AUTH_SECRET'),

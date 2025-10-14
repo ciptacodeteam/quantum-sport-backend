@@ -1,11 +1,12 @@
-import { ok } from 'assert'
+import { ok } from '@/lib/response'
+import { AppEnv } from '@/types'
 import dayjs from 'dayjs'
 import { Context } from 'hono'
 
-export async function getApiHealth(c: Context) {
+export async function getApiHealth(c: Context<AppEnv>) {
   return c.json(
     ok(
-      { up: true, ts: dayjs().format('YYYY-MM-DD HH:mm:ss') },
+      { up: true, ts: dayjs().toISOString() },
       `Server is healthy at ${dayjs().toISOString()}`,
     ),
   )

@@ -1,20 +1,24 @@
+import { StatusCode } from 'hono/utils/http-status'
+import status from 'http-status'
+
 type ResponseSuccess<T> = {
-  success: boolean
+  success: number | true
   msg: string
-  data?: T
+  data?: T | null
 }
 
 type ResponseError = {
-  success: boolean
+  success: number | false
   msg: string
-  code: string
-  details?: unknown
+  code: StatusCode
+  errors?: unknown
 }
 
 export function ok<T>(data: T, msg = 'Success'): ResponseSuccess<T> {
   let res: ResponseSuccess<T> = {
     success: true,
     msg,
+    data: null,
   }
 
   if (data) {
@@ -26,13 +30,13 @@ export function ok<T>(data: T, msg = 'Success'): ResponseSuccess<T> {
 
 export function err(
   msg: string,
-  code = 'ERR_BAD_REQUEST',
-  details?: unknown,
+  code: StatusCode = status.INTERNAL_SERVER_ERROR,
+  errors?: unknown,
 ): ResponseError {
   return {
     success: false,
-    msg,
     code,
-    ...(details !== undefined && { details }),
+    msg,
+    ...(errors !== undefined && { errors }),
   }
 }

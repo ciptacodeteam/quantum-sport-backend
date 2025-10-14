@@ -1,6 +1,9 @@
-import pino from 'pino'
-import path from 'node:path'
+import { env } from '@/env'
+import { pinoLogger } from 'hono-pino'
 import fs from 'node:fs'
+import path from 'node:path'
+import pino from 'pino'
+import pretty from 'pino-pretty'
 
 const logDir = path.resolve(__dirname, '../storage/logs')
 
@@ -14,24 +17,22 @@ const logFile = path.join(
   `${new Date().toISOString().slice(0, 10)}-log.txt`,
 )
 
-const customErrorSerializer = (err: Error) => ({
-  type: err.name,
-  message: err.message,
-  stack: err.stack,
-  code: (err as any).code,
-  details: (err as any).details,
-})
-
-export const logger = pino({
-  level: process.env.LOG_LEVEL ?? 'info',
-  transport:
-    process.env.NODE_ENV === 'development'
-      ? { target: 'pino-pretty', options: { colorize: true } }
-      : {
-          target: 'pino/file',
-          options: { destination: logFile },
-        },
-  serializers: {
-    err: customErrorSerializer,
-  },
-})
+export const logger = () =>
+  pinoLogger({
+    pino: pino(
+      env.nodeEnv === 'production'
+        ? {
+            level: env.logLevel || 'info',
+            transport: {
+              target: 'pino/file',
+              options: { destination: logFile },
+            },
+            formatters: {
+              level(label) {
+                return { level: label }
+              },
+            },
+          }
+        : pretty(),
+    ),
+  })
