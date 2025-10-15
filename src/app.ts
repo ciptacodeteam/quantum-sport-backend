@@ -13,6 +13,7 @@ dayjs.extend(duration).locale('id')
 
 const app = createApp()
 
+// ADD NEW ROUTES HERE
 const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]
 
 configureOpenAPI(app)
