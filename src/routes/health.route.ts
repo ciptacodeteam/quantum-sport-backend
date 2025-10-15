@@ -7,7 +7,7 @@ import { createRoute } from '@hono/zod-openapi'
 import dayjs from 'dayjs'
 import status from 'http-status'
 
-const healthRoute = createRoute({
+const healthRouteDoc = createRoute({
   path: '/health',
   method: 'get',
   summary: 'Health Check',
@@ -27,8 +27,8 @@ const healthRoute = createRoute({
   },
 })
 
-export type HealthRoute = typeof healthRoute
+export type healthRouteDoc = typeof healthRouteDoc
 
-const router = createRouter().openapi(healthRoute, healthCheckHandler)
+const healthRoute = createRouter().openapi(healthRouteDoc, healthCheckHandler)
 
-export default router
+export default healthRoute

@@ -12,7 +12,7 @@ import { createRouter } from '@/lib/create-app'
 import { createRoute } from '@hono/zod-openapi'
 import status from 'http-status'
 
-const sendPhoneVerificationOtpRoute = createRoute({
+const sendPhoneVerificationOtpRouteDoc = createRoute({
   path: '/send-otp',
   method: 'post',
   summary: 'Send Phone Verification OTP',
@@ -44,9 +44,10 @@ const sendPhoneVerificationOtpRoute = createRoute({
   },
 })
 
-export type SendPhoneVerificationOtpRoute = typeof sendPhoneVerificationOtpRoute
+export type SendPhoneVerificationOtpRouteDoc =
+  typeof sendPhoneVerificationOtpRouteDoc
 
-const verifyPhoneOtpRoute = createRoute({
+const verifyPhoneOtpRouteDoc = createRoute({
   path: '/verify-otp',
   method: 'post',
   summary: 'Verify Phone OTP',
@@ -75,10 +76,10 @@ const verifyPhoneOtpRoute = createRoute({
   },
 })
 
-export type VerifyPhoneOtpRoute = typeof verifyPhoneOtpRoute
+export type VerifyPhoneOtpRouteDoc = typeof verifyPhoneOtpRouteDoc
 
-const router = createRouter()
-  .openapi(sendPhoneVerificationOtpRoute, sendPhoneVerificationOtp)
-  .openapi(verifyPhoneOtpRoute, verifyPhoneVerificationOtp)
+const phoneVerificationRoute = createRouter()
+  .openapi(sendPhoneVerificationOtpRouteDoc, sendPhoneVerificationOtp)
+  .openapi(verifyPhoneOtpRouteDoc, verifyPhoneVerificationOtp)
 
-export default router
+export default phoneVerificationRoute

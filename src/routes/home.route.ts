@@ -5,7 +5,7 @@ import { createRouter } from '@/lib/create-app'
 import { createRoute } from '@hono/zod-openapi'
 import status from 'http-status'
 
-const homeRoute = createRoute({
+const homeRouteDoc = createRoute({
   path: '/',
   method: 'get',
   summary: 'Home',
@@ -19,8 +19,8 @@ const homeRoute = createRoute({
   },
 })
 
-export type HomeRoute = typeof homeRoute
+export type HomeRouteDoc = typeof homeRouteDoc
 
-const router = createRouter().openapi(homeRoute, getWelcomeMessage)
+const homeRoute = createRouter().openapi(homeRouteDoc, getWelcomeMessage)
 
-export default router
+export default homeRoute

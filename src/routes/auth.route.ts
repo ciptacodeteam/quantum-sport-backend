@@ -1,0 +1,195 @@
+import {
+  loginHandler,
+  logoutHandler,
+  refreshTokenHandler,
+  registerHandler,
+} from '@/handlers/auth-controller'
+import {
+  authorizationHeaderSchema,
+  loginSchema,
+  refreshTokenCookieSchema,
+  registerSchema,
+} from '@/lib/validation'
+import { requireAuth } from '@/middlewares/authentication'
+
+import jsonContent from '@/helpers/json-content'
+import jsonContentRequired from '@/helpers/json-content-required'
+import createErrorSchema from '@/helpers/schema/create-error-schema'
+import createMessageObjectSchema from '@/helpers/schema/create-message-object'
+import { createRouter } from '@/lib/create-app'
+import { createRoute } from '@hono/zod-openapi'
+import status from 'http-status'
+
+const loginRouteDoc = createRoute({
+  path: '/auth/login',
+  method: 'post',
+  summary: 'Phone Login',
+  description: 'Login route using phone number after OTP verification',
+  tags: ['Authentication'],
+  request: {
+    body: jsonContentRequired(loginSchema, 'Login payload'),
+  },
+  responses: {
+    [status.OK]: {
+      ...jsonContent(
+        createMessageObjectSchema('Login successful', {
+          token: 'jwt-token',
+        }),
+        'Successful Response',
+      ),
+      headers: {
+        'Set-Cookie': {
+          description: 'Set refresh token authentication cookie',
+          schema: {
+            type: 'string',
+            example:
+              'refreshToken=token-value; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict',
+          },
+        },
+      },
+    },
+    [status.BAD_REQUEST]: jsonContent(
+      createErrorSchema(loginSchema),
+      'Bad Request Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type LoginRouteDoc = typeof loginRouteDoc
+
+const registerRouteDoc = createRoute({
+  path: '/auth/register',
+  method: 'post',
+  summary: 'User Registration',
+  description: 'Register a new user with phone number after OTP verification',
+  tags: ['Authentication'],
+  request: {
+    body: jsonContentRequired(registerSchema, 'Register payload'),
+  },
+  responses: {
+    [status.CREATED]: {
+      ...jsonContent(
+        createMessageObjectSchema('User registered successfully', {
+          token: 'jwt-token',
+        }),
+        'Successful Response',
+      ),
+      headers: {
+        'Set-Cookie': {
+          description: 'Set refresh token authentication cookie',
+          schema: {
+            type: 'string',
+            example:
+              'refreshToken=token-value; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict',
+          },
+        },
+      },
+    },
+    [status.BAD_REQUEST]: jsonContent(
+      createErrorSchema(registerSchema),
+      'Bad Request Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type RegisterRouteDoc = typeof registerRouteDoc
+
+const logoutRouteDoc = createRoute({
+  path: '/auth/logout',
+  method: 'post',
+  summary: 'User Logout',
+  description: 'Logout a user',
+  tags: ['Authentication'],
+  request: {
+    headers: authorizationHeaderSchema,
+    cookies: refreshTokenCookieSchema,
+  },
+  middleware: [requireAuth],
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('User logged out successfully'),
+      'Successful Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type LogoutRouteDoc = typeof logoutRouteDoc
+
+const refreshTokenRouteDoc = createRoute({
+  path: '/auth/refresh',
+  method: 'post',
+  summary: 'Refresh Token',
+  description: 'Refresh the access token using the refresh token',
+  tags: ['Authentication'],
+  request: {
+    headers: authorizationHeaderSchema,
+    cookies: refreshTokenCookieSchema,
+  },
+  middleware: [requireAuth],
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('Token refreshed successfully', {
+        accessToken: 'new-access-token',
+      }),
+      'Successful Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type RefreshTokenRouteDoc = typeof refreshTokenRouteDoc
+
+const authRoute = createRouter()
+  .openapi(loginRouteDoc, loginHandler)
+  .openapi(registerRouteDoc, registerHandler)
+  .openapi(logoutRouteDoc, logoutHandler)
+  .openapi(refreshTokenRouteDoc, refreshTokenHandler)
+
+export default authRoute

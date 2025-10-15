@@ -1,9 +1,11 @@
 import { ok } from '@/lib/response'
-import { HealthRoute } from '@/routes/health.route'
+import { healthRouteDoc } from '@/routes/health.route'
 import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
 
-export const healthCheckHandler: AppRouteHandler<HealthRoute> = async (c) => {
+export const healthCheckHandler: AppRouteHandler<healthRouteDoc> = async (
+  c,
+) => {
   return c.json(
     ok(
       { up: true, ts: dayjs().toISOString() },

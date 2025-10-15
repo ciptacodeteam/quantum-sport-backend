@@ -4,14 +4,16 @@ import duration from 'dayjs/plugin/duration'
 
 import configureOpenAPI from './lib/configure-openapi'
 import createApp from './lib/create-app'
-
-import { healthRoute, homeRoute, phoneRoute } from './routes'
+import authRoute from './routes/auth.route'
+import healthRoute from './routes/health.route'
+import homeRoute from './routes/home.route'
+import phoneVerificationRoute from './routes/phone.route'
 
 dayjs.extend(duration).locale('id')
 
 const app = createApp()
 
-const routes = [homeRoute, healthRoute, phoneRoute]
+const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]
 
 configureOpenAPI(app)
 

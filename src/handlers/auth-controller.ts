@@ -4,13 +4,19 @@ import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { generateJwtToken, generateRefreshToken } from '@/lib/token'
 import { formatPhone } from '@/lib/utils'
+import {
+  LoginRouteDoc,
+  LogoutRouteDoc,
+  RefreshTokenRouteDoc,
+  RegisterRouteDoc,
+} from '@/routes/auth.route'
 import { validateOtp } from '@/services/otp-service'
-import { AppContext } from '@/types'
+import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
-export async function loginHandler(c) {
+export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
   try {
     const validated = c.req.valid('json')
     const { phone, code, requestId } = validated
@@ -96,7 +102,7 @@ export async function loginHandler(c) {
   }
 }
 
-export async function registerHandler(c) {
+export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
   try {
     const validated = c.req.valid('json')
     const { phone, code, requestId } = validated
@@ -182,6 +188,7 @@ export async function registerHandler(c) {
         },
         'Registration successful',
       ),
+      status.CREATED,
     )
   } catch (err) {
     c.var.logger.fatal(`Error during registration: ${err}`)
@@ -189,7 +196,7 @@ export async function registerHandler(c) {
   }
 }
 
-export async function logoutHandler(c: AppContext) {
+export const logoutHandler: AppRouteHandler<LogoutRouteDoc> = async (c) => {
   try {
     const user = c.get('user')
     const token = getCookie(c, 'token')
@@ -218,7 +225,9 @@ export async function logoutHandler(c: AppContext) {
   }
 }
 
-export async function refreshTokenHandler(c) {
+export const refreshTokenHandler: AppRouteHandler<
+  RefreshTokenRouteDoc
+> = async (c) => {
   try {
     const refreshToken = getCookie(c, 'refreshToken')
 

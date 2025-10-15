@@ -1,7 +1,7 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
 import { db } from '@/lib/prisma'
 import { validateToken } from '@/lib/token'
-import { AppEnv } from '@/types'
+import { AppBinding, AppMiddleware } from '@/types'
 import { Role } from 'generated/prisma'
 import { Context, Next } from 'hono'
 import { deleteCookie } from 'hono/cookie'
@@ -12,8 +12,8 @@ type SessionData = {
   role: Role
 }
 
-export const globalAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  const authorization = c.req.header('authorization') as string | undefined
+export const globalAuthMiddleware: AppMiddleware = async (c, next) => {
+  const authorization = c.req.header('Authorization') as string | undefined
   const token = authorization?.replace('Bearer ', '')
 
   if (!token) {
@@ -49,7 +49,7 @@ export const globalAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   return next()
 }
 
-export const requireAuth = async (c: Context<AppEnv>, next: Next) => {
+export const requireAuth: AppMiddleware = async (c, next) => {
   const user = c.get('user')
 
   if (!user) {
@@ -59,25 +59,25 @@ export const requireAuth = async (c: Context<AppEnv>, next: Next) => {
   return next()
 }
 
-export const requireAdmin = async (c: Context<AppEnv>, next: Next) => {
+export const requireAdmin: AppMiddleware = async (c, next) => {
   return requireRole('ADMIN')(c, next)
 }
 
-export const requireUser = async (c: Context<AppEnv>, next: Next) => {
+export const requireUser: AppMiddleware = async (c, next) => {
   return requireRole('USER')(c, next)
 }
 
-export const requireCoach = async (c: Context<AppEnv>, next: Next) => {
+export const requireCoach: AppMiddleware = async (c, next) => {
   return requireRole('COACH')(c, next)
 }
 
-export const requireBallboy = async (c: Context<AppEnv>, next: Next) => {
+export const requireBallboy: AppMiddleware = async (c, next) => {
   return requireRole('BALLBOY')(c, next)
 }
 
 // You can add more role-based middlewares as needed
 export const requireRole = (role: Role) => {
-  return async (c: Context<AppEnv>, next: Next) => {
+  return async (c: Context<AppBinding>, next: Next) => {
     const user = c.get('user')
 
     if (!user) {

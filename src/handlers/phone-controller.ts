@@ -4,8 +4,8 @@ import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { formatPhone, generateOtp } from '@/lib/utils'
 import {
-  SendPhoneVerificationOtpRoute,
-  VerifyPhoneOtpRoute,
+  SendPhoneVerificationOtpRouteDoc,
+  VerifyPhoneOtpRouteDoc,
 } from '@/routes/phone.route'
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone-service'
 import { AppRouteHandler } from '@/types'
@@ -13,7 +13,7 @@ import dayjs from 'dayjs'
 import status from 'http-status'
 
 export const sendPhoneVerificationOtp: AppRouteHandler<
-  SendPhoneVerificationOtpRoute
+  SendPhoneVerificationOtpRouteDoc
 > = async (c) => {
   try {
     const validated = c.req.valid('json')
@@ -70,7 +70,7 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
 }
 
 export const verifyPhoneVerificationOtp: AppRouteHandler<
-  VerifyPhoneOtpRoute
+  VerifyPhoneOtpRouteDoc
 > = async (c) => {
   try {
     const validated = c.req.valid('json')
