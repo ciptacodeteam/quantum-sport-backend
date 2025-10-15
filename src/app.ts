@@ -4,6 +4,7 @@ import duration from 'dayjs/plugin/duration'
 
 import configureOpenAPI from './lib/configure-openapi'
 import createApp from './lib/create-app'
+import adminAuthRoute from './routes/admin/auth.route'
 import adminHomeRoute from './routes/admin/home.route'
 import authRoute from './routes/auth.route'
 import healthRoute from './routes/health.route'
@@ -17,7 +18,8 @@ const app = createApp()
 // ADD NEW ROUTES HERE
 const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]
 
-const adminRoutes = [adminHomeRoute]
+// ADD NEW ADMIN ROUTES HERE
+const adminRoutes = [adminHomeRoute, adminAuthRoute]
 
 configureOpenAPI(app)
 

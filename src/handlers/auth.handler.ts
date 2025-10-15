@@ -24,7 +24,7 @@ import {
 import { validateOtp } from '@/services/otp.service'
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { getFilePath } from '@/services/upload.service'
-import { AppRouteHandler } from '@/types'
+import { AppRouteHandler, UserTokenPayload } from '@/types'
 import dayjs from 'dayjs'
 import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -80,11 +80,11 @@ export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
     const token = await generateJwtToken({
       id: existingUser.id,
       phone: existingUser.phone,
-    })
+    } as UserTokenPayload)
     const refreshToken = await generateRefreshToken({
       id: existingUser.id,
       phone: existingUser.phone,
-    })
+    } as UserTokenPayload)
 
     await db.authToken.create({
       data: {
@@ -163,13 +163,13 @@ export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
       }
 
       const token = await generateJwtToken({
-        userId: user.id,
+        id: user.id,
         phone: user.phone,
-      })
+      } as UserTokenPayload)
       const refreshToken = await generateRefreshToken({
-        userId: user.id,
+        id: user.id,
         phone: user.phone,
-      })
+      } as UserTokenPayload)
 
       await tx.authToken.create({
         data: {
@@ -296,11 +296,11 @@ export const refreshTokenHandler: AppRouteHandler<
     const newToken = await generateJwtToken({
       id: authToken.user.id,
       phone: authToken.user.phone,
-    })
+    } as UserTokenPayload)
     const newRefreshToken = await generateRefreshToken({
       id: authToken.user.id,
       phone: authToken.user.phone,
-    })
+    } as UserTokenPayload)
 
     await db.authToken.update({
       where: { id: authToken.id },

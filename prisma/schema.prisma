@@ -75,7 +75,7 @@ model Staff {
   image     String?
   name      String
   email     String   @unique
-  phone     String   @unique
+  phone     String?  @unique
   password  String
   isActive  Boolean  @default(true)
   joinedAt  DateTime @default(now())

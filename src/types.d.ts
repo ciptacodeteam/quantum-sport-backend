@@ -8,8 +8,10 @@ type UserTokenPayload = {
   phone: string
 }
 
-type AdminTokenPayload = UserTokenPayload & {
+type AdminTokenPayload = Omit<UserTokenPayload, 'phone'> & {
   role: Role
+  email: string
+  phone?: string
 }
 
 type AppBinding = {
