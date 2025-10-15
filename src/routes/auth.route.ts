@@ -1,5 +1,6 @@
 import {
   forgotPasswordHandler,
+  getProfileHandler,
   loginHandler,
   loginWithEmailHandler,
   logoutHandler,
@@ -23,6 +24,7 @@ import createErrorSchema from '@/helpers/schema/create-error-schema'
 import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'
 import { createRoute } from '@hono/zod-openapi'
+import dayjs from 'dayjs'
 import status from 'http-status'
 
 const loginRouteDoc = createRoute({
@@ -295,6 +297,56 @@ const loginWithEmailRouteDoc = createRoute({
 
 export type LoginWithEmailRouteDoc = typeof loginWithEmailRouteDoc
 
+const profileRouteDoc = createRoute({
+  path: '/profile',
+  method: 'get',
+  summary: 'Get User Profile',
+  description: 'Retrieve the user profile information',
+  tags: ['Authentication'],
+  middleware: [requireAuth],
+  request: {
+    cookies: authTokenCookieSchema,
+  },
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('User profile retrieved successfully', {
+        id: 'user-id',
+        name: 'John Doe',
+        phone: '+621234567890',
+        email: 'john.doe@example.com',
+        image: 'https://example.com/profile.jpg',
+        createdAt: dayjs().toISOString(),
+        updatedAt: dayjs().toISOString(),
+        banned: false,
+        banExpires: null,
+        banReason: null,
+        googleId: null,
+        emailVerified: true,
+        phoneVerified: true,
+      }),
+      'Successful Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.FORBIDDEN]: jsonContent(
+      createMessageObjectSchema('Forbidden', null, 'Detailed error message'),
+      'Forbidden Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type ProfileRouteDoc = typeof profileRouteDoc
+
 const authRoute = createRouter()
   .basePath('/auth')
   .openapi(loginRouteDoc, loginHandler)
@@ -304,5 +356,6 @@ const authRoute = createRouter()
   .openapi(refreshTokenRouteDoc, refreshTokenHandler)
   .openapi(forgotPasswordRouteDoc, forgotPasswordHandler)
   .openapi(resetPasswordRouteDoc, resetPasswordHandler)
+  .openapi(profileRouteDoc, getProfileHandler)
 
 export default authRoute

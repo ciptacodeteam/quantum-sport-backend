@@ -1,4 +1,4 @@
-import { FAZPASS_GATEWAY_KEY } from '../phone-service'
+import { FAZPASS_GATEWAY_KEY } from '../phone.service'
 
 export class GenerateOTPPayload {
   constructor(

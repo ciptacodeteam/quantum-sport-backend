@@ -16,12 +16,14 @@ import {
   LoginRouteDoc,
   LoginWithEmailRouteDoc,
   LogoutRouteDoc,
+  ProfileRouteDoc,
   RefreshTokenRouteDoc,
   RegisterRouteDoc,
   ResetPasswordRouteDoc,
 } from '@/routes/auth.route'
-import { validateOtp } from '@/services/otp-service'
-import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone-service'
+import { validateOtp } from '@/services/otp.service'
+import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
+import { getFilePath } from '@/services/upload.service'
 import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
 import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
@@ -543,6 +545,63 @@ export const loginWithEmailHandler: AppRouteHandler<
     return c.json(ok(null, 'Login successful'))
   } catch (err) {
     c.var.logger.fatal(`Error during login with email: ${err}`)
+    throw err
+  }
+}
+
+export const getProfileHandler: AppRouteHandler<ProfileRouteDoc> = async (
+  c,
+) => {
+  try {
+    const user = c.get('user')
+
+    if (!user || !user.id) {
+      throw new UnauthorizedException()
+    }
+
+    const existingUser = await db.user.findUnique({
+      where: { id: user.id },
+      omit: {
+        password: true,
+      },
+    })
+
+    if (!existingUser) {
+      throw new UnauthorizedException()
+    }
+
+    if (existingUser.banExpires && dayjs().isAfter(existingUser.banExpires)) {
+      // Lift the ban if the ban period has expired
+      await db.user.update({
+        where: { id: user.id },
+        data: {
+          banned: false,
+          banExpires: null,
+          banReason: null,
+        },
+      })
+    }
+
+    if (existingUser.banned) {
+      return c.json(
+        err(
+          `Your account has been banned. Reason: ${existingUser.banReason}`,
+          status.FORBIDDEN,
+        ),
+        status.FORBIDDEN,
+      )
+    }
+
+    if (existingUser.image) {
+      existingUser.image = await getFilePath(existingUser.image)
+    }
+
+    return c.json(
+      ok(existingUser, 'User profile retrieved successfully'),
+      status.OK,
+    )
+  } catch (err) {
+    c.var.logger.fatal(`Error fetching user profile: ${err}`)
     throw err
   }
 }

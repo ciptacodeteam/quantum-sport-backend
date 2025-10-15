@@ -6,7 +6,7 @@ import {
   SendOTPResponse,
   VerifyOTPPayload,
   VerifyOTPResponse,
-} from './dto/phone-service.dto'
+} from './dto/phone.service.dto'
 
 export const FAZPASS_API_URL = env.fazpassApiUrl
 export const FAZPASS_MERCHANT_KEY = env.fazpassMerchantKey

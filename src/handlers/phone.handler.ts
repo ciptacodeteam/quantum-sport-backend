@@ -7,9 +7,10 @@ import {
   SendPhoneVerificationOtpRouteDoc,
   VerifyPhoneOtpRouteDoc,
 } from '@/routes/phone.route'
-import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone-service'
+import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
+import { PhoneVerificationType } from 'generated/prisma'
 import status from 'http-status'
 
 export const sendPhoneVerificationOtp: AppRouteHandler<
@@ -44,6 +45,7 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
         requestId,
         code,
         isUsed: false,
+        type: PhoneVerificationType.VERIFY_PHONE,
         expiresAt: dayjs().add(5, 'minute').toDate(),
       },
       create: {
@@ -51,6 +53,7 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
         phone: formattedPhone,
         code,
         isUsed: false,
+        type: PhoneVerificationType.VERIFY_PHONE,
         expiresAt: dayjs().add(5, 'minute').toDate(),
       },
     })
