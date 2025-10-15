@@ -482,16 +482,16 @@ export const loginWithEmailHandler: AppRouteHandler<
     if (!existingUser) {
       c.var.logger.error(`No user found with email: ${email}`)
       return c.json(
-        err('Email or password is incorrect', status.BAD_REQUEST),
-        status.BAD_REQUEST,
+        err('Email or password is incorrect', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
       )
     }
 
     if (!existingUser.password) {
       c.var.logger.error(`User with email ${email} has no password set`)
       return c.json(
-        err('Email or password is incorrect', status.BAD_REQUEST),
-        status.BAD_REQUEST,
+        err('Email or password is incorrect', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
       )
     }
 
