@@ -51,11 +51,11 @@ export async function sendPhoneOtp(
 }
 
 export async function verifyPhoneOtp(
-  otpId: string,
+  requestId: string,
   otp: string,
 ): Promise<boolean> {
   try {
-    const payload = new VerifyOTPPayload(otpId, otp).toJson()
+    const payload = new VerifyOTPPayload(requestId, otp).toJson()
 
     const response = await axios.post(VERIFY_OTP_URL, payload, {
       headers: {

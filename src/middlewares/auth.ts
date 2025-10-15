@@ -1,37 +1,39 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
 import { validateToken } from '@/lib/token'
-import { AppBinding, AppMiddleware } from '@/types'
+import { AdminTokenPayload, AppBinding, AppMiddleware } from '@/types'
 import { Role } from 'generated/prisma'
 import { Context, Next } from 'hono'
-import { deleteCookie } from 'hono/cookie'
-
-type SessionData = {
-  id: string
-  phone: string
-  role: Role
-}
+import { deleteCookie, getCookie } from 'hono/cookie'
 
 export const globalAuthMiddleware: AppMiddleware = async (c, next) => {
-  const authorization = c.req.header('Authorization') as string | undefined
-  const token = authorization?.replace('Bearer ', '')
+  const token = getCookie(c, 'token') as string | undefined
+  c.var.logger.debug(`Global auth middleware - token: ${token}`)
 
   if (!token) {
     c.set('user', null)
 
+    deleteCookie(c, 'token')
     deleteCookie(c, 'refreshToken')
 
     return next()
   }
 
   const session = await validateToken(token)
-  const user = session?.data as SessionData | null
+  const user = session?.data as AdminTokenPayload | null
 
   if (!user?.id) {
     c.set('user', null)
 
+    deleteCookie(c, 'token')
     deleteCookie(c, 'refreshToken')
 
     return next()
+  }
+
+  c.set('admin', null)
+
+  if (user && user?.role) {
+    c.set('admin', user)
   }
 
   c.set('user', user)
@@ -49,12 +51,18 @@ export const requireAuth: AppMiddleware = async (c, next) => {
   return next()
 }
 
-export const requireAdmin: AppMiddleware = async (c, next) => {
-  return requireRole('ADMIN')(c, next)
+export const requireAdminAuth: AppMiddleware = async (c, next) => {
+  const admin = c.get('admin')
+
+  if (!admin || !admin.role) {
+    throw new UnauthorizedException()
+  }
+
+  return next()
 }
 
-export const requireUser: AppMiddleware = async (c, next) => {
-  return requireRole('USER')(c, next)
+export const requireAdmin: AppMiddleware = async (c, next) => {
+  return requireRole('ADMIN')(c, next)
 }
 
 export const requireCoach: AppMiddleware = async (c, next) => {
@@ -68,13 +76,13 @@ export const requireBallboy: AppMiddleware = async (c, next) => {
 // You can add more role-based middlewares as needed
 export const requireRole = (role: Role) => {
   return async (c: Context<AppBinding>, next: Next) => {
-    const user = c.get('user')
+    const admin = c.get('admin')
 
-    if (!user) {
+    if (!admin) {
       throw new UnauthorizedException()
     }
 
-    if (user.role !== role) {
+    if (admin.role !== role) {
       throw new ForbiddenException()
     }
 

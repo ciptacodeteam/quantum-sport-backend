@@ -2,7 +2,12 @@ import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
-import { generateJwtToken, generateRefreshToken } from '@/lib/token'
+import {
+  generateJwtToken,
+  generateRefreshToken,
+  validateRefreshToken,
+  validateToken,
+} from '@/lib/token'
 import { formatPhone } from '@/lib/utils'
 import {
   LoginRouteDoc,
@@ -11,8 +16,10 @@ import {
   RegisterRouteDoc,
 } from '@/routes/auth.route'
 import { validateOtp } from '@/services/otp-service'
+import { verifyPhoneOtp } from '@/services/phone-service'
 import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
+import { AuthTokenType } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
@@ -37,6 +44,20 @@ export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
 
     const validOtp = await validateOtp(formattedPhone, requestId, code)
 
+    if (env.nodeEnv === 'production') {
+      const successVerifyOtp = await verifyPhoneOtp(requestId, code)
+
+      if (!successVerifyOtp) {
+        c.var.logger.error(
+          `Failed to verify OTP for phone number: ${formattedPhone}`,
+        )
+        return c.json(
+          err('Failed to verify OTP', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
+    }
+
     // Mark the OTP as used
     await db.phoneVerification.update({
       where: {
@@ -51,51 +72,35 @@ export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
     const token = await generateJwtToken({
       id: existingUser.id,
       phone: existingUser.phone,
-      role: existingUser.role,
     })
     const refreshToken = await generateRefreshToken({
       id: existingUser.id,
       phone: existingUser.phone,
-      role: existingUser.role,
     })
 
-    await db.authToken.upsert({
-      where: {
+    await db.authToken.create({
+      data: {
         userId: existingUser.id,
-      },
-      update: {
-        token: token,
+        type: AuthTokenType.USER,
         refreshToken: refreshToken,
-        tokenExpiresAt: dayjs().add(Number(env.jwt.expires), 'days').toDate(),
-        refreshExpiresAt: dayjs()
-          .add(Number(env.jwt.refreshExpires), 'days')
-          .toDate(),
-      },
-      create: {
-        userId: existingUser.id,
-        token: token,
-        refreshToken: refreshToken,
-        tokenExpiresAt: dayjs().add(Number(env.jwt.expires), 'days').toDate(),
         refreshExpiresAt: dayjs()
           .add(Number(env.jwt.refreshExpires), 'days')
           .toDate(),
       },
     })
 
+    setCookie(c, 'token', token, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
     setCookie(c, 'refreshToken', refreshToken, {
       httpOnly: true,
       secure: env.nodeEnv === 'production',
       sameSite: 'Lax',
     })
 
-    return c.json(
-      ok(
-        {
-          token,
-        },
-        'Login successful',
-      ),
-    )
+    return c.json(ok(null, 'Login successful'))
   } catch (err) {
     c.var.logger.fatal(`Error during login: ${err}`)
     throw err
@@ -109,7 +114,7 @@ export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
 
     const formattedPhone = await formatPhone(phone)
 
-    const token = await db.$transaction(async (tx) => {
+    const { token, refreshToken } = await db.$transaction(async (tx) => {
       const existingUser = await tx.user.findUnique({
         where: { phone: formattedPhone },
       })
@@ -138,7 +143,6 @@ export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
         data: {
           phone: formattedPhone,
           name: 'New User', // Default name, you might want to change this
-          role: 'USER', // Default role, adjust as necessary
         },
       })
 
@@ -152,44 +156,41 @@ export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
       const token = await generateJwtToken({
         userId: user.id,
         phone: user.phone,
-        role: user.role,
       })
       const refreshToken = await generateRefreshToken({
         userId: user.id,
         phone: user.phone,
-        role: user.role,
       })
 
       await tx.authToken.create({
         data: {
           userId: user.id,
-          token: token,
+          type: AuthTokenType.USER,
           refreshToken: refreshToken,
-          tokenExpiresAt: dayjs().add(Number(env.jwt.expires), 'days').toDate(),
           refreshExpiresAt: dayjs()
             .add(Number(env.jwt.refreshExpires), 'days')
             .toDate(),
         },
       })
 
-      setCookie(c, 'refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: env.nodeEnv === 'production',
-        sameSite: 'Lax',
-      })
-
-      return token
+      return {
+        token,
+        refreshToken,
+      }
     })
 
-    return c.json(
-      ok(
-        {
-          token,
-        },
-        'Registration successful',
-      ),
-      status.CREATED,
-    )
+    setCookie(c, 'token', token, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
+    setCookie(c, 'refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
+
+    return c.json(ok(null, 'Registration successful'), status.CREATED)
   } catch (err) {
     c.var.logger.fatal(`Error during registration: ${err}`)
     throw err
@@ -229,9 +230,37 @@ export const refreshTokenHandler: AppRouteHandler<
   RefreshTokenRouteDoc
 > = async (c) => {
   try {
+    const token = getCookie(c, 'token')
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
+      throw new UnauthorizedException()
+    }
+
+    // If the token is still valid, no need to refresh
+    if (token) {
+      const validatedToken = await validateToken(token)
+
+      if (validatedToken) {
+        setCookie(c, 'token', token, {
+          httpOnly: true,
+          secure: env.nodeEnv === 'production',
+          sameSite: 'Lax',
+        })
+
+        setCookie(c, 'refreshToken', refreshToken, {
+          httpOnly: true,
+          secure: env.nodeEnv === 'production',
+          sameSite: 'Lax',
+        })
+
+        return c.json(ok(null, 'Token is still valid'))
+      }
+    }
+
+    const validRefreshToken = await validateRefreshToken(refreshToken)
+
+    if (!validRefreshToken) {
       throw new UnauthorizedException()
     }
 
@@ -245,6 +274,7 @@ export const refreshTokenHandler: AppRouteHandler<
     }
 
     if (dayjs().isAfter(authToken.refreshExpiresAt)) {
+      deleteCookie(c, 'token')
       deleteCookie(c, 'refreshToken')
 
       await db.authToken.deleteMany({
@@ -257,42 +287,38 @@ export const refreshTokenHandler: AppRouteHandler<
     const newToken = await generateJwtToken({
       id: authToken.user.id,
       phone: authToken.user.phone,
-      role: authToken.user.role,
     })
     const newRefreshToken = await generateRefreshToken({
       id: authToken.user.id,
       phone: authToken.user.phone,
-      role: authToken.user.role,
     })
 
     await db.authToken.update({
-      where: { userId: authToken.user.id },
+      where: { id: authToken.id },
       data: {
-        token: newToken,
+        type: AuthTokenType.USER,
         refreshToken: newRefreshToken,
-        tokenExpiresAt: dayjs().add(Number(env.jwt.expires), 'days').toDate(),
         refreshExpiresAt: dayjs()
           .add(Number(env.jwt.refreshExpires), 'days')
           .toDate(),
       },
     })
 
+    deleteCookie(c, 'token')
     deleteCookie(c, 'refreshToken')
 
+    setCookie(c, 'token', newToken, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
     setCookie(c, 'refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: env.nodeEnv === 'production',
       sameSite: 'Lax',
     })
 
-    return c.json(
-      ok(
-        {
-          token: newToken,
-        },
-        'Token refreshed',
-      ),
-    )
+    return c.json(ok(null, 'Token refreshed'))
   } catch (err) {
     c.var.logger.fatal(`Error during token refresh: ${err}`)
     throw err

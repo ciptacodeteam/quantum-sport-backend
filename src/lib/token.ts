@@ -14,8 +14,9 @@ export async function generateJwtToken(payloadData: Record<string, any>) {
       exp: now.add(Number(env.jwt.expires), 'days').unix(),
       data: payloadData,
     }
+    log.debug(`Generating JWT token with payload: ${JSON.stringify(payload)}`)
     const token = await sign(payload, secret)
-    console.log(token)
+    log.debug(`Generated JWT token: ${token}`)
     return token
   } catch (err) {
     log.fatal(`Error generating JWT token: ${err}`)
@@ -35,7 +36,11 @@ export async function generateRefreshToken(payloadData: Record<string, any>) {
       type: 'refresh',
       data: payloadData,
     }
+    log.debug(
+      `Generating refresh token with payload: ${JSON.stringify(payload)}`,
+    )
     const token = await sign(payload, secret)
+    log.debug(`Generated refresh token: ${token}`)
     return token
   } catch (err) {
     log.fatal(`Error generating refresh token: ${err}`)
@@ -46,8 +51,9 @@ export async function generateRefreshToken(payloadData: Record<string, any>) {
 export async function validateToken(token: string) {
   try {
     const secret = env.jwt.secret
+    log.debug(`Validating JWT token: ${token}`)
     const payload = await verify(token, secret)
-    console.log('🚀 ~ validateToken ~ payload:', payload)
+    log.debug(`Validated JWT token with payload: ${JSON.stringify(payload)}`)
     return payload
   } catch (err) {
     log.error(`Invalid JWT token: ${err}`)
@@ -58,7 +64,11 @@ export async function validateToken(token: string) {
 export async function validateRefreshToken(token: string) {
   try {
     const secret = env.jwt.secret
+    log.debug(`Validating refresh token: ${token}`)
     const payload = await verify(token, secret)
+    log.debug(
+      `Validated refresh token with payload: ${JSON.stringify(payload)}`,
+    )
     if (payload && payload.type === 'refresh') {
       return payload
     }

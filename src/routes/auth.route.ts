@@ -5,12 +5,11 @@ import {
   registerHandler,
 } from '@/handlers/auth.handler'
 import {
-  authorizationHeaderSchema,
+  authTokenCookieSchema,
   loginSchema,
-  refreshTokenCookieSchema,
   registerSchema,
 } from '@/lib/validation'
-import { requireAuth } from '@/middlewares/authentication'
+import { requireAuth } from '@/middlewares/auth'
 
 import jsonContent from '@/helpers/json-content'
 import jsonContentRequired from '@/helpers/json-content-required'
@@ -21,7 +20,7 @@ import { createRoute } from '@hono/zod-openapi'
 import status from 'http-status'
 
 const loginRouteDoc = createRoute({
-  path: '/auth/login',
+  path: '/login',
   method: 'post',
   summary: 'Phone Login',
   description: 'Login route using phone number after OTP verification',
@@ -32,18 +31,16 @@ const loginRouteDoc = createRoute({
   responses: {
     [status.OK]: {
       ...jsonContent(
-        createMessageObjectSchema('Login successful', {
-          token: 'jwt-token',
-        }),
+        createMessageObjectSchema('Login successful'),
         'Successful Response',
       ),
       headers: {
         'Set-Cookie': {
-          description: 'Set refresh token authentication cookie',
+          description: 'Set authentication cookies (token and refreshToken)',
           schema: {
             type: 'string',
             example:
-              'refreshToken=token-value; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict',
+              'token=jwt-token; HttpOnly; Path=/; Max-Age=3600; SameSite=Strict, refreshToken=token-value; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict',
           },
         },
       },
@@ -70,7 +67,7 @@ const loginRouteDoc = createRoute({
 export type LoginRouteDoc = typeof loginRouteDoc
 
 const registerRouteDoc = createRoute({
-  path: '/auth/register',
+  path: '/register',
   method: 'post',
   summary: 'User Registration',
   description: 'Register a new user with phone number after OTP verification',
@@ -88,11 +85,11 @@ const registerRouteDoc = createRoute({
       ),
       headers: {
         'Set-Cookie': {
-          description: 'Set refresh token authentication cookie',
+          description: 'Set authentication cookies (token and refreshToken)',
           schema: {
             type: 'string',
             example:
-              'refreshToken=token-value; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict',
+              'token=jwt-token; HttpOnly; Path=/; Max-Age=3600; SameSite=Strict, refreshToken=token-value; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict',
           },
         },
       },
@@ -119,14 +116,13 @@ const registerRouteDoc = createRoute({
 export type RegisterRouteDoc = typeof registerRouteDoc
 
 const logoutRouteDoc = createRoute({
-  path: '/auth/logout',
+  path: '/logout',
   method: 'post',
   summary: 'User Logout',
   description: 'Logout a user',
   tags: ['Authentication'],
   request: {
-    headers: authorizationHeaderSchema,
-    cookies: refreshTokenCookieSchema,
+    cookies: authTokenCookieSchema,
   },
   middleware: [requireAuth],
   responses: {
@@ -152,14 +148,13 @@ const logoutRouteDoc = createRoute({
 export type LogoutRouteDoc = typeof logoutRouteDoc
 
 const refreshTokenRouteDoc = createRoute({
-  path: '/auth/refresh',
+  path: '/refresh',
   method: 'post',
   summary: 'Refresh Token',
   description: 'Refresh the access token using the refresh token',
   tags: ['Authentication'],
   request: {
-    headers: authorizationHeaderSchema,
-    cookies: refreshTokenCookieSchema,
+    cookies: authTokenCookieSchema,
   },
   middleware: [requireAuth],
   responses: {
@@ -187,6 +182,7 @@ const refreshTokenRouteDoc = createRoute({
 export type RefreshTokenRouteDoc = typeof refreshTokenRouteDoc
 
 const authRoute = createRouter()
+  .basePath('/auth')
   .openapi(loginRouteDoc, loginHandler)
   .openapi(registerRouteDoc, registerHandler)
   .openapi(logoutRouteDoc, logoutHandler)

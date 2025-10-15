@@ -23,7 +23,6 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
-  role       Role      @default(USER)
   banned     Boolean?  @default(false)
   banReason  String?
   banExpires DateTime?
@@ -51,15 +50,41 @@ model PhoneVerification {
   @@map("phone_verification")
 }
 
-model AuthToken {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  refreshToken     String   @unique
-  refreshExpiresAt DateTime
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @default(now()) @updatedAt
+enum AuthTokenType {
+  STAFF
+  USER
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Staff {
+  id        String   @id @default(cuid())
+  image     String?
+  name      String
+  email     String   @unique
+  phone     String   @unique
+  password  String
+  isActive  Boolean  @default(true)
+  joinedAt  DateTime @default(now())
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  authTokens AuthToken[]
+
+  @@map("staff")
+}
+
+model AuthToken {
+  id               String        @id @default(cuid())
+  userId           String?
+  staffId          String?
+  type             AuthTokenType @default(USER)
+  refreshToken     String        @unique
+  refreshExpiresAt DateTime
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @default(now()) @updatedAt
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staff Staff? @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@map("auth_token")
 }
@@ -68,5 +93,16 @@ enum Role {
   ADMIN
   BALLBOY
   COACH
-  USER
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  quantity    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("inventory_item")
 }

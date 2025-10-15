@@ -13,7 +13,7 @@ import { createRoute } from '@hono/zod-openapi'
 import status from 'http-status'
 
 const sendPhoneVerificationOtpRouteDoc = createRoute({
-  path: '/send-otp',
+  path: '/phone/send-otp',
   method: 'post',
   summary: 'Send Phone Verification OTP',
   description: 'Send Phone Verification OTP route',
@@ -48,7 +48,7 @@ export type SendPhoneVerificationOtpRouteDoc =
   typeof sendPhoneVerificationOtpRouteDoc
 
 const verifyPhoneOtpRouteDoc = createRoute({
-  path: '/verify-otp',
+  path: '/phone/verify-otp',
   method: 'post',
   summary: 'Verify Phone OTP',
   description: 'Verify Phone OTP route',

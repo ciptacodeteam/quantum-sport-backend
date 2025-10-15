@@ -4,11 +4,8 @@ export const phoneSchema = z.object({
   phone: z.string().min(10).max(15),
 })
 
-export const authorizationHeaderSchema = z.object({
-  authorization: z.string().min(1).describe('Bearer token'),
-})
-
-export const refreshTokenCookieSchema = z.object({
+export const authTokenCookieSchema = z.object({
+  token: z.string().min(10).describe('Access token'),
   refreshToken: z.string().min(10).describe('Refresh token'),
 })
 

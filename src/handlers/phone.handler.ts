@@ -24,7 +24,7 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
     c.var.logger.info(`Sending phone OTP to ${formattedPhone}`)
 
     let code = DEFAULT_OTP_CODE
-    let requestId = Math.random().toString(36).substring(2, 15)
+    let requestId = Math.random().toString(36).substring(2, 30)
 
     if (env.nodeEnv === 'production') {
       code = await generateOtp(OTP_LENGTH)
@@ -58,10 +58,7 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
     c.var.logger.info(`OTP sent to ${formattedPhone}, requestId: ${requestId}`)
 
     return c.json(
-      ok(
-        { phone: formattedPhone, requestId: requestId },
-        'OTP sent successfully',
-      ),
+      ok({ phone: formattedPhone, requestId }, 'OTP sent successfully'),
     )
   } catch (err) {
     c.var.logger.fatal(`Error sending phone OTP: ${err}`)
