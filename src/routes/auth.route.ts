@@ -264,7 +264,7 @@ const authRoute = createRouter()
   .openapi(registerRouteDoc, registerHandler)
   .openapi(logoutRouteDoc, logoutHandler)
   .openapi(refreshTokenRouteDoc, refreshTokenHandler)
-  .openapi(forgotPasswordRouteDoc, forgotPasswordHandler) // To be implemented
-  .openapi(resetPasswordRouteDoc, resetPasswordHandler) // To be implemented
+  .openapi(forgotPasswordRouteDoc, forgotPasswordHandler)
+  .openapi(resetPasswordRouteDoc, resetPasswordHandler)
 
 export default authRoute
