@@ -3,7 +3,7 @@ import {
   logoutHandler,
   refreshTokenHandler,
   registerHandler,
-} from '@/controllers/auth-controller'
+} from '@/handlers/auth-controller'
 import { loginSchema, registerSchema } from '@/lib/validation'
 import { requireAuth } from '@/middlewares/authentication'
 import { zValidator } from '@hono/zod-validator'

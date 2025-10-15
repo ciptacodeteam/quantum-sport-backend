@@ -1,9 +1,9 @@
 import { ok } from '@/lib/response'
-import { AppEnv } from '@/types'
+import { HealthRoute } from '@/routes/health.route'
+import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
-import { Context } from 'hono'
 
-export async function getApiHealth(c: Context<AppEnv>) {
+export const healthCheckHandler: AppRouteHandler<HealthRoute> = async (c) => {
   return c.json(
     ok(
       { up: true, ts: dayjs().toISOString() },

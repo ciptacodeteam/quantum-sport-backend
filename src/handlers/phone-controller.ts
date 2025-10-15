@@ -3,11 +3,18 @@ import { env } from '@/env'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { formatPhone, generateOtp } from '@/lib/utils'
+import {
+  SendPhoneVerificationOtpRoute,
+  VerifyPhoneOtpRoute,
+} from '@/routes/phone.route'
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone-service'
+import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
 import status from 'http-status'
 
-export async function sendPhoneVerificationOtp(c): Promise<Response> {
+export const sendPhoneVerificationOtp: AppRouteHandler<
+  SendPhoneVerificationOtpRoute
+> = async (c) => {
   try {
     const validated = c.req.valid('json')
     const phone = validated.phone
@@ -62,7 +69,9 @@ export async function sendPhoneVerificationOtp(c): Promise<Response> {
   }
 }
 
-export async function verifyPhoneVerificationOtp(c) {
+export const verifyPhoneVerificationOtp: AppRouteHandler<
+  VerifyPhoneOtpRoute
+> = async (c) => {
   try {
     const validated = c.req.valid('json')
     const { phone, code, requestId } = validated

@@ -2,7 +2,7 @@ import { handle } from 'hono/vercel'
 
 import app from '../src/app'
 
-const handler = handle(app as any)
+const handler = handle(app)
 
 export const GET = handler
 export const POST = handler
