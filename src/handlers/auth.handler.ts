@@ -1,7 +1,7 @@
 import { OTP_LENGTH } from '@/constants'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
-import { hashPassword } from '@/lib/password'
+import { hashPassword, verifyPassword } from '@/lib/password'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import {
@@ -14,6 +14,7 @@ import { formatPhone, generateOtp } from '@/lib/utils'
 import {
   ForgotPasswordRouteDoc,
   LoginRouteDoc,
+  LoginWithEmailRouteDoc,
   LogoutRouteDoc,
   RefreshTokenRouteDoc,
   RegisterRouteDoc,
@@ -481,6 +482,87 @@ export const resetPasswordHandler: AppRouteHandler<
     return c.json(ok(null, 'Password reset successful'))
   } catch (err) {
     c.var.logger.fatal(`Error during reset password: ${err}`)
+    throw err
+  }
+}
+
+export const loginWithEmailHandler: AppRouteHandler<
+  LoginWithEmailRouteDoc
+> = async (c) => {
+  try {
+    const validated = c.req.valid('json')
+    const { email, password } = validated
+
+    const existingUser = await db.user.findUnique({
+      where: { email },
+    })
+
+    if (!existingUser) {
+      c.var.logger.error(`No user found with email: ${email}`)
+      return c.json(
+        err('Email or password is incorrect', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    if (!existingUser.password) {
+      c.var.logger.error(`User with email ${email} has no password set`)
+      return c.json(
+        err('Email or password is incorrect', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    // Here you would typically verify the password
+    // For demonstration purposes, we'll assume a function `verifyPassword`
+    const isPasswordValid = await verifyPassword(
+      password,
+      existingUser.password,
+    )
+
+    if (!isPasswordValid) {
+      c.var.logger.error(`Invalid password for email: ${email}`)
+      return c.json(
+        err('Email or password is incorrect', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    // Create a session or JWT token for the user
+    const token = await generateJwtToken({
+      id: existingUser.id,
+      email: existingUser.email!,
+    })
+    const refreshToken = await generateRefreshToken({
+      id: existingUser.id,
+      email: existingUser.email!,
+    })
+
+    await db.authToken.create({
+      data: {
+        userId: existingUser.id,
+        type: AuthTokenType.USER,
+        refreshToken: refreshToken,
+        refreshExpiresAt: dayjs()
+          .add(Number(env.jwt.refreshExpires), 'days')
+          .toDate(),
+      },
+    })
+
+    setCookie(c, 'token', token, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
+    setCookie(c, 'refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
+
+    return c.json(ok(null, 'Login successful'))
+  } catch (err) {
+    c.var.logger.fatal(`Error during login with email: ${err}`)
     throw err
   }
 }

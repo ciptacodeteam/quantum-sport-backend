@@ -1,6 +1,7 @@
 import {
   forgotPasswordHandler,
   loginHandler,
+  loginWithEmailHandler,
   logoutHandler,
   refreshTokenHandler,
   registerHandler,
@@ -10,6 +11,7 @@ import {
   authTokenCookieSchema,
   forgotPasswordSchema,
   loginSchema,
+  loginWithEmailSchema,
   registerSchema,
   resetPasswordSchema,
 } from '@/lib/validation'
@@ -258,10 +260,46 @@ const resetPasswordRouteDoc = createRoute({
 
 export type ResetPasswordRouteDoc = typeof resetPasswordRouteDoc
 
+const loginWithEmailRouteDoc = createRoute({
+  path: '/login/email',
+  method: 'post',
+  summary: 'Login with Email',
+  description: 'Login a user with their email and password',
+  tags: ['Authentication'],
+  request: {
+    body: jsonContentRequired(loginWithEmailSchema, 'Login with Email payload'),
+  },
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('Login successful'),
+      'Successful Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.BAD_REQUEST]: jsonContent(
+      createErrorSchema(loginWithEmailSchema),
+      'Bad Request Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type LoginWithEmailRouteDoc = typeof loginWithEmailRouteDoc
+
 const authRoute = createRouter()
   .basePath('/auth')
   .openapi(loginRouteDoc, loginHandler)
   .openapi(registerRouteDoc, registerHandler)
+  .openapi(loginWithEmailRouteDoc, loginWithEmailHandler)
   .openapi(logoutRouteDoc, logoutHandler)
   .openapi(refreshTokenRouteDoc, refreshTokenHandler)
   .openapi(forgotPasswordRouteDoc, forgotPasswordHandler)
