@@ -1,4 +1,4 @@
-import { getWelcomeMessage } from '@/handlers/home.controller'
+import { getWelcomeMessage } from '@/handlers/home.handler'
 import jsonContent from '@/helpers/json-content'
 import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'

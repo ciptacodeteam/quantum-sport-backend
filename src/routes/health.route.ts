@@ -1,5 +1,5 @@
 import { DATETIME_FORMAT } from '@/constants'
-import { healthCheckHandler } from '@/handlers/health-controller'
+import { healthCheckHandler } from '@/handlers/health.handler'
 import jsonContent from '@/helpers/json-content'
 import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'

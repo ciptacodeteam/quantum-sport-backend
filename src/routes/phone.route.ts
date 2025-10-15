@@ -1,7 +1,7 @@
 import {
   sendPhoneVerificationOtp,
   verifyPhoneVerificationOtp,
-} from '@/handlers/phone-controller'
+} from '@/handlers/phone.handler'
 import { phoneSchema, verifyOtpPayloadSchema } from '@/lib/validation'
 
 import jsonContent from '@/helpers/json-content'

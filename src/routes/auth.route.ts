@@ -3,7 +3,7 @@ import {
   logoutHandler,
   refreshTokenHandler,
   registerHandler,
-} from '@/handlers/auth-controller'
+} from '@/handlers/auth.handler'
 import {
   authorizationHeaderSchema,
   loginSchema,
