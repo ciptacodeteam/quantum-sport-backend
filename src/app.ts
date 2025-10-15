@@ -16,7 +16,7 @@ dayjs.extend(duration).locale('id')
 
 const app = createApp()
 
-app.use('/storage/*', serveStatic({ root: './' }))
+app.use('/storage/*', serveStatic({ root: './src' }))
 
 // ADD NEW ROUTES HERE
 const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]
