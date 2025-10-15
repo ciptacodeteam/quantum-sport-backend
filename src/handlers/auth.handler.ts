@@ -505,8 +505,8 @@ export const loginWithEmailHandler: AppRouteHandler<
     if (!isPasswordValid) {
       c.var.logger.error(`Invalid password for email: ${email}`)
       return c.json(
-        err('Email or password is incorrect', status.BAD_REQUEST),
-        status.BAD_REQUEST,
+        err('Email or password is incorrect', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
       )
     }
 
