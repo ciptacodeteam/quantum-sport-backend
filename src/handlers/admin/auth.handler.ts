@@ -115,14 +115,20 @@ export const adminLoginHandler: AppRouteHandler<AdminLoginRouteDoc> = async (
 
     if (!user) {
       c.var.logger.error(`Login attempt failed for email: ${email}`)
-      return c.json(err('Invalid email or password'), status.UNAUTHORIZED)
+      return c.json(
+        err('Invalid email or password', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
+      )
     }
 
     const isPasswordValid = await verifyPassword(password, user.password)
 
     if (!isPasswordValid) {
       c.var.logger.error(`Login attempt failed for email: ${email}`)
-      return c.json(err('Invalid email or password'), status.UNAUTHORIZED)
+      return c.json(
+        err('Invalid email or password', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
+      )
     }
 
     const token = await generateJwtToken({
