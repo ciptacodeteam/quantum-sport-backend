@@ -1,5 +1,4 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
-import { db } from '@/lib/prisma'
 import { validateToken } from '@/lib/token'
 import { AppBinding, AppMiddleware } from '@/types'
 import { Role } from 'generated/prisma'
@@ -8,7 +7,7 @@ import { deleteCookie } from 'hono/cookie'
 
 type SessionData = {
   id: string
-  email: string
+  phone: string
   role: Role
 }
 
@@ -35,16 +34,7 @@ export const globalAuthMiddleware: AppMiddleware = async (c, next) => {
     return next()
   }
 
-  const userData = await db.user.findUnique({
-    where: { id: user.id },
-  })
-
-  if (!userData) {
-    c.set('user', null)
-    return next()
-  }
-
-  c.set('user', userData)
+  c.set('user', user)
 
   return next()
 }

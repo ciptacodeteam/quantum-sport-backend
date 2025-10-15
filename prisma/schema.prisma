@@ -54,8 +54,6 @@ model PhoneVerification {
 model AuthToken {
   id               String   @id @default(cuid())
   userId           String   @unique
-  token            String   @unique
-  tokenExpiresAt   DateTime
   refreshToken     String   @unique
   refreshExpiresAt DateTime
   createdAt        DateTime @default(now())

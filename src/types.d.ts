@@ -1,11 +1,16 @@
 import { OpenAPIHono, RouteConfig, RouteHandler } from '@hono/zod-openapi'
-import { User } from 'generated/prisma'
 import { Context } from 'hono'
 import type { PinoLogger } from 'hono-pino'
 
+type UserTokenPayload = {
+  id: string
+  phone: string
+  role: string
+}
+
 type AppBinding = {
   Variables: {
-    user: User | null
+    user: UserTokenPayload | null
     logger: PinoLogger
   }
 }
