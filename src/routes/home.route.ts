@@ -1,4 +1,4 @@
-import { getWelcomeMessage } from '@/handlers/home.handler'
+import { getWelcomeMessageHandler } from '@/handlers/home.handler'
 import jsonContent from '@/helpers/json-content'
 import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'
@@ -21,6 +21,6 @@ const homeRouteDoc = createRoute({
 
 export type HomeRouteDoc = typeof homeRouteDoc
 
-const homeRoute = createRouter().openapi(homeRouteDoc, getWelcomeMessage)
+const homeRoute = createRouter().openapi(homeRouteDoc, getWelcomeMessageHandler)
 
 export default homeRoute

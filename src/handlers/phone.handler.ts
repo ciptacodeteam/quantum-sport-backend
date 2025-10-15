@@ -13,7 +13,7 @@ import dayjs from 'dayjs'
 import { PhoneVerificationType } from 'generated/prisma'
 import status from 'http-status'
 
-export const sendPhoneVerificationOtp: AppRouteHandler<
+export const sendPhoneVerificationOtpHandler: AppRouteHandler<
   SendPhoneVerificationOtpRouteDoc
 > = async (c) => {
   try {
@@ -21,6 +21,32 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
     const phone = validated.phone
 
     const formattedPhone = await formatPhone(phone)
+
+    const existingRecord = await db.phoneVerification.findFirst({
+      where: {
+        phone: formattedPhone,
+        isUsed: false,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+
+    if (
+      existingRecord &&
+      dayjs(existingRecord.createdAt).add(1, 'minute') > dayjs()
+    ) {
+      c.var.logger.warn(
+        `OTP already sent recently to ${formattedPhone}, requestId: ${existingRecord.requestId}`,
+      )
+      return c.json(
+        err(
+          'OTP already sent recently. Please wait before requesting a new one.',
+          status.TOO_MANY_REQUESTS,
+        ),
+        status.TOO_MANY_REQUESTS,
+      )
+    }
 
     c.var.logger.info(`Sending phone OTP to ${formattedPhone}`)
 
@@ -69,7 +95,7 @@ export const sendPhoneVerificationOtp: AppRouteHandler<
   }
 }
 
-export const verifyPhoneVerificationOtp: AppRouteHandler<
+export const verifyPhoneVerificationOtpHandler: AppRouteHandler<
   VerifyPhoneOtpRouteDoc
 > = async (c) => {
   try {

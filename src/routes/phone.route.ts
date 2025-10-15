@@ -1,6 +1,6 @@
 import {
-  sendPhoneVerificationOtp,
-  verifyPhoneVerificationOtp,
+  sendPhoneVerificationOtpHandler,
+  verifyPhoneVerificationOtpHandler,
 } from '@/handlers/phone.handler'
 import { phoneSchema, verifyOtpPayloadSchema } from '@/lib/validation'
 
@@ -32,6 +32,14 @@ const sendPhoneVerificationOtpRouteDoc = createRoute({
     [status.BAD_REQUEST]: jsonContent(
       createErrorSchema(phoneSchema),
       'Bad Request Response',
+    ),
+    [status.TOO_MANY_REQUESTS]: jsonContent(
+      createMessageObjectSchema(
+        'Too many requests. Please try again later.',
+        null,
+        'Detailed error message',
+      ),
+      'Too Many Requests Response',
     ),
     [status.INTERNAL_SERVER_ERROR]: jsonContent(
       createMessageObjectSchema(
@@ -79,7 +87,7 @@ const verifyPhoneOtpRouteDoc = createRoute({
 export type VerifyPhoneOtpRouteDoc = typeof verifyPhoneOtpRouteDoc
 
 const phoneVerificationRoute = createRouter()
-  .openapi(sendPhoneVerificationOtpRouteDoc, sendPhoneVerificationOtp)
-  .openapi(verifyPhoneOtpRouteDoc, verifyPhoneVerificationOtp)
+  .openapi(sendPhoneVerificationOtpRouteDoc, sendPhoneVerificationOtpHandler)
+  .openapi(verifyPhoneOtpRouteDoc, verifyPhoneVerificationOtpHandler)
 
 export default phoneVerificationRoute
