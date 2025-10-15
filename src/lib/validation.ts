@@ -49,3 +49,10 @@ export const loginWithEmailSchema = z.object({
 export const adminRegisterSchema = loginWithEmailSchema.extend({
   name: z.string().min(3).max(100),
 })
+
+export const adminProfileSchema = z.object({
+  name: z.string().min(3).max(100),
+  phone: z.string().min(10).max(15).optional(),
+  email: z.string().email().min(5).max(100).optional(),
+  image: z.file().optional(),
+})

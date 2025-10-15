@@ -10,10 +10,13 @@ import authRoute from './routes/auth.route'
 import healthRoute from './routes/health.route'
 import homeRoute from './routes/home.route'
 import phoneVerificationRoute from './routes/phone.route'
+import { serveStatic } from '@hono/node-server/serve-static'
 
 dayjs.extend(duration).locale('id')
 
 const app = createApp()
+
+app.use('/storage/*', serveStatic({ root: './' }))
 
 // ADD NEW ROUTES HERE
 const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]

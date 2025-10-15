@@ -11,6 +11,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { buildFilename } from '../lib/filename'
 import { ensureDir, safeJoin } from '../lib/fs'
+import { env } from '@/env'
 
 export type UploadOptions = {
   subdir?: string // e.g. "images", "avatars/2025/10"
@@ -110,9 +111,10 @@ export async function uploadFile(
 }
 
 export async function deleteFile(relativePath: string): Promise<boolean> {
+  const fullPath = safeJoin(relativePath)
   try {
-    await fs.access(relativePath)
-    await fs.unlink(relativePath)
+    await fs.access(fullPath)
+    await fs.unlink(fullPath)
     return true
   } catch (err) {
     log.error(`Failed to delete file: ${err}`)
@@ -125,7 +127,7 @@ export async function getFilePath(relativePath: string): Promise<string> {
   const fullPath = safeJoin(relativePath)
   try {
     await fs.access(fullPath)
-    return fullPath
+    return `${env.baseUrl}/storage/uploads${relativePath.startsWith('/') ? '' : '/'}${relativePath}`
   } catch {
     throw new Error('File not found')
   }

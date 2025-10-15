@@ -3,13 +3,16 @@ import {
   adminLogoutHandler,
   adminProfileHandler,
   adminRegisterHandler,
+  adminUpdateProfileHandler,
 } from '@/handlers/admin/auth.handler'
 import jsonContent from '@/helpers/json-content'
 import jsonContentRequired from '@/helpers/json-content-required'
+import multiformContent from '@/helpers/multiform-content'
 import createErrorSchema from '@/helpers/schema/create-error-schema'
 import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'
 import {
+  adminProfileSchema,
   adminRegisterSchema,
   authTokenCookieSchema,
   loginWithEmailSchema,
@@ -168,11 +171,57 @@ export const adminProfileRouteDoc = createRoute({
 
 export type AdminProfileRouteDoc = typeof adminProfileRouteDoc
 
+const adminUpdateProfileRouteDoc = createRoute({
+  path: '/profile',
+  method: 'post',
+  summary: 'Update Admin Profile',
+  description: 'Update the admin profile information',
+  tags: ['Admin Authentication'],
+  middleware: [requireAdminAuth],
+  request: {
+    cookies: authTokenCookieSchema,
+    body: multiformContent(adminProfileSchema, 'Update Admin Profile payload'),
+  },
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('Admin profile updated successfully'),
+      'Successful Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.FORBIDDEN]: jsonContent(
+      createMessageObjectSchema('Forbidden', null, 'Detailed error message'),
+      'Forbidden Response',
+    ),
+    [status.CONFLICT]: jsonContent(
+      createMessageObjectSchema('Conflict', null, 'Detailed error message'),
+      'Conflict Response',
+    ),
+    [status.BAD_REQUEST]: jsonContent(
+      createErrorSchema(adminProfileSchema),
+      'Bad Request Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type AdminUpdateProfileRouteDoc = typeof adminUpdateProfileRouteDoc
+
 const adminAuthRoute = createRouter()
   .basePath('/auth')
   .openapi(adminLoginRouteDoc, adminLoginHandler)
   .openapi(adminRegisterRouteDoc, adminRegisterHandler)
   .openapi(adminLogoutRouteDoc, adminLogoutHandler)
   .openapi(adminProfileRouteDoc, adminProfileHandler)
+  .openapi(adminUpdateProfileRouteDoc, adminUpdateProfileHandler)
 
 export default adminAuthRoute

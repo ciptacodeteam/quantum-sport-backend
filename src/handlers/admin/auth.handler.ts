@@ -9,8 +9,9 @@ import {
   AdminLogoutRouteDoc,
   AdminProfileRouteDoc,
   AdminRegisterAdminRouteDoc,
+  AdminUpdateProfileRouteDoc,
 } from '@/routes/admin/auth.route'
-import { getFilePath } from '@/services/upload.service'
+import { deleteFile, getFilePath, uploadFile } from '@/services/upload.service'
 import { AdminTokenPayload, AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
 import { AuthTokenType, Role } from 'generated/prisma'
@@ -242,6 +243,108 @@ export const adminProfileHandler: AppRouteHandler<
     return c.json(ok(adminData, 'Profile fetched successfully'), status.OK)
   } catch (err) {
     c.var.logger.fatal(`Error in getProfileHandler: ${err}`)
+    throw err
+  }
+}
+
+export const adminUpdateProfileHandler: AppRouteHandler<
+  AdminUpdateProfileRouteDoc
+> = async (c) => {
+  try {
+    const admin = c.get('admin')
+
+    if (!admin || !admin.id) {
+      throw new UnauthorizedException()
+    }
+
+    const validated = c.req.valid('form')
+    const { name, phone, email, image } = validated
+
+    const existingAdmin = await db.staff.findUnique({
+      where: { id: admin.id },
+    })
+
+    if (!existingAdmin) {
+      throw new UnauthorizedException()
+    }
+
+    if (email && email !== existingAdmin.email) {
+      const emailTaken = await db.staff.findUnique({
+        where: { email },
+      })
+      if (emailTaken) {
+        return c.json(
+          err('Email is already taken', status.CONFLICT),
+          status.CONFLICT,
+        )
+      }
+    }
+
+    let imageUrl = existingAdmin.image
+
+    if (image) {
+      if (existingAdmin.image) {
+        const deleted = await deleteFile(existingAdmin.image)
+        if (deleted) {
+          c.var.logger.info(
+            `Old profile image deleted for admin ID: ${admin.id}`,
+          )
+        } else {
+          c.var.logger.warn(
+            `Failed to delete old profile image for admin ID: ${admin.id}`,
+          )
+        }
+      }
+
+      const uploaded = await uploadFile(image, {
+        subdir: 'admin-profiles',
+      })
+
+      if (!uploaded) {
+        c.var.logger.error(
+          `Failed to upload new profile image for admin ID: ${admin.id}`,
+        )
+        return c.json(
+          err('Failed to upload profile image', status.INTERNAL_SERVER_ERROR),
+          status.INTERNAL_SERVER_ERROR,
+        )
+      }
+
+      imageUrl = uploaded.relativePath
+      c.var.logger.info(`New profile image uploaded for admin ID: ${admin.id}`)
+    }
+
+    const updatedAdmin = await db.staff.update({
+      where: { id: admin.id },
+      data: {
+        name: name ?? existingAdmin.name,
+        phone: phone ?? existingAdmin.phone,
+        email: email ?? existingAdmin.email,
+        image: imageUrl,
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        image: true,
+        createdAt: true,
+        role: true,
+        isActive: true,
+        joinedAt: true,
+      },
+    })
+
+    if (updatedAdmin.image) {
+      const imageUrl = await getFilePath(updatedAdmin.image)
+      updatedAdmin.image = imageUrl
+    }
+
+    c.var.logger.info(`Admin profile updated for admin ID: ${admin.id}`)
+
+    return c.json(ok(updatedAdmin, 'Profile updated successfully'), status.OK)
+  } catch (err) {
+    c.var.logger.fatal(`Error in updateProfileHandler: ${err}`)
     throw err
   }
 }

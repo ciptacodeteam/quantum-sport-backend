@@ -18,6 +18,7 @@
     "db:pull": "prisma db pull",
     "db:truncate": "tsx prisma/truncate.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit"
   },
