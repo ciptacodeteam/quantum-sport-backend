@@ -32,6 +32,16 @@ export default function configureOpenAPI(app: AppOpenApi) {
     },
   })
 
+  app.doc('/docs/admin/open-api', {
+    openapi: '3.0.0',
+    tags: [{ name: 'General', description: 'General endpoints' }],
+    info: {
+      title: 'Quantum Sport Admin API',
+      version: packageJson.version,
+      description: 'API documentation for Quantum Sport admin backend.',
+    },
+  })
+
   app.get(
     '/docs',
     Scalar({
@@ -40,6 +50,10 @@ export default function configureOpenAPI(app: AppOpenApi) {
         {
           title: 'API Documentation',
           url: '/docs/open-api',
+        },
+        {
+          title: 'Admin API Documentation',
+          url: '/docs/admin/open-api',
         },
       ],
       theme: 'kepler',

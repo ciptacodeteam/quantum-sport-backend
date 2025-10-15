@@ -5,12 +5,12 @@ import { createRouter } from '@/lib/create-app'
 import { createRoute } from '@hono/zod-openapi'
 import status from 'http-status'
 
-const homeRouteDoc = createRoute({
+const adminHomeRouteDoc = createRoute({
   path: '/',
   method: 'get',
-  summary: 'Home',
-  description: 'Get a welcome message for the Quantum Sport API.',
-  tags: ['General'],
+  summary: 'Admin Home Route',
+  description: 'Get a welcome message for the Quantum Sport API admin.',
+  tags: ['Admin General'],
   responses: {
     [status.OK]: jsonContent(
       createMessageObjectSchema('Welcome to Quantum Sport API!'),
@@ -19,8 +19,11 @@ const homeRouteDoc = createRoute({
   },
 })
 
-export type HomeRouteDoc = typeof homeRouteDoc
+export type AdminHomeRouteDoc = typeof adminHomeRouteDoc
 
-const homeRoute = createRouter().openapi(homeRouteDoc, getWelcomeMessageHandler)
+const adminHomeRoute = createRouter().openapi(
+  adminHomeRouteDoc,
+  getWelcomeMessageHandler,
+)
 
-export default homeRoute
+export default adminHomeRoute
