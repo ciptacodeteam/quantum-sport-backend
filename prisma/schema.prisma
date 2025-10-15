@@ -125,18 +125,6 @@ model Inventory {
   @@map("inventories")
 }
 
-model CourtType {
-  id        String   @id @default(cuid())
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  courts Court[]
-
-  @@map("court_types")
-}
-
 model Court {
   id          String   @id @default(cuid())
   name        String
@@ -145,9 +133,6 @@ model Court {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
-
-  courtTypeId String
-  courtType   CourtType @relation(fields: [courtTypeId], references: [id])
 
   costSchedules CourtCostSchedule[]
   BookingDetail BookingDetail[]
