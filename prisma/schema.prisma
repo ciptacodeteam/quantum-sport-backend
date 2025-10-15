@@ -52,15 +52,15 @@ enum PhoneVerificationType {
 }
 
 model PhoneVerification {
-  id        String                @id @default(cuid())
-  phone     String                @unique
-  type      PhoneVerificationType
+  id        String                 @id @default(cuid())
+  phone     String                 @unique
+  type      PhoneVerificationType?
   code      String
   expiresAt DateTime
   requestId String
-  isUsed    Boolean               @default(false)
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @default(now()) @updatedAt
+  isUsed    Boolean                @default(false)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @default(now()) @updatedAt
 
   @@map("phone_verification")
 }

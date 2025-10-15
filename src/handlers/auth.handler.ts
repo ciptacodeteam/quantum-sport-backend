@@ -69,6 +69,7 @@ export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
         id: validOtp.id,
       },
       data: {
+        type: PhoneVerificationType.LOGIN,
         isUsed: true,
       },
     })
@@ -140,6 +141,7 @@ export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
           phone: formattedPhone,
         },
         data: {
+          type: PhoneVerificationType.REGISTER,
           isUsed: true,
         },
       })
@@ -415,7 +417,7 @@ export const resetPasswordHandler: AppRouteHandler<
       )
     }
 
-    await validateOtp(formattedPhone, requestId, code)
+    const validOtp = await validateOtp(formattedPhone, requestId, code)
 
     if (env.nodeEnv === 'production') {
       const successVerifyOtp = await verifyPhoneOtp(requestId, code)
@@ -431,35 +433,13 @@ export const resetPasswordHandler: AppRouteHandler<
       }
     }
 
-    const validOtp = await db.phoneVerification.findFirst({
-      where: {
-        requestId,
-        phone: formattedPhone,
-        code,
-        type: PhoneVerificationType.FORGOT_PASSWORD,
-        isUsed: false,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-    })
-
-    if (!validOtp) {
-      c.var.logger.error(
-        `Invalid or expired OTP for phone number: ${formattedPhone}`,
-      )
-      return c.json(
-        err('Invalid or expired OTP', status.BAD_REQUEST),
-        status.BAD_REQUEST,
-      )
-    }
-
     // Mark the OTP as used
     await db.phoneVerification.update({
       where: {
         id: validOtp.id,
       },
       data: {
+        type: PhoneVerificationType.FORGOT_PASSWORD,
         isUsed: true,
       },
     })
