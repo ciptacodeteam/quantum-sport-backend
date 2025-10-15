@@ -1,13 +1,17 @@
 import {
+  forgotPasswordHandler,
   loginHandler,
   logoutHandler,
   refreshTokenHandler,
   registerHandler,
+  resetPasswordHandler,
 } from '@/handlers/auth.handler'
 import {
   authTokenCookieSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
 } from '@/lib/validation'
 import { requireAuth } from '@/middlewares/auth'
 
@@ -181,11 +185,86 @@ const refreshTokenRouteDoc = createRoute({
 
 export type RefreshTokenRouteDoc = typeof refreshTokenRouteDoc
 
+const forgotPasswordRouteDoc = createRoute({
+  path: '/forgot-password',
+  method: 'post',
+  summary: 'Forgot Password',
+  description: 'Request a password reset link',
+  tags: ['Authentication'],
+  request: {
+    body: jsonContentRequired(forgotPasswordSchema, 'Forgot Password payload'),
+  },
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('OTP sent successfully', {
+        phone: '+621234567890',
+        requestId: 'unique-request-id',
+      }),
+      'Successful Response',
+    ),
+    [status.BAD_REQUEST]: jsonContent(
+      createErrorSchema(forgotPasswordSchema),
+      'Bad Request Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type ForgotPasswordRouteDoc = typeof forgotPasswordRouteDoc
+
+const resetPasswordRouteDoc = createRoute({
+  path: '/reset-password',
+  method: 'post',
+  summary: 'Reset Password',
+  description: 'Reset the user password',
+  tags: ['Authentication'],
+  request: {
+    body: jsonContentRequired(resetPasswordSchema, 'Reset Password payload'),
+  },
+  responses: {
+    [status.OK]: jsonContent(
+      createMessageObjectSchema('Password reset successfully'),
+      'Successful Response',
+    ),
+    [status.BAD_REQUEST]: jsonContent(
+      createErrorSchema(resetPasswordSchema),
+      'Bad Request Response',
+    ),
+    [status.UNAUTHORIZED]: jsonContent(
+      createMessageObjectSchema('Unauthorized', null, 'Detailed error message'),
+      'Unauthorized Response',
+    ),
+    [status.INTERNAL_SERVER_ERROR]: jsonContent(
+      createMessageObjectSchema(
+        'Internal Server Error',
+        null,
+        'Detailed error message',
+      ),
+      'Internal Server Error Response',
+    ),
+  },
+})
+
+export type ResetPasswordRouteDoc = typeof resetPasswordRouteDoc
+
 const authRoute = createRouter()
   .basePath('/auth')
   .openapi(loginRouteDoc, loginHandler)
   .openapi(registerRouteDoc, registerHandler)
   .openapi(logoutRouteDoc, logoutHandler)
   .openapi(refreshTokenRouteDoc, refreshTokenHandler)
+  .openapi(forgotPasswordRouteDoc, forgotPasswordHandler) // To be implemented
+  .openapi(resetPasswordRouteDoc, resetPasswordHandler) // To be implemented
 
 export default authRoute

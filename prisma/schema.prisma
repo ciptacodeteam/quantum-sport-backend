@@ -19,6 +19,7 @@ model User {
   name          String
   email         String?  @unique
   emailVerified Boolean  @default(false)
+  password      String?
   image         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
@@ -42,15 +43,24 @@ model User {
   @@map("user")
 }
 
+enum PhoneVerificationType {
+  LOGIN
+  REGISTER
+  FORGOT_PASSWORD
+  VERIFY_PHONE
+  CHANGE_PHONE
+}
+
 model PhoneVerification {
-  id        String   @id @default(cuid())
-  phone     String   @unique
+  id        String                @id @default(cuid())
+  phone     String                @unique
+  type      PhoneVerificationType
   code      String
   expiresAt DateTime
   requestId String
-  isUsed    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  isUsed    Boolean               @default(false)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @default(now()) @updatedAt
 
   @@map("phone_verification")
 }

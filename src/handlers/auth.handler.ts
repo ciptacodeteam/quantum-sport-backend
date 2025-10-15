@@ -1,5 +1,7 @@
+import { OTP_LENGTH } from '@/constants'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
+import { hashPassword } from '@/lib/password'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import {
@@ -8,18 +10,20 @@ import {
   validateRefreshToken,
   validateToken,
 } from '@/lib/token'
-import { formatPhone } from '@/lib/utils'
+import { formatPhone, generateOtp } from '@/lib/utils'
 import {
+  ForgotPasswordRouteDoc,
   LoginRouteDoc,
   LogoutRouteDoc,
   RefreshTokenRouteDoc,
   RegisterRouteDoc,
+  ResetPasswordRouteDoc,
 } from '@/routes/auth.route'
 import { validateOtp } from '@/services/otp-service'
-import { verifyPhoneOtp } from '@/services/phone-service'
+import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone-service'
 import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
-import { AuthTokenType } from 'generated/prisma'
+import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
@@ -321,6 +325,162 @@ export const refreshTokenHandler: AppRouteHandler<
     return c.json(ok(null, 'Token refreshed'))
   } catch (err) {
     c.var.logger.fatal(`Error during token refresh: ${err}`)
+    throw err
+  }
+}
+
+export const forgotPasswordHandler: AppRouteHandler<
+  ForgotPasswordRouteDoc
+> = async (c) => {
+  try {
+    const validated = c.req.valid('json')
+    const { phone } = validated
+
+    const formattedPhone = await formatPhone(phone)
+
+    const existingUser = await db.user.findUnique({
+      where: { phone: formattedPhone },
+    })
+
+    if (!existingUser) {
+      c.var.logger.error(`No user found with phone number: ${formattedPhone}`)
+      return c.json(
+        err('Phone number is incorrect', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    // Here you would typically initiate the forgot password process,
+    // such as sending a password reset email or SMS.
+    const otp = await generateOtp(OTP_LENGTH)
+    c.var.logger.info(`Generated OTP for ${formattedPhone}: ${otp}`)
+
+    const requestId = await sendPhoneOtp(formattedPhone, otp)
+
+    if (!requestId) {
+      c.var.logger.error(
+        `Failed to send OTP to phone number: ${formattedPhone}`,
+      )
+      return c.json(
+        err('Failed to send OTP', status.INTERNAL_SERVER_ERROR),
+        status.INTERNAL_SERVER_ERROR,
+      )
+    }
+
+    await db.phoneVerification.create({
+      data: {
+        phone: formattedPhone,
+        requestId,
+        code: otp,
+        type: PhoneVerificationType.FORGOT_PASSWORD,
+        isUsed: false,
+        expiresAt: dayjs().add(5, 'minute').toDate(),
+      },
+    })
+
+    return c.json(
+      ok(
+        {
+          phone: formattedPhone,
+          requestId,
+        },
+        'OTP sent successfully',
+      ),
+    )
+  } catch (err) {
+    c.var.logger.fatal(`Error during forgot password: ${err}`)
+    throw err
+  }
+}
+
+export const resetPasswordHandler: AppRouteHandler<
+  ResetPasswordRouteDoc
+> = async (c) => {
+  try {
+    const validated = c.req.valid('json')
+    const { phone, code, requestId, newPassword } = validated
+
+    const formattedPhone = await formatPhone(phone)
+
+    const existingUser = await db.user.findUnique({
+      where: { phone: formattedPhone },
+    })
+
+    if (!existingUser) {
+      c.var.logger.error(`No user found with phone number: ${formattedPhone}`)
+      return c.json(
+        err('Phone number is incorrect', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    await validateOtp(formattedPhone, requestId, code)
+
+    if (env.nodeEnv === 'production') {
+      const successVerifyOtp = await verifyPhoneOtp(requestId, code)
+
+      if (!successVerifyOtp) {
+        c.var.logger.error(
+          `Failed to verify OTP for phone number: ${formattedPhone}`,
+        )
+        return c.json(
+          err('Failed to verify OTP', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
+    }
+
+    const validOtp = await db.phoneVerification.findFirst({
+      where: {
+        requestId,
+        phone: formattedPhone,
+        code,
+        type: PhoneVerificationType.FORGOT_PASSWORD,
+        isUsed: false,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    })
+
+    if (!validOtp) {
+      c.var.logger.error(
+        `Invalid or expired OTP for phone number: ${formattedPhone}`,
+      )
+      return c.json(
+        err('Invalid or expired OTP', status.BAD_REQUEST),
+        status.BAD_REQUEST,
+      )
+    }
+
+    // Mark the OTP as used
+    await db.phoneVerification.update({
+      where: {
+        id: validOtp.id,
+      },
+      data: {
+        isUsed: true,
+      },
+    })
+
+    // Here you would typically hash the new password before saving it
+    // For demonstration purposes, we'll just log it
+    c.var.logger.info(
+      `Resetting password for ${formattedPhone} to ${newPassword}`,
+    )
+
+    const hashNewPassword = await hashPassword(newPassword)
+
+    await db.user.update({
+      where: { id: existingUser.id },
+      data: {
+        password: hashNewPassword,
+      },
+    })
+
+    return c.json(ok(null, 'Password reset successful'))
+  } catch (err) {
+    c.var.logger.fatal(`Error during reset password: ${err}`)
     throw err
   }
 }

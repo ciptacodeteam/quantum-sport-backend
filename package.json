@@ -27,6 +27,7 @@
     "@hono/zod-validator": "^0.7.4",
     "@prisma/client": "^6.17.1",
     "@scalar/hono-api-reference": "^0.9.21",
+    "argon2": "^0.44.0",
     "axios": "^1.12.2",
     "dayjs": "^1.11.18",
     "dayjs-plugin-duration": "^0.0.1-security",
