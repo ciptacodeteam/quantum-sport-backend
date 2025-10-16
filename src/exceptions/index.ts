@@ -34,7 +34,7 @@ export class ForbiddenException extends HTTPException {
 export class BadRequestException extends HTTPException {
   constructor(details?: string) {
     super(400, {
-      message: `Bad request.${details ? ' ' + details : ''}`,
+      message: `Bad request. ${details || 'Invalid input.'}`,
     })
   }
 }

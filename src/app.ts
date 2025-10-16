@@ -7,6 +7,7 @@ import createApp from './lib/create-app'
 import adminAuthRoute from './routes/admin/auth.route'
 import adminHomeRoute from './routes/admin/home.route'
 import adminInventoryRoute from './routes/admin/inventory.route'
+import adminStaffRoute from './routes/admin/staff.route'
 import authRoute from './routes/auth.route'
 import healthRoute from './routes/health.route'
 import homeRoute from './routes/home.route'
@@ -22,7 +23,12 @@ app.use('/storage/*', serveStatic({ root: './src' }))
 const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]
 
 // ADD NEW ADMIN ROUTES HERE
-const adminRoutes = [adminHomeRoute, adminAuthRoute, adminInventoryRoute]
+const adminRoutes = [
+  adminHomeRoute,
+  adminAuthRoute,
+  adminInventoryRoute,
+  adminStaffRoute,
+]
 
 routes.forEach((route) => {
   app.route('/', route)

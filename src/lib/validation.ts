@@ -1,3 +1,6 @@
+import { DEFAULT_DATE_FORMAT } from '@/config'
+import dayjs from 'dayjs'
+import { Role } from 'generated/prisma'
 import z from 'zod'
 
 export const idSchema = z.object({
@@ -104,3 +107,44 @@ export const searchQuerySchema = z.object({
 })
 
 export type SearchQuerySchema = z.infer<typeof searchQuerySchema>
+
+export const createStaffSchema = z
+  .object({
+    name: z.string().min(3).max(100),
+    email: z.email().min(5).max(100),
+    phone: z.string().min(10).max(15),
+    password: z.string().min(6).max(100),
+    confirmPassword: z.string().min(6).max(100),
+    joinedAt: z
+      .string()
+      .optional()
+      .default(dayjs().format(DEFAULT_DATE_FORMAT)),
+    role: z.enum(Role).default(Role.ADMIN),
+    isActive: z.coerce.boolean().optional(),
+    image: z.file().optional(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  })
+
+export type CreateStaffSchema = z.infer<typeof createStaffSchema>
+
+export const updateStaffSchema = createStaffSchema
+  .partial()
+  .omit({ password: true, confirmPassword: true })
+
+export type UpdateStaffSchema = z.infer<typeof updateStaffSchema>
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(6).max(100),
+    newPassword: z.string().min(6).max(100),
+    confirmNewPassword: z.string().min(6).max(100),
+  })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: "New passwords don't match",
+    path: ['confirmNewPassword'],
+  })
+
+export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>

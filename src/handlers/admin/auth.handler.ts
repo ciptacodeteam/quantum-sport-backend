@@ -1,3 +1,4 @@
+import { ADMIN_PROFILE_SUBDIR } from '@/config'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -299,7 +300,7 @@ export const updateAdminProfileHandler = factory.createHandlers(
         }
 
         const uploaded = await uploadFile(image, {
-          subdir: 'admin-profiles',
+          subdir: ADMIN_PROFILE_SUBDIR,
         })
 
         if (!uploaded) {
