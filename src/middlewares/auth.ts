@@ -1,58 +1,56 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
-import { factory } from '@/lib/create-app'
 import { validateToken } from '@/lib/token'
 import { AdminTokenPayload, UserTokenPayload } from '@/types'
 import { Role } from 'generated/prisma'
+import { MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie } from 'hono/cookie'
 
-export const globalAuthMiddleware = factory.createMiddleware(
-  async (c, next) => {
-    const token = getCookie(c, 'token') as string | undefined
-    c.var.logger.debug(`Global auth middleware - token: ${token}`)
+export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
+  const token = getCookie(c, 'token') as string | undefined
+  c.var.logger.debug(`Global auth middleware - token: ${token}`)
 
-    if (!token) {
-      c.set('user', null)
-
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
-
-      return next()
-    }
-
-    const session = await validateToken(token)
-    const payload = session?.data as UserTokenPayload | AdminTokenPayload | null
-
-    if (!payload?.id) {
-      c.set('user', null)
-
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
-
-      return next()
-    }
-
-    // clear both contexts initially
-    c.set('admin', null)
+  if (!token) {
     c.set('user', null)
 
-    // type guard to discriminate admin payloads
-    const isAdminPayload = (
-      p: UserTokenPayload | AdminTokenPayload | null,
-    ): p is AdminTokenPayload => {
-      return !!p && (p as AdminTokenPayload).role !== undefined
-    }
-
-    if (isAdminPayload(payload)) {
-      c.set('admin', payload)
-    } else {
-      c.set('user', payload as UserTokenPayload)
-    }
+    deleteCookie(c, 'token')
+    deleteCookie(c, 'refreshToken')
 
     return next()
-  },
-)
+  }
 
-export const requireAuth = factory.createMiddleware(async (c, next) => {
+  const session = await validateToken(token)
+  const payload = session?.data as UserTokenPayload | AdminTokenPayload | null
+
+  if (!payload?.id) {
+    c.set('user', null)
+
+    deleteCookie(c, 'token')
+    deleteCookie(c, 'refreshToken')
+
+    return next()
+  }
+
+  // clear both contexts initially
+  c.set('admin', null)
+  c.set('user', null)
+
+  // type guard to discriminate admin payloads
+  const isAdminPayload = (
+    p: UserTokenPayload | AdminTokenPayload | null,
+  ): p is AdminTokenPayload => {
+    return !!p && (p as AdminTokenPayload).role !== undefined
+  }
+
+  if (isAdminPayload(payload)) {
+    c.set('admin', payload)
+  } else {
+    c.set('user', payload as UserTokenPayload)
+  }
+
+  return next()
+}
+
+export const requireAuth: MiddlewareHandler = async (c, next) => {
   const user = c.get('user')
 
   if (!user) {
@@ -60,9 +58,9 @@ export const requireAuth = factory.createMiddleware(async (c, next) => {
   }
 
   return next()
-})
+}
 
-export const requireAdminAuth = factory.createMiddleware(async (c, next) => {
+export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
   const admin = c.get('admin')
 
   if (!admin || !admin.role) {
@@ -70,23 +68,23 @@ export const requireAdminAuth = factory.createMiddleware(async (c, next) => {
   }
 
   return next()
-})
+}
 
-export const requireAdmin = factory.createMiddleware(async (c, next) => {
+export const requireAdmin: MiddlewareHandler = async (c, next) => {
   return requireRole('ADMIN')(c, next)
-})
+}
 
-export const requireCoach = factory.createMiddleware(async (c, next) => {
+export const requireCoach: MiddlewareHandler = async (c, next) => {
   return requireRole('COACH')(c, next)
-})
+}
 
-export const requireBallboy = factory.createMiddleware(async (c, next) => {
+export const requireBallboy: MiddlewareHandler = async (c, next) => {
   return requireRole('BALLBOY')(c, next)
-})
+}
 
 // You can add more role-based middlewares as needed
 export const requireRole = (role: Role) => {
-  return factory.createMiddleware(async (c, next) => {
+  const middleware: MiddlewareHandler = async (c, next) => {
     const admin = c.get('admin')
 
     if (!admin) {
@@ -98,5 +96,6 @@ export const requireRole = (role: Role) => {
     }
 
     return next()
-  })
+  }
+  return middleware
 }
