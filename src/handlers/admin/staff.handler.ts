@@ -290,3 +290,30 @@ export const changeStaffPasswordHandler = factory.createHandlers(
     }
   },
 )
+
+export const revokeStaffTokenHandler = factory.createHandlers(
+  zValidator('param', idSchema, validateHook),
+  async (c) => {
+    try {
+      const validatedParam = c.req.valid('param') as IdSchema
+      const staffId = validatedParam.id
+
+      const existingStaff = await db.staff.findUnique({
+        where: { id: staffId },
+      })
+
+      if (!existingStaff) {
+        throw new NotFoundException('Staff not found')
+      }
+
+      await db.authToken.deleteMany({
+        where: { staffId },
+      })
+
+      return c.json(ok(null, 'Staff tokens revoked successfully'), status.OK)
+    } catch (err) {
+      c.var.logger.fatal(`Error revoking staff tokens: ${err}`)
+      throw err
+    }
+  },
+)

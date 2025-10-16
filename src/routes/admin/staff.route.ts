@@ -3,6 +3,7 @@ import {
   createStaffHandler,
   getAllStaffHandler,
   getStaffHandler,
+  revokeStaffTokenHandler,
   updateStaffHandler,
 } from '@/handlers/admin/staff.handler'
 import { createRouter } from '@/lib/create-app'
@@ -14,5 +15,6 @@ const adminStaffRoute = createRouter()
   .put('/:id', ...updateStaffHandler)
   .post('/', ...createStaffHandler)
   .post('/:id/password', ...changeStaffPasswordHandler)
+  .post('/:id/revoke', ...revokeStaffTokenHandler)
 
 export default adminStaffRoute
