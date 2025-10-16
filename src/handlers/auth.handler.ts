@@ -27,7 +27,7 @@ import {
 } from '@/lib/validation'
 import { validateOtp } from '@/services/otp.service'
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
-import { getFilePath } from '@/services/upload.service'
+import { getFileUrl } from '@/services/upload.service'
 import { AppRouteHandler, UserTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
@@ -603,7 +603,7 @@ export const getProfileHandler: AppRouteHandler = async (c) => {
     }
 
     if (existingUser.image) {
-      existingUser.image = await getFilePath(existingUser.image)
+      existingUser.image = await getFileUrl(existingUser.image)
     }
 
     return c.json(

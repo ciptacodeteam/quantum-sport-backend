@@ -15,7 +15,7 @@ import {
   updateAdminProfileSchema,
   UpdateAdminProfileSchema,
 } from '@/lib/validation'
-import { deleteFile, getFilePath, uploadFile } from '@/services/upload.service'
+import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import { AdminTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
@@ -239,7 +239,7 @@ export const getAdminProfileHandler = factory.createHandlers(async (c) => {
     }
 
     if (adminData.image) {
-      const imageUrl = await getFilePath(adminData.image)
+      const imageUrl = await getFileUrl(adminData.image)
       adminData.image = imageUrl
     }
 
@@ -341,7 +341,7 @@ export const updateAdminProfileHandler = factory.createHandlers(
       })
 
       if (updatedAdmin.image) {
-        const imageUrl = await getFilePath(updatedAdmin.image)
+        const imageUrl = await getFileUrl(updatedAdmin.image)
         updatedAdmin.image = imageUrl
       }
 

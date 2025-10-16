@@ -16,7 +16,7 @@ import {
   searchQuerySchema,
   updateStaffSchema,
 } from '@/lib/validation'
-import { deleteFile, getFilePath, uploadFile } from '@/services/upload.service'
+import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 
@@ -60,7 +60,7 @@ export const getAllStaffHandler = factory.createHandlers(
 
       for (const item of items) {
         if (item.image) {
-          const imageUrl = await getFilePath(item.image)
+          const imageUrl = await getFileUrl(item.image)
           item.image = imageUrl
         }
       }
@@ -110,7 +110,7 @@ export const getStaffHandler = factory.createHandlers(
       }
 
       if (staff.image) {
-        const imageUrl = await getFilePath(staff.image)
+        const imageUrl = await getFileUrl(staff.image)
         staff.image = imageUrl
       }
 
@@ -178,7 +178,7 @@ export const createStaffHandler = factory.createHandlers(
       })
 
       if (newStaff.image) {
-        const imageUrl = await getFilePath(newStaff.image)
+        const imageUrl = await getFileUrl(newStaff.image)
         newStaff.image = imageUrl
       }
 
@@ -273,7 +273,7 @@ export const updateStaffHandler = factory.createHandlers(
       })
 
       if (updatedStaff.image) {
-        const imageUrl = await getFilePath(updatedStaff.image)
+        const imageUrl = await getFileUrl(updatedStaff.image)
         updatedStaff.image = imageUrl
       }
 

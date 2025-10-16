@@ -122,7 +122,18 @@ export async function deleteFile(relativePath: string): Promise<boolean> {
   }
 }
 
-export async function getFilePath(relativePath: string): Promise<string> {
+export async function getFileUrl(relativePath: string | null): Promise<string> {
+  if (!relativePath) {
+    return ''
+  }
+
+  if (
+    relativePath.startsWith('http://') ||
+    relativePath.startsWith('https://')
+  ) {
+    return relativePath
+  }
+
   // Ensure relativePath is sanitized and joined safely
   const fullPath = safeJoin(relativePath)
   try {

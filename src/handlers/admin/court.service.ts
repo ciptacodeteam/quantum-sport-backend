@@ -4,6 +4,7 @@ import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
+import { ok } from '@/lib/response'
 import {
   CreateCourtSchema,
   createCourtSchema,
@@ -14,9 +15,8 @@ import {
   UpdateCourtSchema,
   updateCourtSchema,
 } from '@/lib/validation'
-import { deleteFile, uploadFile } from '@/services/upload.service'
+import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
-import { ok } from 'assert'
 import status from 'http-status'
 
 export const getAllCourtHandler = factory.createHandlers(
@@ -32,6 +32,14 @@ export const getAllCourtHandler = factory.createHandlers(
       const items = await db.court.findMany({
         ...queryOptions,
       })
+
+      for (const item of items) {
+        if (item.image) {
+          const imageUrl = await getFileUrl(item.image)
+          item.image = imageUrl
+        }
+      }
+
       return c.json(ok(items), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getCourtItemsHandler: ${error}`)
@@ -59,6 +67,10 @@ export const getCourtHandler = factory.createHandlers(
         throw new NotFoundException('Court item not found')
       }
 
+      if (item.image) {
+        item.image = await getFileUrl(item.image)
+      }
+
       return c.json(ok(item), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getCourtHandler: ${error}`)
@@ -68,10 +80,10 @@ export const getCourtHandler = factory.createHandlers(
 )
 
 export const createCourtHandler = factory.createHandlers(
-  zValidator('json', createCourtSchema, validateHook),
+  zValidator('form', createCourtSchema, validateHook),
   async (c) => {
     try {
-      const body = c.req.valid('json') as CreateCourtSchema
+      const body = c.req.valid('form') as CreateCourtSchema
       const { name, description, image } = body
 
       let imageUrl: string | undefined
@@ -92,6 +104,10 @@ export const createCourtHandler = factory.createHandlers(
         },
       })
 
+      if (newItem.image) {
+        newItem.image = await getFileUrl(newItem.image)
+      }
+
       return c.json(ok(newItem), status.CREATED)
     } catch (error) {
       c.var.logger.fatal(`Error in createCourt: ${error}`)
@@ -102,11 +118,11 @@ export const createCourtHandler = factory.createHandlers(
 
 export const updateCourtHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
-  zValidator('json', updateCourtSchema, validateHook),
+  zValidator('form', updateCourtSchema, validateHook),
   async (c) => {
     try {
       const { id } = c.req.valid('param') as IdSchema
-      const body = c.req.valid('json') as UpdateCourtSchema
+      const body = c.req.valid('form') as UpdateCourtSchema
       const { name, description, image, isActive } = body
 
       const existingItem = await db.court.findUnique({
@@ -133,7 +149,9 @@ export const updateCourtHandler = factory.createHandlers(
           }
         }
 
-        const uploaded = await uploadFile(image)
+        const uploaded = await uploadFile(image, {
+          subdir: COURT_SUBDIR,
+        })
         imageUrl = uploaded.relativePath
       }
 
@@ -146,6 +164,8 @@ export const updateCourtHandler = factory.createHandlers(
           isActive: isActive ?? false,
         },
       })
+
+      updatedItem.image = await getFileUrl(imageUrl)
 
       return c.json(ok(updatedItem), status.OK)
     } catch (error) {

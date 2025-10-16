@@ -8,10 +8,11 @@ import {
 import { createRouter } from '@/lib/create-app'
 
 const adminCourtRoute = createRouter()
+  .basePath('/courts')
   .get('/', ...getAllCourtHandler)
   .get('/:id', ...getCourtHandler)
+  .post('/:id', ...updateCourtHandler)
   .post('/', ...createCourtHandler)
-  .put('/:id', ...updateCourtHandler)
   .delete('/:id', ...deleteCourtHandler)
 
 export default adminCourtRoute
