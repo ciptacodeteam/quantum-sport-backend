@@ -407,7 +407,7 @@ model BookingBallboy {
 
 model BookingCoachType {
   id          String   @id @default(cuid())
-  name        String
+  name        String // e.g., "guided match" or "personal training"
   price       Int      @db.Integer
   description String?
   isActive    Boolean  @default(true)
