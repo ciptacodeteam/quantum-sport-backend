@@ -323,12 +323,19 @@ export async function updateCourtPricing({
   }
 }
 
-export async function overrideSingleCourtHourPrice(
-  courtId: string,
-  date: string,
-  hour: number,
-  price: bigint,
-) {
+type OverrideSingleCourtHourPricePayload = {
+  courtId: string
+  date: string
+  hour: number
+  price: bigint
+}
+
+export async function overrideSingleCourtHourPrice({
+  courtId,
+  date,
+  hour,
+  price,
+}: OverrideSingleCourtHourPricePayload) {
   try {
     const { startAt, endAt } = toUtcRange(date, hour)
 

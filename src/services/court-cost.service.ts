@@ -5,13 +5,19 @@ import {
   createCourtCostSchema,
   IdSchema,
   idSchema,
+  OverrideSingleCourtCostSchema,
+  overrideSingleCourtCostSchema,
   SearchQuerySchema,
   searchQuerySchema,
   UpdateCourtCostSchema,
   updateCourtCostSchema,
 } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
-import { setCourtPricing, updateCourtPricing } from './costing.service'
+import {
+  overrideSingleCourtHourPrice,
+  setCourtPricing,
+  updateCourtPricing,
+} from './costing.service'
 import { err, ok } from '@/lib/response'
 import status from 'http-status'
 import { db } from '@/lib/prisma'
@@ -107,6 +113,43 @@ export const updateCourtCostHandler = factory.createHandlers(
       if (!updated) {
         return c.json(
           err('Failed to update court pricing', status.INTERNAL_SERVER_ERROR),
+          status.INTERNAL_SERVER_ERROR,
+        )
+      }
+
+      return c.json(ok(null, 'Court pricing updated successfully'), status.OK)
+    } catch (error) {
+      c.var.logger.error(`Error updating court cost: ${error}`)
+      throw error
+    }
+  },
+)
+
+export const overrideSingleCourtCostHandler = factory.createHandlers(
+  zValidator('json', overrideSingleCourtCostSchema, validateHook),
+  async (c) => {
+    try {
+      const validated = c.req.valid('json') as OverrideSingleCourtCostSchema
+      const { date, courtId, hour, price } = validated
+
+      const existing = await db.courtCostSchedule.findUnique({
+        where: { id: courtId },
+      })
+
+      if (!existing) {
+        throw new NotFoundException('Court cost schedule not found')
+      }
+
+      const updated = await overrideSingleCourtHourPrice({
+        courtId,
+        date,
+        price,
+        hour,
+      })
+
+      if (!updated) {
+        return c.json(
+          err('Failed to override court pricing', status.INTERNAL_SERVER_ERROR),
           status.INTERNAL_SERVER_ERROR,
         )
       }

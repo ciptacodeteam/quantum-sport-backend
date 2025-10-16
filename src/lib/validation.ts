@@ -179,3 +179,16 @@ export const updateCourtCostSchema = createCourtCostSchema
   })
 
 export type UpdateCourtCostSchema = z.infer<typeof updateCourtCostSchema>
+
+export const overrideSingleCourtCostSchema = z.object({
+  date: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+    message: 'Invalid date format, expected YYYY-MM-DD',
+  }),
+  hour: z.number().min(0),
+  courtId: z.string(),
+  price: z.bigint().min(0n),
+})
+
+export type OverrideSingleCourtCostSchema = z.infer<
+  typeof overrideSingleCourtCostSchema
+>
