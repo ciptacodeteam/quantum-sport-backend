@@ -79,7 +79,7 @@ model Staff {
   phone     String?  @unique
   password  String
   isActive  Boolean  @default(true)
-  joinedAt  DateTime @default(now())
+  joinedAt  DateTime @default(now()) @db.Date
   role      Role     @default(ADMIN)
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -94,8 +94,8 @@ model Staff {
 model BallboySchedule {
   id          String   @id @default(cuid())
   staffId     String
-  date        DateTime
-  time        String // e.g., "08:00"
+  date        DateTime @db.Date
+  time        String // e.g., "08:00" 
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -109,7 +109,7 @@ model BallboySchedule {
 model CoachSchedule {
   id          String   @id @default(cuid())
   staffId     String
-  date        DateTime
+  date        DateTime @db.Date
   time        String // e.g., "08:00"
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -241,7 +241,7 @@ model MembershipUser {
 model CourtCostSchedule {
   id          String   @id @default(cuid())
   courtId     String
-  date        DateTime
+  date        DateTime @db.Date
   time        String // e.g., "08:00"
   price       BigInt
   isAvailable Boolean  @default(true)
@@ -308,7 +308,7 @@ model BookingDetail {
   bookingId  String
   courtId    String
   scheduleId String
-  date       DateTime
+  date       DateTime @db.Date
   time       String // e.g., "08:00"
   price      BigInt
   createdAt  DateTime @default(now())
@@ -339,7 +339,7 @@ model BookingBallboy {
   id                String   @id @default(cuid())
   bookingId         String
   ballboyScheduleId String
-  date              DateTime
+  date              DateTime @db.Date
   time              String // e.g., "08:00"
   price             BigInt
   createdAt         DateTime @default(now())
@@ -369,7 +369,7 @@ model BookingCoach {
   id                 String   @id @default(cuid())
   bookingId          String
   coachScheduleId    String
-  date               DateTime
+  date               DateTime @db.Date
   time               String // e.g., "08:00"
   price              BigInt
   bookingCoachTypeId String
@@ -397,8 +397,8 @@ model Class {
   organizerName String? // e.g., "Quantum Sport"
   speakerName   String? // e.g., "John Doe"
   image         String?
-  startDate     DateTime
-  endDate       DateTime
+  startDate     DateTime       @db.Date
+  endDate       DateTime       @db.Date
   startTime     String // e.g., "08:00"
   endTime       String // e.g., "09:00"
   price         BigInt // per session
@@ -443,7 +443,7 @@ model ClassBooking {
 model ClassBookingDetail {
   id             String   @id @default(cuid())
   classBookingId String
-  date           DateTime
+  date           DateTime @db.Date
   time           String // e.g., "08:00"
   price          BigInt
   attendance     Boolean  @default(false)
@@ -501,8 +501,8 @@ model Tournament {
   description            String?
   rules                  String?
   image                  String?
-  startDate              DateTime
-  endDate                DateTime
+  startDate              DateTime                 @db.Date
+  endDate                DateTime                 @db.Date
   startTime              String // e.g., "08:00"
   endTime                String // e.g., "17:00"
   maxTeams               Int

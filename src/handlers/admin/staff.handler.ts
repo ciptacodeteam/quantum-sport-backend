@@ -45,12 +45,26 @@ export const getAllStaffHandler = factory.createHandlers(
           ...queryOptions.where,
           id: { not: staffId }, // Exclude the currently logged-in admin
         },
+        include: {
+          _count: {
+            select: {
+              ballboySchedule: true,
+              coachSchedule: true,
+            },
+          },
+        },
       })
 
       for (const item of items) {
         if (item.image) {
           const imageUrl = await getFilePath(item.image)
           item.image = imageUrl
+        }
+
+        item['ballboyScheduleCount'] = item._count.ballboySchedule
+        item['coachScheduleCount'] = item._count.coachSchedule
+        if (item._count) {
+          delete (item as any)._count
         }
       }
 
@@ -90,8 +104,24 @@ export const getStaffHandler = factory.createHandlers(
               createdAt: true,
               updatedAt: true,
             },
+            orderBy: [
+              {
+                date: 'asc',
+              },
+              {
+                time: 'asc',
+              },
+            ],
           },
           coachSchedule: {
+            orderBy: [
+              {
+                date: 'asc',
+              },
+              {
+                time: 'asc',
+              },
+            ],
             select: {
               id: true,
               date: true,
@@ -161,7 +191,7 @@ export const createStaffHandler = factory.createHandlers(
           role,
           image: imageUrl,
           isActive,
-          joinedAt: dayjs(joinedAt).toDate(),
+          joinedAt: joinedAt ? new Date(joinedAt) : new Date(),
         },
         select: {
           id: true,
@@ -255,8 +285,8 @@ export const updateStaffHandler = factory.createHandlers(
           image: imageUrl,
           isActive: validatedForm.isActive,
           joinedAt: validatedForm.joinedAt
-            ? dayjs(validatedForm.joinedAt).toDate()
-            : undefined,
+            ? new Date(validatedForm.joinedAt)
+            : new Date(),
         },
         select: {
           id: true,
@@ -384,7 +414,7 @@ export const createBallboyScheduleHandler = factory.createHandlers(
         const existingSchedule = await db.ballboySchedule.findFirst({
           where: {
             staffId,
-            date: dayjs(date).toDate(),
+            date: new Date(date),
             time,
           },
         })
@@ -404,7 +434,7 @@ export const createBallboyScheduleHandler = factory.createHandlers(
           newSchedule = await db.ballboySchedule.create({
             data: {
               staffId,
-              date: dayjs(date).toDate(),
+              date: new Date(date),
               time,
               isAvailable,
             },
@@ -430,9 +460,6 @@ export const createBallboyScheduleHandler = factory.createHandlers(
 
         const { fromDate, toDate, fromTime, toTime, days, isAvailable } = range
 
-        const schedulesToCreate: Array<Prisma.BallboyScheduleCreateManyInput> =
-          []
-
         const generatedSchedules = getScheduleFromDateRange(
           fromDate,
           toDate,
@@ -453,42 +480,19 @@ export const createBallboyScheduleHandler = factory.createHandlers(
           `Generated Schedules: ${JSON.stringify(generatedSchedules)}`,
         )
 
-        const existingSchedules = await db.ballboySchedule.findMany({
-          where: {
-            staffId,
-            date: {
-              gte: dayjs(fromDate).toDate(),
-              lte: dayjs(toDate).toDate(),
-            },
-          },
-        })
-
-        if (existingSchedules.length > 0) {
-          c.var.logger.debug(
-            `Found ${existingSchedules.length} existing schedules in the range`,
-          )
-        }
-
-        const existingScheduleSet = new Set(
-          existingSchedules.map(
-            (s) => `${dayjs(s.date).format('YYYY-MM-DD')}-${s.time}`,
-          ),
-        )
-
-        for (const sched of generatedSchedules) {
-          const key = `${sched.date}-${sched.time}`
-
-          if (!existingScheduleSet.has(key)) {
-            schedulesToCreate.push({
+        const schedulesToCreate: Array<Prisma.BallboyScheduleCreateManyInput> =
+          generatedSchedules
+            .map((sched) => ({
               staffId,
-              date: dayjs(sched.date, 'YYYY-MM-DD', true)
-                .add(1, 'day')
-                .toDate(),
+              date: new Date(sched.date),
               time: sched.time,
               isAvailable: isAvailable ?? true,
-            })
-          }
-        }
+            }))
+            .sort(
+              (a, b) =>
+                a.date.getTime() - b.date.getTime() ||
+                a.time.localeCompare(b.time),
+            )
 
         if (schedulesToCreate.length === 0) {
           throw new BadRequestException(
@@ -505,8 +509,8 @@ export const createBallboyScheduleHandler = factory.createHandlers(
           where: {
             staffId,
             date: {
-              gte: dayjs(fromDate).toDate(),
-              lte: dayjs(toDate).toDate(),
+              gte: new Date(fromDate),
+              lte: new Date(toDate),
             },
           },
         })
@@ -574,7 +578,7 @@ export const createCoachScheduleHandler = factory.createHandlers(
         const existingSchedule = await db.coachSchedule.findFirst({
           where: {
             staffId,
-            date: dayjs(date).toDate(),
+            date: new Date(date),
             time,
           },
         })
@@ -593,7 +597,7 @@ export const createCoachScheduleHandler = factory.createHandlers(
           newSchedule = await db.coachSchedule.create({
             data: {
               staffId,
-              date: dayjs(date).toDate(),
+              date: new Date(date),
               time,
               isAvailable,
             },
@@ -649,8 +653,8 @@ export const createCoachScheduleHandler = factory.createHandlers(
           where: {
             staffId,
             date: {
-              gte: dayjs(fromDate).toDate(),
-              lte: dayjs(toDate).toDate(),
+              gte: new Date(fromDate),
+              lte: new Date(toDate),
             },
           },
         })
@@ -697,8 +701,8 @@ export const createCoachScheduleHandler = factory.createHandlers(
           where: {
             staffId,
             date: {
-              gte: dayjs(fromDate).toDate(),
-              lte: dayjs(toDate).toDate(),
+              gte: new Date(fromDate),
+              lte: new Date(toDate),
             },
           },
         })

@@ -84,7 +84,10 @@ export function getScheduleFromDateRange(
       t.isSameOrBefore(endTime);
       t = t.add(intervalMinutes, 'minute')
     ) {
-      schedules.push({ date: base, time: t.format('HH:mm') })
+      schedules.push({
+        date: base,
+        time: t.format('HH:mm'),
+      })
     }
   }
   return schedules
