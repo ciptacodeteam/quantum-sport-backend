@@ -1,6 +1,7 @@
 import {
   changeStaffPasswordHandler,
   createBallboyScheduleHandler,
+  createCoachScheduleHandler,
   createStaffHandler,
   getAllStaffHandler,
   getStaffHandler,
@@ -18,5 +19,6 @@ const adminStaffRoute = createRouter()
   .post('/:id/password', ...changeStaffPasswordHandler)
   .post('/:id/revoke', ...revokeStaffTokenHandler)
   .post('/:id/ballboy-schedule', ...createBallboyScheduleHandler)
+  .post('/:id/coach-schedule', ...createCoachScheduleHandler)
 
 export default adminStaffRoute
