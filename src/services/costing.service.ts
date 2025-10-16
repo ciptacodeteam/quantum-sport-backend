@@ -577,14 +577,21 @@ export async function updateStaffPricing(p: UpdateStaffPricingPayload) {
   }
 }
 
+type OverrideSingleBallboyCostPayload = {
+  staffId: string
+  type: Extract<SlotType, 'COACH' | 'BALLBOY'>
+  date: string
+  hour: number
+  price: bigint
+}
 // ---------- 3) One-hour override (e.g., promo or manual edit)
-export async function overrideStaffHourPrice(
-  staffId: string,
-  type: Extract<SlotType, 'COACH' | 'BALLBOY'>,
-  date: string,
-  hour: number,
-  price: bigint,
-) {
+export async function overrideStaffHourPrice({
+  staffId,
+  type,
+  date,
+  hour,
+  price,
+}: OverrideSingleBallboyCostPayload) {
   try {
     const { startAt, endAt } = toUtcRange(date, hour)
 

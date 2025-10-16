@@ -205,3 +205,25 @@ export type CreateCourtSchema = z.infer<typeof createCourtSchema>
 export const updateCourtSchema = createCourtSchema.partial()
 
 export type UpdateCourtSchema = z.infer<typeof updateCourtSchema>
+
+export const createBallboyCostSchema = createCourtCostSchema
+  .omit({ courtId: true })
+  .extend({
+    ballboyId: z.string(),
+  })
+
+export type CreateBallboyCostSchema = z.infer<typeof createBallboyCostSchema>
+
+export const updateBallboyCostSchema = updateCourtCostSchema
+
+export type UpdateBallboyCostSchema = z.infer<typeof updateBallboyCostSchema>
+
+export const overrideSingleBallboyCostSchema = overrideSingleCourtCostSchema
+  .omit({ courtId: true })
+  .extend({
+    ballboyId: z.string(),
+  })
+
+export type OverrideSingleBallboyCostSchema = z.infer<
+  typeof overrideSingleBallboyCostSchema
+>
