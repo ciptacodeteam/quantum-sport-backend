@@ -7,7 +7,7 @@ import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { generateJwtToken } from '@/lib/token'
 import {
-  loginSchema,
+  loginWithEmailSchema,
   LoginWithEmailSchema,
   registerAdminSchema,
   RegisterAdminSchema,
@@ -100,7 +100,7 @@ export const registerAdminHandler = factory.createHandlers(
 )
 
 export const loginAdminHandler = factory.createHandlers(
-  zValidator('json', loginSchema, validateHook),
+  zValidator('json', loginWithEmailSchema, validateHook),
   async (c) => {
     try {
       const validated = c.req.valid('json') as LoginWithEmailSchema
