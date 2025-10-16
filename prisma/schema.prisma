@@ -127,9 +127,10 @@ model Staff {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  authTokens AuthToken[]
+  authTokens          AuthToken[]
   // Derived schedules now use Slot (see below) instead of separate tables
-  slot       Slot[]
+  slot                Slot[]
+  coachTypeStaffPrice CoachTypeStaffPrice[]
 
   @@map("staff")
 }
@@ -408,17 +409,32 @@ model BookingBallboy {
 model BookingCoachType {
   id          String   @id @default(cuid())
   name        String // e.g., "guided match" or "personal training"
-  price       Int      @db.Integer
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  bookingCoach BookingCoach[]
+  bookingCoach        BookingCoach[]
+  coachTypeStaffPrice CoachTypeStaffPrice[]
 
   @@unique([name])
   @@index([isActive])
   @@map("coach_types")
+}
+
+model CoachTypeStaffPrice {
+  id          String   @id @default(cuid())
+  staffId     String
+  coachTypeId String
+  basePrice   BigInt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  staff     Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  coachType BookingCoachType @relation(fields: [coachTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, coachTypeId], map: "uq_staff_coachtype_price")
+  @@map("coach_type_staff_prices")
 }
 
 model BookingCoach {
