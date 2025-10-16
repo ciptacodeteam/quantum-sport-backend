@@ -68,6 +68,26 @@ export const getStaffHandler = factory.createHandlers(
           role: true,
           isActive: true,
           joinedAt: true,
+          ballboySchedule: {
+            select: {
+              id: true,
+              date: true,
+              isAvailable: true,
+              time: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          coachSchedule: {
+            select: {
+              id: true,
+              date: true,
+              time: true,
+              isAvailable: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
         },
       })
 

@@ -35,11 +35,11 @@ model User {
 
   authTokens                   AuthToken[]
   bookings                     Booking[]
-  MembershipUser               MembershipUser[]
-  ClassBooking                 ClassBooking[]
-  Club                         Club[]
-  ClubMember                   ClubMember[]
-  TournamentRegistrationMember TournamentRegistrationMember[]
+  membershipUser               MembershipUser[]
+  classBooking                 ClassBooking[]
+  club                         Club[]
+  clubMember                   ClubMember[]
+  tournamentRegistrationMember TournamentRegistrationMember[]
 
   @@map("user")
 }
@@ -85,8 +85,8 @@ model Staff {
   updatedAt DateTime @default(now()) @updatedAt
 
   authTokens      AuthToken[]
-  BallboySchedule BallboySchedule[]
-  CoachSchedule   CoachSchedule[]
+  ballboySchedule BallboySchedule[]
+  coachSchedule   CoachSchedule[]
 
   @@map("staff")
 }
@@ -101,7 +101,7 @@ model BallboySchedule {
   updatedAt   DateTime @default(now()) @updatedAt
 
   staff          Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  BookingBallboy BookingBallboy[]
+  bookingBallboy BookingBallboy[]
 
   @@map("ballboy_schedules")
 }
@@ -116,7 +116,7 @@ model CoachSchedule {
   updatedAt   DateTime @default(now()) @updatedAt
 
   staff        Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  BookingCoach BookingCoach[]
+  bookingCoach BookingCoach[]
 
   @@map("coach_schedules")
 }
@@ -151,7 +151,7 @@ model Inventory {
   isActive         Boolean            @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @default(now()) @updatedAt
-  BookingInventory BookingInventory[]
+  bookingInventory BookingInventory[]
 
   @@map("inventories")
 }
@@ -166,7 +166,7 @@ model Court {
   updatedAt   DateTime @default(now()) @updatedAt
 
   costSchedules CourtCostSchedule[]
-  BookingDetail BookingDetail[]
+  bookingDetail BookingDetail[]
 
   @@map("courts")
 }
@@ -200,7 +200,7 @@ model Membership {
 
   benefits       MembershipBenefit[]
   bookings       Booking[]
-  MembershipUser MembershipUser[]
+  membershipUser MembershipUser[]
 
   @@map("memberships")
 }
@@ -249,7 +249,7 @@ model CourtCostSchedule {
   updatedAt   DateTime @default(now()) @updatedAt
 
   court         Court           @relation(fields: [courtId], references: [id])
-  BookingDetail BookingDetail[]
+  bookingDetail BookingDetail[]
 
   @@map("court_cost_schedules")
 }
@@ -295,10 +295,10 @@ model Booking {
   user             User               @relation(fields: [userId], references: [id])
   paymentMethod    PaymentMethod      @relation(fields: [paymentMethodId], references: [id])
   membership       Membership?        @relation(fields: [membershipId], references: [id])
-  BookingDetail    BookingDetail[]
-  BookingInventory BookingInventory[]
-  BookingBallboy   BookingBallboy[]
-  BookingCoach     BookingCoach[]
+  bookingDetail    BookingDetail[]
+  bookingInventory BookingInventory[]
+  bookingBallboy   BookingBallboy[]
+  bookingCoach     BookingCoach[]
 
   @@map("bookings")
 }
@@ -360,7 +360,7 @@ model BookingCoachType {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  BookingCoach BookingCoach[]
+  bookingCoach BookingCoach[]
 
   @@map("coach_types")
 }
@@ -411,7 +411,7 @@ model Class {
   isActive      Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @default(now()) @updatedAt
-  ClassBooking  ClassBooking[]
+  classBooking  ClassBooking[]
 
   @@map("classes")
 }
@@ -435,7 +435,7 @@ model ClassBooking {
   class              Class                @relation(fields: [classId], references: [id])
   user               User                 @relation(fields: [userId], references: [id])
   paymentMethod      PaymentMethod        @relation(fields: [paymentMethodId], references: [id])
-  ClassBookingDetail ClassBookingDetail[]
+  classBookingDetail ClassBookingDetail[]
 
   @@map("class_bookings")
 }
@@ -473,8 +473,8 @@ model Club {
   updatedAt   DateTime       @default(now()) @updatedAt
 
   leader                 User                     @relation(fields: [leaderId], references: [id])
-  ClubMember             ClubMember[]
-  TournamentRegistration TournamentRegistration[]
+  clubMember             ClubMember[]
+  tournamentRegistration TournamentRegistration[]
 
   @@map("clubs")
 }
@@ -512,7 +512,7 @@ model Tournament {
   isActive               Boolean                  @default(true)
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @default(now()) @updatedAt
-  TournamentRegistration TournamentRegistration[]
+  tournamentRegistration TournamentRegistration[]
 
   @@map("tournaments")
 }
@@ -535,7 +535,7 @@ model TournamentRegistration {
 
   tournament                   Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   club                         Club                           @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  TournamentRegistrationMember TournamentRegistrationMember[]
+  tournamentRegistrationMember TournamentRegistrationMember[]
 
   @@map("tournament_registrations")
 }
