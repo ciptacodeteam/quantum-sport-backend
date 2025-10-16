@@ -9,8 +9,8 @@ type SetCourtPricingPayload = {
   fromDate: string // YYYY-MM-DD
   toDate: string // YYYY-MM-DD
   days: number[] // 1=Mon, 2=Tue, ..., 7=Sun
-  happyHourPrice: bigint
-  peakHourPrice: bigint
+  happyHourPrice: number
+  peakHourPrice: number
   closedHours?: number[]
 }
 
@@ -147,8 +147,8 @@ export async function setCourtPricing({
 type UpdateCourtPricingPayload = {
   courtId: string
   date: string // YYYY-MM-DD (local)
-  happyHourPrice: bigint // 06–15
-  peakHourPrice: bigint // 15–24
+  happyHourPrice: number // 06–15
+  peakHourPrice: number // 15–24
   closedHours?: number[] // 0..23 (default: 0–5 closed)
 }
 
@@ -204,9 +204,9 @@ export async function updateCourtPricing({
         }
 
         // 4) Decide create/update/keep/delete
-        const toCreate: Array<{ startAt: Date; endAt: Date; price: bigint }> =
+        const toCreate: Array<{ startAt: Date; endAt: Date; price: number }> =
           []
-        const toUpdate: Array<{ id: string; price: bigint }> = []
+        const toUpdate: Array<{ id: string; price: number }> = []
         const keepIds = new Set<string>()
 
         for (const { h, price } of target) {
@@ -240,9 +240,9 @@ export async function updateCourtPricing({
           ccsByHour.set(h, r)
         }
 
-        const ccsCreate: Array<{ startAt: Date; endAt: Date; price: bigint }> =
+        const ccsCreate: Array<{ startAt: Date; endAt: Date; price: number }> =
           []
-        const ccsUpdate: Array<{ id: string; price: bigint }> = []
+        const ccsUpdate: Array<{ id: string; price: number }> = []
         const ccsKeep = new Set<string>()
 
         for (const { h, price } of target) {
@@ -327,7 +327,7 @@ type OverrideSingleCourtHourPricePayload = {
   courtId: string
   date: string
   hour: number
-  price: bigint
+  price: number
 }
 
 export async function overrideSingleCourtHourPrice({
@@ -390,8 +390,8 @@ type SetStaffPricingRangePayload = {
   fromDate: string // YYYY-MM-DD
   toDate: string // YYYY-MM-DD
   days: number[]
-  happyHourPrice: bigint
-  peakHourPrice: bigint
+  happyHourPrice: number
+  peakHourPrice: number
   closedHours?: number[] // default: []
 }
 
@@ -464,8 +464,8 @@ type UpdateStaffPricingPayload = {
   staffId: string
   type: Extract<SlotType, 'COACH' | 'BALLBOY'>
   date: string // YYYY-MM-DD
-  happyHourPrice: bigint // 06–15
-  peakHourPrice: bigint // 15–24
+  happyHourPrice: number // 06–15
+  peakHourPrice: number // 15–24
   closedHours?: number[] // hours to remove/close (default: none)
 }
 
@@ -514,8 +514,8 @@ export async function updateStaffPricing(p: UpdateStaffPricingPayload) {
       }
 
       const keepIds = new Set<string>()
-      const toCreate: Array<{ startAt: Date; endAt: Date; price: bigint }> = []
-      const toUpdate: Array<{ id: string; price: bigint }> = []
+      const toCreate: Array<{ startAt: Date; endAt: Date; price: number }> = []
+      const toUpdate: Array<{ id: string; price: number }> = []
 
       for (const { h, price } of target) {
         const found = byHour.get(h)
@@ -582,7 +582,7 @@ type OverrideSingleBallboyCostPayload = {
   type: Extract<SlotType, 'COACH' | 'BALLBOY'>
   date: string
   hour: number
-  price: bigint
+  price: number
 }
 // ---------- 3) One-hour override (e.g., promo or manual edit)
 export async function overrideStaffHourPrice({

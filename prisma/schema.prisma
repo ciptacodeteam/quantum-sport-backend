@@ -217,7 +217,7 @@ model Slot {
   // The actual time window (timestamptz)
   startAt     DateTime
   endAt       DateTime
-  price       BigInt   @default(0) // in rupiah, 0 for free/ballboy if bundled
+  price       Int      @default(0) @db.Integer // in rupiah, 0 for free/ballboy if bundled
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -245,7 +245,7 @@ model CourtCostSchedule {
   // For a whole-day price grid (e.g., 08:00-09:00), store range:
   startAt     DateTime
   endAt       DateTime
-  price       BigInt
+  price       Int      @db.Integer
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -264,7 +264,7 @@ model PaymentMethod {
   id        String   @id @default(cuid())
   name      String
   logo      String?
-  fees      BigInt   @default(0) // fixed fee (rupiah)
+  fees      Int      @default(0) @db.Integer // fixed fee (rupiah)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -280,8 +280,8 @@ model Payment {
   id              String        @id @default(cuid())
   paymentMethodId String
   status          PaymentStatus @default(PENDING)
-  amount          BigInt // total amount requested
-  fees            BigInt        @default(0) // gateway/admin fees recorded
+  amount          Int           @db.Integer // total amount requested
+  fees            Int           @default(0) @db.Integer // gateway/admin fees recorded
   externalRef     String?       @unique // gateway transaction id / VA number, etc.
   meta            Json? // raw payloads or gateway-specific fields
   dueDate         DateTime?
@@ -308,9 +308,9 @@ model Invoice {
   number        String        @unique // human-readable invoice no
   userId        String
   paymentId     String?       @unique
-  subtotal      BigInt
-  processingFee BigInt        @default(0)
-  total         BigInt
+  subtotal      Int           @db.Integer
+  processingFee Int           @default(0) @db.Integer
+  total         Int           @db.Integer
   status        PaymentStatus @default(PENDING)
 
   issuedAt    DateTime  @default(now())
@@ -336,8 +336,8 @@ model Booking {
   id                 String        @id @default(cuid())
   userId             String
   status             BookingStatus @default(DRAFT)
-  totalPrice         BigInt        @default(0)
-  processingFee      BigInt        @default(0)
+  totalPrice         Int           @default(0) @db.Integer
+  processingFee      Int           @default(0) @db.Integer
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @default(now()) @updatedAt
   holdExpiresAt      DateTime? // for HOLD; auto-release slots when passed
@@ -359,7 +359,7 @@ model BookingDetail {
   id        String @id @default(cuid())
   bookingId String
   slotId    String // COURT slot
-  price     BigInt
+  price     Int    @db.Integer
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -379,7 +379,7 @@ model BookingInventory {
   bookingId   String
   inventoryId String
   quantity    Int      @default(1)
-  price       BigInt   @default(0) // unit price captured at checkout
+  price       Int      @default(0) @db.Integer // unit price captured at checkout
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
@@ -394,7 +394,7 @@ model BookingBallboy {
   id        String   @id @default(cuid())
   bookingId String
   slotId    String // BALLBOY slot
-  price     BigInt   @default(0)
+  price     Int      @default(0) @db.Integer
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -408,7 +408,7 @@ model BookingBallboy {
 model BookingCoachType {
   id          String   @id @default(cuid())
   name        String
-  price       BigInt
+  price       Int      @db.Integer
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -426,7 +426,7 @@ model BookingCoach {
   bookingId          String
   slotId             String // COACH slot
   bookingCoachTypeId String
-  price              BigInt
+  price              Int      @db.Integer
   createdAt          DateTime @default(now())
   updatedAt          DateTime @default(now()) @updatedAt
 
@@ -446,7 +446,7 @@ model Membership {
   name        String
   description String?
   content     String?
-  price       BigInt
+  price       Int      @db.Integer
   sessions    Int
   duration    Int // days
   sequence    Int      @default(0)
@@ -512,7 +512,7 @@ model Class {
   endDate       DateTime @db.Date
   startTime     String
   endTime       String
-  price         BigInt
+  price         Int      @db.Integer
   sessions      Int
   capacity      Int
   remaining     Int
@@ -534,8 +534,8 @@ model ClassBooking {
   classId            String
   userId             String
   status             BookingStatus @default(DRAFT)
-  totalPrice         BigInt
-  processingFee      BigInt        @default(0)
+  totalPrice         Int           @db.Integer
+  processingFee      Int           @default(0) @db.Integer
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @default(now()) @updatedAt
   cancelledAt        DateTime?
@@ -555,7 +555,7 @@ model ClassBookingDetail {
   classBookingId String
   date           DateTime @db.Date
   time           String
-  price          BigInt
+  price          Int      @db.Integer
   attendance     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
@@ -617,7 +617,7 @@ model Tournament {
   endTime                String
   maxTeams               Int
   teamSize               Int
-  entryFee               BigInt
+  entryFee               Int                      @db.Integer
   location               String
   isActive               Boolean                  @default(true)
   createdAt              DateTime                 @default(now())
@@ -633,7 +633,7 @@ model TournamentRegistration {
   tournamentId       String
   clubId             String
   members            Int
-  totalFee           BigInt
+  totalFee           Int           @db.Integer
   status             BookingStatus @default(DRAFT)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @default(now()) @updatedAt

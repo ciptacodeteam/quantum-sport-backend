@@ -24,6 +24,8 @@ import {
   setStaffPricingRange,
   updateStaffPricing,
 } from './costing.service'
+import dayjs from 'dayjs'
+import { DATETIME_FORMAT } from '@/constants'
 
 export const getBallboyCostHandler = factory.createHandlers(
   zValidator('query', searchQuerySchema, validateHook),
@@ -35,13 +37,19 @@ export const getBallboyCostHandler = factory.createHandlers(
         searchableFields: ['price', 'startAt', 'endAt'],
       })
 
-      const items = await db.slot.findMany({
+      const items: any = await db.slot.findMany({
         ...queryOptions,
         where: {
           type: SlotType.BALLBOY,
           ...queryOptions.where,
         },
       })
+
+      for (const item of items) {
+        item['startAt'] = dayjs(item.startAt).tz().format(DATETIME_FORMAT)
+        item['endAt'] = dayjs(item.endAt).tz().format(DATETIME_FORMAT)
+      }
+
       return c.json(ok(items, 'Ballboy cost endpoint is working'), status.OK)
     } catch (error) {
       c.var.logger.error(`Error fetching ballboy cost: ${error}`)

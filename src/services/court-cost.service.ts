@@ -23,6 +23,8 @@ import status from 'http-status'
 import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
 import { NotFoundException } from '@/exceptions'
+import dayjs from 'dayjs'
+import { DATETIME_FORMAT } from '@/constants'
 
 export const getCourtCostHandler = factory.createHandlers(
   zValidator('query', searchQuerySchema, validateHook),
@@ -34,9 +36,15 @@ export const getCourtCostHandler = factory.createHandlers(
         searchableFields: ['price', 'startAt', 'endAt'],
       })
 
-      const items = await db.courtCostSchedule.findMany({
+      const items: any = await db.courtCostSchedule.findMany({
         ...queryOptions,
       })
+
+      for (const item of items) {
+        item['startAt'] = dayjs(item.startAt).tz().format(DATETIME_FORMAT)
+        item['endAt'] = dayjs(item.endAt).tz().format(DATETIME_FORMAT)
+      }
+
       return c.json(ok(items, 'Court cost endpoint is working'), status.OK)
     } catch (error) {
       c.var.logger.error(`Error fetching court cost: ${error}`)

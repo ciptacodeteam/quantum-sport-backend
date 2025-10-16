@@ -38,23 +38,16 @@ export const getAllStaffHandler = factory.createHandlers(
           ...queryOptions.where,
           id: { not: staffId }, // Exclude the currently logged-in admin
         },
-        include: {
-          _count: {
-            select: {
-              slot: {
-                where: {
-                  OR: [
-                    {
-                      type: 'COACH',
-                    },
-                    {
-                      type: 'BALLBOY',
-                    },
-                  ],
-                },
-              },
-            },
-          },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          image: true,
+          createdAt: true,
+          role: true,
+          isActive: true,
+          joinedAt: true,
         },
       })
 
