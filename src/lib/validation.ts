@@ -157,7 +157,7 @@ export const singleScheduleSchema = z.object({
     message: 'Invalid date format, expected YYYY-MM-DD',
   }),
   time: z.string().min(5).max(8),
-  isAvailable: z.boolean().optional(),
+  isAvailable: z.coerce.boolean().optional(),
 })
 
 export type SingleScheduleSchema = z.infer<typeof singleScheduleSchema>
@@ -186,6 +186,7 @@ export const rangeScheduleSchema = z.object({
       ]),
     )
     .optional(),
+  isAvailable: z.coerce.boolean().optional(),
 })
 
 export type RangeScheduleSchema = z.infer<typeof rangeScheduleSchema>

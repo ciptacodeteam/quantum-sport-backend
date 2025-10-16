@@ -47,6 +47,13 @@ export const getAllStaffHandler = factory.createHandlers(
         },
       })
 
+      for (const item of items) {
+        if (item.image) {
+          const imageUrl = await getFilePath(item.image)
+          item.image = imageUrl
+        }
+      }
+
       return c.json(ok(items), status.OK)
     } catch (err) {
       c.var.logger.fatal(`Error fetching staff list: ${err}`)
@@ -382,28 +389,35 @@ export const createBallboyScheduleHandler = factory.createHandlers(
           },
         })
 
-        if (existingSchedule) {
-          throw new BadRequestException(
-            'Schedule already exists for the given date and time',
-          )
-        }
+        let newSchedule: Partial<Prisma.BallboyScheduleCreateInput> | null =
+          null
 
-        const newSchedule = await db.ballboySchedule.create({
-          data: {
-            staffId,
-            date: dayjs(date).toDate(),
-            time,
-            isAvailable,
-          },
-          select: {
-            id: true,
-            date: true,
-            time: true,
-            isAvailable: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        })
+        if (existingSchedule) {
+          const updated = await db.ballboySchedule.update({
+            where: { id: existingSchedule.id },
+            data: {
+              isAvailable: isAvailable ?? true,
+            },
+          })
+          newSchedule = updated
+        } else {
+          newSchedule = await db.ballboySchedule.create({
+            data: {
+              staffId,
+              date: dayjs(date).toDate(),
+              time,
+              isAvailable,
+            },
+            select: {
+              id: true,
+              date: true,
+              time: true,
+              isAvailable: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          })
+        }
 
         return c.json(
           ok(newSchedule, 'Ballboy schedule created successfully'),
@@ -414,7 +428,7 @@ export const createBallboyScheduleHandler = factory.createHandlers(
           throw new BadRequestException('Range schedule data is required')
         }
 
-        const { fromDate, toDate, fromTime, toTime, days } = range
+        const { fromDate, toDate, fromTime, toTime, days, isAvailable } = range
 
         const schedulesToCreate: Array<Prisma.BallboyScheduleCreateManyInput> =
           []
@@ -463,6 +477,7 @@ export const createBallboyScheduleHandler = factory.createHandlers(
 
         for (const sched of generatedSchedules) {
           const key = `${sched.date}-${sched.time}`
+
           if (!existingScheduleSet.has(key)) {
             schedulesToCreate.push({
               staffId,
@@ -470,7 +485,7 @@ export const createBallboyScheduleHandler = factory.createHandlers(
                 .add(1, 'day')
                 .toDate(),
               time: sched.time,
-              isAvailable: true,
+              isAvailable: isAvailable ?? true,
             })
           }
         }
@@ -486,6 +501,20 @@ export const createBallboyScheduleHandler = factory.createHandlers(
         )
         c.var.logger.debug(`Schedules: ${JSON.stringify(schedulesToCreate)}`)
 
+        const deleted = await db.ballboySchedule.deleteMany({
+          where: {
+            staffId,
+            date: {
+              gte: dayjs(fromDate).toDate(),
+              lte: dayjs(toDate).toDate(),
+            },
+          },
+        })
+
+        c.var.logger.debug(
+          `Deleted ${deleted.count} existing schedules for ballboy ID ${staffId} in the date range`,
+        )
+
         const createdSchedules = await db.ballboySchedule.createMany({
           data: schedulesToCreate,
         })
@@ -499,7 +528,7 @@ export const createBallboyScheduleHandler = factory.createHandlers(
         )
 
         return c.json(
-          ok(createdSchedules, 'Ballboy schedules created successfully'),
+          ok(schedulesToCreate, 'Ballboy schedules created successfully'),
           status.CREATED,
         )
       } else {
@@ -550,28 +579,38 @@ export const createCoachScheduleHandler = factory.createHandlers(
           },
         })
 
+        let newSchedule: Partial<Prisma.CoachScheduleCreateInput> | null = null
+
         if (existingSchedule) {
-          throw new BadRequestException(
-            'Schedule already exists for the given date and time',
-          )
+          const updated = await db.coachSchedule.update({
+            where: { id: existingSchedule.id },
+            data: {
+              isAvailable: isAvailable ?? true,
+            },
+          })
+          newSchedule = updated
+        } else {
+          newSchedule = await db.coachSchedule.create({
+            data: {
+              staffId,
+              date: dayjs(date).toDate(),
+              time,
+              isAvailable,
+            },
+            select: {
+              id: true,
+              date: true,
+              time: true,
+              isAvailable: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          })
         }
 
-        const newSchedule = await db.coachSchedule.create({
-          data: {
-            staffId,
-            date: dayjs(date).toDate(),
-            time,
-            isAvailable,
-          },
-          select: {
-            id: true,
-            date: true,
-            time: true,
-            isAvailable: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        })
+        if (!newSchedule) {
+          throw new BadRequestException('Failed to create or update schedule')
+        }
 
         return c.json(
           ok(newSchedule, 'Coach schedule created successfully'),
@@ -582,7 +621,7 @@ export const createCoachScheduleHandler = factory.createHandlers(
           throw new BadRequestException('Range schedule data is required')
         }
 
-        const { fromDate, toDate, fromTime, toTime, days } = range
+        const { fromDate, toDate, fromTime, toTime, days, isAvailable } = range
 
         const schedulesToCreate: Array<Prisma.CoachScheduleCreateManyInput> = []
 
@@ -630,6 +669,7 @@ export const createCoachScheduleHandler = factory.createHandlers(
 
         for (const sched of generatedSchedules) {
           const key = `${sched.date}-${sched.time}`
+
           if (!existingScheduleSet.has(key)) {
             schedulesToCreate.push({
               staffId,
@@ -637,7 +677,7 @@ export const createCoachScheduleHandler = factory.createHandlers(
                 .add(1, 'day')
                 .toDate(),
               time: sched.time,
-              isAvailable: true,
+              isAvailable: isAvailable ?? true,
             })
           }
         }
@@ -653,6 +693,20 @@ export const createCoachScheduleHandler = factory.createHandlers(
         )
         c.var.logger.debug(`Schedules: ${JSON.stringify(schedulesToCreate)}`)
 
+        const deleted = await db.coachSchedule.deleteMany({
+          where: {
+            staffId,
+            date: {
+              gte: dayjs(fromDate).toDate(),
+              lte: dayjs(toDate).toDate(),
+            },
+          },
+        })
+
+        c.var.logger.debug(
+          `Deleted ${deleted.count} existing schedules for coach ID ${staffId} in the date range`,
+        )
+
         const createdSchedules = await db.coachSchedule.createMany({
           data: schedulesToCreate,
         })
@@ -666,7 +720,7 @@ export const createCoachScheduleHandler = factory.createHandlers(
         )
 
         return c.json(
-          ok(createdSchedules, 'Coach schedules created successfully'),
+          ok(schedulesToCreate, 'Coach schedules created successfully'),
           status.CREATED,
         )
       } else {
