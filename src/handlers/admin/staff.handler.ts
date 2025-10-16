@@ -446,7 +446,6 @@ export const createBallboyScheduleHandler = factory.createHandlers(
             },
           },
         })
-        console.log('🚀 ~ existingSchedules:', existingSchedules)
 
         if (existingSchedules.length > 0) {
           c.var.logger.debug(
