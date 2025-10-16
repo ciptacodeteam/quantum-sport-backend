@@ -1,9 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// ------------------------------
+// Prisma Generators & Datasource
+// ------------------------------
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -14,34 +11,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String?  @unique
-  emailVerified Boolean  @default(false)
-  password      String?
-  image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
-
-  banned     Boolean?  @default(false)
-  banReason  String?
-  banExpires DateTime?
-
-  googleId String? @unique
-
-  phone         String   @unique
-  phoneVerified Boolean?
-
-  authTokens                   AuthToken[]
-  bookings                     Booking[]
-  membershipUser               MembershipUser[]
-  classBooking                 ClassBooking[]
-  club                         Club[]
-  clubMember                   ClubMember[]
-  tournamentRegistrationMember TournamentRegistrationMember[]
-
-  @@map("user")
+// ------------------------------
+// Common Enums
+// ------------------------------
+enum Role {
+  ADMIN
+  BALLBOY
+  COACH
 }
 
 enum PhoneVerificationType {
@@ -50,6 +26,78 @@ enum PhoneVerificationType {
   FORGOT_PASSWORD
   VERIFY_PHONE
   CHANGE_PHONE
+}
+
+enum AuthTokenType {
+  STAFF
+  USER
+}
+
+enum PaymentStatus {
+  PENDING
+  AWAITING_CONFIRMATION // created but not paid (e.g., VA issued)
+  PAID // paid & captured/settled by gateway
+  CANCELLED
+  EXPIRED
+  REFUNDED
+}
+
+enum BookingStatus {
+  DRAFT // cart-like pre-checkout
+  HOLD // temporary hold on slots before payment (expiry)
+  CONFIRMED // paid; slots locked
+  CANCELLED
+}
+
+enum SlotType {
+  COURT
+  COACH
+  BALLBOY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  ALL
+}
+
+enum ClubVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+// ------------------------------
+// Users & Auth
+// ------------------------------
+model User {
+  id            String  @id @default(cuid())
+  name          String
+  email         String? @unique
+  emailVerified Boolean @default(false)
+  password      String?
+  image         String?
+  googleId      String? @unique
+
+  phone         String  @unique
+  phoneVerified Boolean @default(false)
+
+  banned     Boolean   @default(false)
+  banReason  String?
+  banExpires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  authTokens                   AuthToken[]
+  bookings                     Booking[]
+  membershipUser               MembershipUser[]
+  classBookings                ClassBooking[]
+  clubsLed                     Club[]                         @relation("ClubLeader")
+  clubMember                   ClubMember[]
+  tournamentRegistrationMember TournamentRegistrationMember[]
+  invoice                      Invoice[]
+
+  @@map("user")
 }
 
 model PhoneVerification {
@@ -66,11 +114,6 @@ model PhoneVerification {
   @@map("phone_verification")
 }
 
-enum AuthTokenType {
-  STAFF
-  USER
-}
-
 model Staff {
   id        String   @id @default(cuid())
   image     String?
@@ -84,41 +127,11 @@ model Staff {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  authTokens      AuthToken[]
-  ballboySchedule BallboySchedule[]
-  coachSchedule   CoachSchedule[]
+  authTokens AuthToken[]
+  // Derived schedules now use Slot (see below) instead of separate tables
+  slot       Slot[]
 
   @@map("staff")
-}
-
-model BallboySchedule {
-  id          String   @id @default(cuid())
-  staffId     String
-  date        DateTime @db.Date
-  time        String // e.g., "08:00" 
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-
-  staff          Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  bookingBallboy BookingBallboy[]
-
-  @@map("ballboy_schedules")
-}
-
-model CoachSchedule {
-  id          String   @id @default(cuid())
-  staffId     String
-  date        DateTime @db.Date
-  time        String // e.g., "08:00"
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-
-  staff        Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  bookingCoach BookingCoach[]
-
-  @@map("coach_schedules")
 }
 
 model AuthToken {
@@ -137,23 +150,22 @@ model AuthToken {
   @@map("auth_token")
 }
 
-enum Role {
-  ADMIN
-  BALLBOY
-  COACH
-}
+// ------------------------------
+// Catalogs / Content
+// ------------------------------
+model Banner {
+  id        String    @id @default(cuid())
+  image     String
+  link      String?
+  isActive  Boolean   @default(true)
+  startAt   DateTime?
+  endAt     DateTime?
+  sequence  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
-model Inventory {
-  id               String             @id @default(cuid())
-  name             String
-  description      String?
-  quantity         Int                @default(0)
-  isActive         Boolean            @default(true)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @default(now()) @updatedAt
-  bookingInventory BookingInventory[]
-
-  @@map("inventories")
+  @@index([isActive, startAt, endAt, sequence])
+  @@map("banners")
 }
 
 model Court {
@@ -167,41 +179,285 @@ model Court {
 
   costSchedules CourtCostSchedule[]
   bookingDetail BookingDetail[]
+  slot          Slot[]
 
+  @@unique([name])
+  @@index([isActive])
   @@map("courts")
 }
 
-model Banner {
-  id        String    @id @default(cuid())
-  image     String
-  link      String?
-  isActive  Boolean   @default(true)
-  startAt   DateTime?
-  endAt     DateTime?
-  sequence  Int       @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
+model Inventory {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  quantity    Int      @default(0) // stock on hand
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-  @@map("banners")
+  bookingInventory BookingInventory[]
+
+  @@unique([name])
+  @@index([isActive])
+  @@map("inventories")
 }
 
+// ------------------------------
+// Scheduling (Unified Slot model)
+// ------------------------------
+// All “time grids” (court / coach / ballboy) are modeled as Slots with start/end times.
+// Non-overlap is enforced via unique constraints per resource.
+
+model Slot {
+  id          String   @id @default(cuid())
+  type        SlotType
+  // Resource pointers (exactly one must be set depending on type)
+  courtId     String?
+  staffId     String? // for COACH or BALLBOY
+  // The actual time window (timestamptz)
+  startAt     DateTime
+  endAt       DateTime
+  price       BigInt   @default(0) // in rupiah, 0 for free/ballboy if bundled
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  court Court? @relation(fields: [courtId], references: [id])
+  staff Staff? @relation(fields: [staffId], references: [id])
+
+  bookingDetails  BookingDetail[] // court slots
+  bookingCoaches  BookingCoach[] // coach slots
+  bookingBallboys BookingBallboy[] // ballboy slots
+
+  // Prevent overlaps per resource+time window:
+  // (Postgres cannot enforce “no overlap” via Prisma directly; we simulate with unique composite on (resource, startAt))
+  @@unique([courtId, startAt], map: "uq_court_slot_start") // for COURT
+  @@unique([staffId, startAt], map: "uq_staff_slot_start") // for COACH/BALLBOY
+  @@index([type, startAt, endAt, isAvailable])
+  @@map("slots")
+}
+
+// Legacy CourtCostSchedule kept as a published price table (optional)
+// Often still useful for “price calendar” UIs and batch slot generation.
+model CourtCostSchedule {
+  id          String   @id @default(cuid())
+  courtId     String
+  // For a whole-day price grid (e.g., 08:00-09:00), store range:
+  startAt     DateTime
+  endAt       DateTime
+  price       BigInt
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  court Court @relation(fields: [courtId], references: [id])
+
+  @@index([courtId, startAt, endAt, isAvailable])
+  @@map("court_cost_schedules")
+}
+
+// ------------------------------
+// Payments & Invoices
+// ------------------------------
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  name      String
+  logo      String?
+  fees      BigInt   @default(0) // fixed fee (rupiah)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  payments Payment[]
+
+  @@unique([name])
+  @@index([isActive])
+  @@map("payment_methods")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  paymentMethodId String
+  status          PaymentStatus @default(PENDING)
+  amount          BigInt // total amount requested
+  fees            BigInt        @default(0) // gateway/admin fees recorded
+  externalRef     String?       @unique // gateway transaction id / VA number, etc.
+  meta            Json? // raw payloads or gateway-specific fields
+  dueDate         DateTime?
+  paidAt          DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  method  PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  invoice Invoice?
+
+  @@index([status, dueDate])
+  @@map("payments")
+}
+
+model Invoice {
+  id                       String  @id @default(cuid())
+  // Polymorphic linkage via nullable FKs (exactly one must be set)
+  bookingId                String? @unique
+  classBookingId           String? @unique
+  membershipUserId         String? @unique
+  tournamentRegistrationId String? @unique
+
+  number        String        @unique // human-readable invoice no
+  userId        String
+  paymentId     String?       @unique
+  subtotal      BigInt
+  processingFee BigInt        @default(0)
+  total         BigInt
+  status        PaymentStatus @default(PENDING)
+
+  issuedAt    DateTime  @default(now())
+  dueDate     DateTime
+  paidAt      DateTime?
+  cancelledAt DateTime?
+
+  user                   User                    @relation(fields: [userId], references: [id])
+  payment                Payment?                @relation(fields: [paymentId], references: [id])
+  booking                Booking?                @relation(fields: [bookingId], references: [id])
+  classBooking           ClassBooking?           @relation(fields: [classBookingId], references: [id])
+  membershipUser         MembershipUser?         @relation(fields: [membershipUserId], references: [id])
+  tournamentRegistration TournamentRegistration? @relation(fields: [tournamentRegistrationId], references: [id])
+
+  @@index([status, dueDate])
+  @@map("invoices")
+}
+
+// ------------------------------
+// Booking (Courts + optional add-ons)
+// ------------------------------
+model Booking {
+  id                 String        @id @default(cuid())
+  userId             String
+  status             BookingStatus @default(DRAFT)
+  totalPrice         BigInt        @default(0)
+  processingFee      BigInt        @default(0)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
+  holdExpiresAt      DateTime? // for HOLD; auto-release slots when passed
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  user        User               @relation(fields: [userId], references: [id])
+  details     BookingDetail[]
+  inventories BookingInventory[]
+  ballboys    BookingBallboy[]
+  coaches     BookingCoach[]
+  invoice     Invoice?
+
+  @@index([userId, status, createdAt])
+  @@map("bookings")
+}
+
+model BookingDetail {
+  id        String @id @default(cuid())
+  bookingId String
+  slotId    String // COURT slot
+  price     BigInt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  slot    Slot    @relation(fields: [slotId], references: [id])
+  court   Court?  @relation(fields: [courtId], references: [id])
+  courtId String?
+
+  // Ensure a court slot is not double-booked:
+  @@unique([slotId], map: "uq_bookingdetail_slot")
+  @@map("booking_details")
+}
+
+model BookingInventory {
+  id          String   @id @default(cuid())
+  bookingId   String
+  inventoryId String
+  quantity    Int      @default(1)
+  price       BigInt   @default(0) // unit price captured at checkout
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  inventory Inventory @relation(fields: [inventoryId], references: [id])
+
+  @@index([bookingId])
+  @@map("booking_inventories")
+}
+
+model BookingBallboy {
+  id        String   @id @default(cuid())
+  bookingId String
+  slotId    String // BALLBOY slot
+  price     BigInt   @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  slot    Slot    @relation(fields: [slotId], references: [id])
+
+  @@unique([slotId], map: "uq_bookingballboy_slot")
+  @@map("booking_ballboys")
+}
+
+model BookingCoachType {
+  id          String   @id @default(cuid())
+  name        String
+  price       BigInt
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  bookingCoach BookingCoach[]
+
+  @@unique([name])
+  @@index([isActive])
+  @@map("coach_types")
+}
+
+model BookingCoach {
+  id                 String   @id @default(cuid())
+  bookingId          String
+  slotId             String // COACH slot
+  bookingCoachTypeId String
+  price              BigInt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  booking          Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  slot             Slot             @relation(fields: [slotId], references: [id])
+  bookingCoachType BookingCoachType @relation(fields: [bookingCoachTypeId], references: [id])
+
+  @@unique([slotId], map: "uq_bookingcoach_slot")
+  @@map("booking_coaches")
+}
+
+// ------------------------------
+// Membership
+// ------------------------------
 model Membership {
   id          String   @id @default(cuid())
   name        String
   description String?
   content     String?
   price       BigInt
-  sessions    Int // number of sessions
-  duration    Int // duration in days
-  sequence    Int // for ordering
+  sessions    Int
+  duration    Int // days
+  sequence    Int      @default(0)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
   benefits       MembershipBenefit[]
-  bookings       Booking[]
   membershipUser MembershipUser[]
 
+  @@unique([name])
+  @@index([isActive, sequence])
   @@map("memberships")
 }
 
@@ -224,7 +480,7 @@ model MembershipUser {
   startDate         DateTime
   endDate           DateTime
   remainingSessions Int
-  remainingDuration Int // in days
+  remainingDuration Int
   isExpired         Boolean   @default(false)
   isSuspended       Boolean   @default(false)
   suspensionReason  String?
@@ -234,209 +490,62 @@ model MembershipUser {
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  invoice    Invoice?
 
+  @@index([userId, isExpired, isSuspended])
   @@map("membership_users")
 }
 
-model CourtCostSchedule {
-  id          String   @id @default(cuid())
-  courtId     String
-  date        DateTime @db.Date
-  time        String // e.g., "08:00"
-  price       BigInt
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-
-  court         Court           @relation(fields: [courtId], references: [id])
-  bookingDetail BookingDetail[]
-
-  @@map("court_cost_schedules")
-}
-
-enum PaymentStatus {
-  PENDING
-  CANCELLED
-  COMPLETED
-  EXPIRED
-}
-
-model PaymentMethod {
-  id        String   @id @default(cuid())
-  name      String
-  logo      String?
-  fees      BigInt   @default(0) // in rupiah
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  bookings     Booking[]
-  ClassBooking ClassBooking[]
-
-  @@map("payment_methods")
-}
-
-model Booking {
-  id                 String        @id
-  userId             String
-  membershipId       String?
-  totalPrice         BigInt
-  processingFee      BigInt        @default(0)
-  paymentMethodId    String
-  paymentStatus      PaymentStatus @default(PENDING)
-  bookingDate        DateTime      @default(now())
-  paymentDueDate     DateTime
-  paymentDate        DateTime?
-  cancelledAt        DateTime?
-  cancellationReason String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @default(now()) @updatedAt
-
-  user             User               @relation(fields: [userId], references: [id])
-  paymentMethod    PaymentMethod      @relation(fields: [paymentMethodId], references: [id])
-  membership       Membership?        @relation(fields: [membershipId], references: [id])
-  bookingDetail    BookingDetail[]
-  bookingInventory BookingInventory[]
-  bookingBallboy   BookingBallboy[]
-  bookingCoach     BookingCoach[]
-
-  @@map("bookings")
-}
-
-model BookingDetail {
-  id         String   @id @default(cuid())
-  bookingId  String
-  courtId    String
-  scheduleId String
-  date       DateTime @db.Date
-  time       String // e.g., "08:00"
-  price      BigInt
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @default(now()) @updatedAt
-
-  booking  Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  court    Court             @relation(fields: [courtId], references: [id])
-  schedule CourtCostSchedule @relation(fields: [scheduleId], references: [id])
-
-  @@map("booking_details")
-}
-
-model BookingInventory {
-  id          String   @id @default(cuid())
-  bookingId   String
-  inventoryId String
-  quantity    Int      @default(1)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-
-  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  inventory Inventory @relation(fields: [inventoryId], references: [id])
-
-  @@map("booking_inventories")
-}
-
-model BookingBallboy {
-  id                String   @id @default(cuid())
-  bookingId         String
-  ballboyScheduleId String
-  date              DateTime @db.Date
-  time              String // e.g., "08:00"
-  price             BigInt
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
-
-  booking         Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  ballboySchedule BallboySchedule @relation(fields: [ballboyScheduleId], references: [id])
-
-  @@map("booking_ballboys")
-}
-
-model BookingCoachType {
-  id          String   @id @default(cuid())
-  name        String
-  price       BigInt
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-
-  bookingCoach BookingCoach[]
-
-  @@map("coach_types")
-}
-
-model BookingCoach {
-  id                 String   @id @default(cuid())
-  bookingId          String
-  coachScheduleId    String
-  date               DateTime @db.Date
-  time               String // e.g., "08:00"
-  price              BigInt
-  bookingCoachTypeId String
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @default(now()) @updatedAt
-
-  booking          Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  bookingCoachType BookingCoachType @relation(fields: [bookingCoachTypeId], references: [id])
-  coachSchedule    CoachSchedule    @relation(fields: [coachScheduleId], references: [id])
-
-  @@map("booking_coaches")
-}
-
-enum Gender {
-  MALE
-  FEMALE
-  ALL
-}
-
+// ------------------------------
+// Class
+// ------------------------------
 model Class {
-  id            String         @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
   description   String?
   content       String?
-  organizerName String? // e.g., "Quantum Sport"
-  speakerName   String? // e.g., "John Doe"
+  organizerName String?
+  speakerName   String?
   image         String?
-  startDate     DateTime       @db.Date
-  endDate       DateTime       @db.Date
-  startTime     String // e.g., "08:00"
-  endTime       String // e.g., "09:00"
-  price         BigInt // per session
+  startDate     DateTime @db.Date
+  endDate       DateTime @db.Date
+  startTime     String
+  endTime       String
+  price         BigInt
   sessions      Int
   capacity      Int
   remaining     Int
-  maxBookingPax Int            @default(0) // 0 means no limit
-  gender        Gender         @default(ALL)
+  maxBookingPax Int      @default(0)
+  gender        Gender   @default(ALL)
   ageMin        Int
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @default(now()) @updatedAt
-  classBooking  ClassBooking[]
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
+  classBookings ClassBooking[]
+
+  @@index([isActive, startDate, endDate])
   @@map("classes")
 }
 
 model ClassBooking {
-  id                 String        @id
+  id                 String        @id @default(cuid())
   classId            String
   userId             String
+  status             BookingStatus @default(DRAFT)
   totalPrice         BigInt
   processingFee      BigInt        @default(0)
-  paymentMethodId    String
-  paymentStatus      PaymentStatus @default(PENDING)
-  cancelledAt        DateTime?
-  cancellationReason String?
-  bookingDate        DateTime      @default(now())
-  paymentDueDate     DateTime
-  paymentDate        DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @default(now()) @updatedAt
+  cancelledAt        DateTime?
+  cancellationReason String?
 
-  class              Class                @relation(fields: [classId], references: [id])
-  user               User                 @relation(fields: [userId], references: [id])
-  paymentMethod      PaymentMethod        @relation(fields: [paymentMethodId], references: [id])
-  classBookingDetail ClassBookingDetail[]
+  class   Class                @relation(fields: [classId], references: [id])
+  user    User                 @relation(fields: [userId], references: [id])
+  details ClassBookingDetail[]
+  invoice Invoice?
 
+  @@index([userId, status, createdAt])
   @@map("class_bookings")
 }
 
@@ -444,7 +553,7 @@ model ClassBookingDetail {
   id             String   @id @default(cuid())
   classBookingId String
   date           DateTime @db.Date
-  time           String // e.g., "08:00"
+  time           String
   price          BigInt
   attendance     Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -455,11 +564,9 @@ model ClassBookingDetail {
   @@map("class_booking_details")
 }
 
-enum ClubVisibility {
-  PRIVATE
-  PUBLIC
-}
-
+// ------------------------------
+// Club & Tournament
+// ------------------------------
 model Club {
   id          String         @id @default(cuid())
   name        String
@@ -472,10 +579,12 @@ model Club {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @default(now()) @updatedAt
 
-  leader                 User                     @relation(fields: [leaderId], references: [id])
+  leader                 User                     @relation("ClubLeader", fields: [leaderId], references: [id])
   clubMember             ClubMember[]
   tournamentRegistration TournamentRegistration[]
 
+  @@unique([name])
+  @@index([visibility, isActive])
   @@map("clubs")
 }
 
@@ -503,8 +612,8 @@ model Tournament {
   image                  String?
   startDate              DateTime                 @db.Date
   endDate                DateTime                 @db.Date
-  startTime              String // e.g., "08:00"
-  endTime                String // e.g., "17:00"
+  startTime              String
+  endTime                String
   maxTeams               Int
   teamSize               Int
   entryFee               BigInt
@@ -514,6 +623,7 @@ model Tournament {
   updatedAt              DateTime                 @default(now()) @updatedAt
   tournamentRegistration TournamentRegistration[]
 
+  @@index([isActive, startDate, endDate])
   @@map("tournaments")
 }
 
@@ -523,20 +633,19 @@ model TournamentRegistration {
   clubId             String
   members            Int
   totalFee           BigInt
-  paymentMethodId    String
-  paymentStatus      PaymentStatus @default(PENDING)
-  paymentDueDate     DateTime
-  paymentDate        DateTime?
-  cancelledAt        DateTime?
-  cancellationReason String?
-  registeredAt       DateTime      @default(now())
+  status             BookingStatus @default(DRAFT)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @default(now()) @updatedAt
+  paymentLockedUntil DateTime? // soft hold for payment window
+  cancelledAt        DateTime?
+  cancellationReason String?
 
-  tournament                   Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  club                         Club                           @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  tournamentRegistrationMember TournamentRegistrationMember[]
+  tournament Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  club       Club                           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  membersRef TournamentRegistrationMember[]
+  invoice    Invoice?
 
+  @@index([clubId, status, createdAt])
   @@map("tournament_registrations")
 }
 
@@ -551,5 +660,6 @@ model TournamentRegistrationMember {
   tournamentRegistration TournamentRegistration @relation(fields: [tournamentRegistrationId], references: [id], onDelete: Cascade)
   user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([tournamentRegistrationId, userId])
   @@map("tournament_registration_members")
 }
