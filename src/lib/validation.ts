@@ -89,6 +89,10 @@ export const createInventorySchema = z.object({
 
 export type CreateInventorySchema = z.infer<typeof createInventorySchema>
 
+export const updateInventorySchema = createInventorySchema.partial()
+
+export type UpdateInventorySchema = z.infer<typeof updateInventorySchema>
+
 export const searchQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
