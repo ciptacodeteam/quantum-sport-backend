@@ -38,7 +38,7 @@ Follow these steps to add a new API route to the project.
 ## 4. Test the New Route
 
 1. **Start the development server.**
-2. **Use Postman or open the /docs route** to send requests to your new endpoint.
+2. **Use Postman** to send requests to your new endpoint.
 3. **Verify the handler functions are called and responses are correct.**
 
 ---
