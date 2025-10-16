@@ -14,8 +14,9 @@ export const IMAGE_MIME_WHITELIST = new Set([
 
 export const WEBP_QUALITY = 82 // good balance
 
-export const ADMIN_PROFILE_SUBDIR = 'admin-profiles'
-
 export const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 export const DEFAULT_DATETIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 export const JAKARTA_TZ = 'Asia/Jakarta'
+
+export const ADMIN_PROFILE_SUBDIR = 'admin-profiles'
+export const COURT_SUBDIR = 'courts'

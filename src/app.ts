@@ -17,6 +17,7 @@ import healthRoute from './routes/health.route'
 import homeRoute from './routes/home.route'
 import phoneVerificationRoute from './routes/phone.route'
 import adminCourtCostRoute from './routes/admin/court-cost.route'
+import adminCourtRoute from './routes/admin/court.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -38,6 +39,7 @@ const adminRoutes = [
   adminAuthRoute,
   adminInventoryRoute,
   adminStaffRoute,
+  adminCourtRoute,
   adminCourtCostRoute,
   // adminBallboyCostRoute,
   // adminCoachCostRoute,

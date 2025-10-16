@@ -192,3 +192,16 @@ export const overrideSingleCourtCostSchema = z.object({
 export type OverrideSingleCourtCostSchema = z.infer<
   typeof overrideSingleCourtCostSchema
 >
+
+export const createCourtSchema = z.object({
+  name: z.string().min(3).max(100),
+  description: z.string().min(3).max(500).optional(),
+  image: z.file().optional(),
+  isActive: z.coerce.boolean().optional(),
+})
+
+export type CreateCourtSchema = z.infer<typeof createCourtSchema>
+
+export const updateCourtSchema = createCourtSchema.partial()
+
+export type UpdateCourtSchema = z.infer<typeof updateCourtSchema>
