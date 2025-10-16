@@ -1,11 +1,11 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
 import { validateToken } from '@/lib/token'
-import { AdminTokenPayload, AppBinding, AppMiddleware } from '@/types'
+import { AdminTokenPayload } from '@/types'
 import { Role } from 'generated/prisma'
-import { Context, Next } from 'hono'
+import { MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie } from 'hono/cookie'
 
-export const globalAuthMiddleware: AppMiddleware = async (c, next) => {
+export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
   const token = getCookie(c, 'token') as string | undefined
   c.var.logger.debug(`Global auth middleware - token: ${token}`)
 
@@ -41,7 +41,7 @@ export const globalAuthMiddleware: AppMiddleware = async (c, next) => {
   return next()
 }
 
-export const requireAuth: AppMiddleware = async (c, next) => {
+export const requireAuth: MiddlewareHandler = async (c, next) => {
   const user = c.get('user')
 
   if (!user) {
@@ -51,7 +51,7 @@ export const requireAuth: AppMiddleware = async (c, next) => {
   return next()
 }
 
-export const requireAdminAuth: AppMiddleware = async (c, next) => {
+export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
   const admin = c.get('admin')
 
   if (!admin || !admin.role) {
@@ -61,21 +61,21 @@ export const requireAdminAuth: AppMiddleware = async (c, next) => {
   return next()
 }
 
-export const requireAdmin: AppMiddleware = async (c, next) => {
+export const requireAdmin: MiddlewareHandler = async (c, next) => {
   return requireRole('ADMIN')(c, next)
 }
 
-export const requireCoach: AppMiddleware = async (c, next) => {
+export const requireCoach: MiddlewareHandler = async (c, next) => {
   return requireRole('COACH')(c, next)
 }
 
-export const requireBallboy: AppMiddleware = async (c, next) => {
+export const requireBallboy: MiddlewareHandler = async (c, next) => {
   return requireRole('BALLBOY')(c, next)
 }
 
 // You can add more role-based middlewares as needed
 export const requireRole = (role: Role) => {
-  return async (c: Context<AppBinding>, next: Next) => {
+  const middleware: MiddlewareHandler = async (c, next) => {
     const admin = c.get('admin')
 
     if (!admin) {
@@ -88,4 +88,5 @@ export const requireRole = (role: Role) => {
 
     return next()
   }
+  return middleware
 }

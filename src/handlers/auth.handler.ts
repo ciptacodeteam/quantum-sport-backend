@@ -12,15 +12,12 @@ import {
 } from '@/lib/token'
 import { formatPhone, generateOtp } from '@/lib/utils'
 import {
-  ForgotPasswordRouteDoc,
-  LoginRouteDoc,
-  LoginWithEmailRouteDoc,
-  LogoutRouteDoc,
-  ProfileRouteDoc,
-  RefreshTokenRouteDoc,
-  RegisterRouteDoc,
-  ResetPasswordRouteDoc,
-} from '@/routes/auth.route'
+  ForgotPasswordSchema,
+  LoginSchema,
+  LoginWithEmailSchema,
+  RegisterSchema,
+  ResetPasswordSchema,
+} from '@/lib/validation'
 import { validateOtp } from '@/services/otp.service'
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { getFilePath } from '@/services/upload.service'
@@ -30,9 +27,9 @@ import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
-export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
+export const loginHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as LoginSchema
     const { phone, code, requestId } = validated
 
     const formattedPhone = await formatPhone(phone)
@@ -115,9 +112,9 @@ export const loginHandler: AppRouteHandler<LoginRouteDoc> = async (c) => {
   }
 }
 
-export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
+export const registerHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as RegisterSchema
     const { phone, code, requestId } = validated
 
     const formattedPhone = await formatPhone(phone)
@@ -206,7 +203,7 @@ export const registerHandler: AppRouteHandler<RegisterRouteDoc> = async (c) => {
   }
 }
 
-export const logoutHandler: AppRouteHandler<LogoutRouteDoc> = async (c) => {
+export const logoutHandler: AppRouteHandler = async (c) => {
   try {
     const user = c.get('user')
     const token = getCookie(c, 'token')
@@ -235,9 +232,7 @@ export const logoutHandler: AppRouteHandler<LogoutRouteDoc> = async (c) => {
   }
 }
 
-export const refreshTokenHandler: AppRouteHandler<
-  RefreshTokenRouteDoc
-> = async (c) => {
+export const refreshTokenHandler: AppRouteHandler = async (c) => {
   try {
     const token = getCookie(c, 'token')
     const refreshToken = getCookie(c, 'refreshToken')
@@ -334,11 +329,9 @@ export const refreshTokenHandler: AppRouteHandler<
   }
 }
 
-export const forgotPasswordHandler: AppRouteHandler<
-  ForgotPasswordRouteDoc
-> = async (c) => {
+export const forgotPasswordHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as ForgotPasswordSchema
     const { phone } = validated
 
     const formattedPhone = await formatPhone(phone)
@@ -398,11 +391,9 @@ export const forgotPasswordHandler: AppRouteHandler<
   }
 }
 
-export const resetPasswordHandler: AppRouteHandler<
-  ResetPasswordRouteDoc
-> = async (c) => {
+export const resetPasswordHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as ResetPasswordSchema
     const { phone, code, requestId, newPassword } = validated
 
     const formattedPhone = await formatPhone(phone)
@@ -468,11 +459,9 @@ export const resetPasswordHandler: AppRouteHandler<
   }
 }
 
-export const loginWithEmailHandler: AppRouteHandler<
-  LoginWithEmailRouteDoc
-> = async (c) => {
+export const loginWithEmailHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as LoginWithEmailSchema
     const { email, password } = validated
 
     const existingUser = await db.user.findUnique({
@@ -549,9 +538,7 @@ export const loginWithEmailHandler: AppRouteHandler<
   }
 }
 
-export const getProfileHandler: AppRouteHandler<ProfileRouteDoc> = async (
-  c,
-) => {
+export const getProfileHandler: AppRouteHandler = async (c) => {
   try {
     const user = c.get('user')
 

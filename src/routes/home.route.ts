@@ -1,26 +1,6 @@
 import { getWelcomeMessageHandler } from '@/handlers/home.handler'
-import jsonContent from '@/helpers/json-content'
-import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'
-import { createRoute } from '@hono/zod-openapi'
-import status from 'http-status'
 
-const homeRouteDoc = createRoute({
-  path: '/',
-  method: 'get',
-  summary: 'Home',
-  description: 'Get a welcome message for the Quantum Sport API.',
-  tags: ['General'],
-  responses: {
-    [status.OK]: jsonContent(
-      createMessageObjectSchema('Welcome to Quantum Sport API!'),
-      'Successful Response',
-    ),
-  },
-})
-
-export type HomeRouteDoc = typeof homeRouteDoc
-
-const homeRoute = createRouter().openapi(homeRouteDoc, getWelcomeMessageHandler)
+const homeRoute = createRouter().get('/', getWelcomeMessageHandler)
 
 export default homeRoute

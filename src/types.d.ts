@@ -1,4 +1,3 @@
-import { OpenAPIHono, RouteConfig, RouteHandler } from '@hono/zod-openapi'
 import { Role } from 'generated/prisma'
 import { Context } from 'hono'
 import type { PinoLogger } from 'hono-pino'
@@ -14,17 +13,23 @@ type AdminTokenPayload = Omit<UserTokenPayload, 'phone'> & {
   phone?: string
 }
 
-type AppBinding = {
-  Variables: {
-    user: UserTokenPayload | null
-    admin: AdminTokenPayload | null
-    logger: PinoLogger
-  }
+export type AppBinding = {}
+export type AppVariables = {
+  user: UserTokenPayload | null
+  admin: AdminTokenPayload | null
+  logger: PinoLogger
 }
 
-type AppOpenApi = OpenAPIHono<AppBinding>
-type AppRouteHandler<R extends RouteConfig> = RouteHandler<R, AppBinding>
-type AppMiddleware = (
-  c: Context<AppBinding>,
-  next: () => Promise<void>,
-) => Promise<void>
+export type AppEnv = {
+  Bindings: AppBinding
+  Variables: AppVariables
+}
+
+export type AppContext<P extends string = string, S = any> = Context<
+  AppEnv,
+  P,
+  S
+>
+export type AppRouteHandler<P extends string = string, S = any> = (
+  c: AppContext<P, S>,
+) => Promise<Response> | Response

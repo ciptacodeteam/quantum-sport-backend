@@ -6,17 +6,15 @@ import { globalAuthMiddleware } from '@/middlewares/auth'
 import onError from '@/middlewares/error'
 import onNotFound from '@/middlewares/not-found'
 import serveEmojiFavicon from '@/middlewares/serve-emoji-favicon'
-import type { AppBinding } from '@/types'
-import { OpenAPIHono } from '@hono/zod-openapi'
+import type { AppEnv } from '@/types'
+import { Hono } from 'hono'
 import { requestId } from 'hono/request-id'
-import { defaultHook } from './configure-openapi'
 import { corsMiddlewareOptions } from './cors'
 import { logger } from './logger'
 
 export const createRouter = () => {
-  return new OpenAPIHono<AppBinding>({
+  return new Hono<AppEnv>({
     strict: false,
-    defaultHook,
   })
 }
 

@@ -3,22 +3,17 @@ import { env } from '@/env'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { formatPhone, generateOtp } from '@/lib/utils'
-import {
-  SendPhoneVerificationOtpRouteDoc,
-  VerifyPhoneOtpRouteDoc,
-} from '@/routes/phone.route'
+import { PhoneSchema, VerifyOtpSchema } from '@/lib/validation'
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
 import { PhoneVerificationType } from 'generated/prisma'
 import status from 'http-status'
 
-export const sendPhoneVerificationOtpHandler: AppRouteHandler<
-  SendPhoneVerificationOtpRouteDoc
-> = async (c) => {
+export const sendPhoneVerificationOtpHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
-    const phone = validated.phone
+    const validated = c.req.valid('json') as PhoneSchema
+    const { phone } = validated
 
     const formattedPhone = await formatPhone(phone)
 
@@ -95,11 +90,9 @@ export const sendPhoneVerificationOtpHandler: AppRouteHandler<
   }
 }
 
-export const verifyPhoneVerificationOtpHandler: AppRouteHandler<
-  VerifyPhoneOtpRouteDoc
-> = async (c) => {
+export const verifyPhoneVerificationOtpHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as VerifyOtpSchema
     const { phone, code, requestId } = validated
 
     const phoneNumber = await formatPhone(phone)

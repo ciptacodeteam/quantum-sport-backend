@@ -33,12 +33,13 @@ model User {
   phone         String   @unique
   phoneVerified Boolean?
 
-  authTokens     AuthToken[]
-  bookings       Booking[]
-  MembershipUser MembershipUser[]
-  ClassBooking   ClassBooking[]
-  Club           Club[]
-  ClubMember     ClubMember[]
+  authTokens                   AuthToken[]
+  bookings                     Booking[]
+  MembershipUser               MembershipUser[]
+  ClassBooking                 ClassBooking[]
+  Club                         Club[]
+  ClubMember                   ClubMember[]
+  TournamentRegistrationMember TournamentRegistrationMember[]
 
   @@map("user")
 }
@@ -83,11 +84,41 @@ model Staff {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  authTokens     AuthToken[]
-  BookingBallboy BookingBallboy[]
-  BookingCoach   BookingCoach[]
+  authTokens      AuthToken[]
+  BallboySchedule BallboySchedule[]
+  CoachSchedule   CoachSchedule[]
 
   @@map("staff")
+}
+
+model BallboySchedule {
+  id          String   @id @default(cuid())
+  staffId     String
+  date        DateTime
+  time        String // e.g., "08:00"
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  staff          Staff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  BookingBallboy BookingBallboy[]
+
+  @@map("ballboy_schedules")
+}
+
+model CoachSchedule {
+  id          String   @id @default(cuid())
+  staffId     String
+  date        DateTime
+  time        String // e.g., "08:00"
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  staff        Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  BookingCoach BookingCoach[]
+
+  @@map("coach_schedules")
 }
 
 model AuthToken {
@@ -213,7 +244,6 @@ model CourtCostSchedule {
   date        DateTime
   time        String // e.g., "08:00"
   price       BigInt
-  note        String?
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -306,17 +336,17 @@ model BookingInventory {
 }
 
 model BookingBallboy {
-  id        String   @id @default(cuid())
-  bookingId String
-  staffId   String
-  date      DateTime
-  time      String // e.g., "08:00"
-  price     BigInt
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  id                String   @id @default(cuid())
+  bookingId         String
+  ballboyScheduleId String
+  date              DateTime
+  time              String // e.g., "08:00"
+  price             BigInt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  staff   Staff   @relation(fields: [staffId], references: [id])
+  booking         Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  ballboySchedule BallboySchedule @relation(fields: [ballboyScheduleId], references: [id])
 
   @@map("booking_ballboys")
 }
@@ -338,7 +368,7 @@ model BookingCoachType {
 model BookingCoach {
   id                 String   @id @default(cuid())
   bookingId          String
-  staffId            String
+  coachScheduleId    String
   date               DateTime
   time               String // e.g., "08:00"
   price              BigInt
@@ -347,8 +377,8 @@ model BookingCoach {
   updatedAt          DateTime @default(now()) @updatedAt
 
   booking          Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  staff            Staff            @relation(fields: [staffId], references: [id])
   bookingCoachType BookingCoachType @relation(fields: [bookingCoachTypeId], references: [id])
+  coachSchedule    CoachSchedule    @relation(fields: [coachScheduleId], references: [id])
 
   @@map("booking_coaches")
 }
@@ -490,10 +520,7 @@ model Tournament {
 model TournamentRegistration {
   id                 String        @id @default(cuid())
   tournamentId       String
-  clubId             String?
-  teamName           String
-  captainName        String
-  captainPhone       String
+  clubId             String
   members            Int
   totalFee           BigInt
   paymentMethodId    String
@@ -506,8 +533,23 @@ model TournamentRegistration {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @default(now()) @updatedAt
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  club       Club?      @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  tournament                   Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  club                         Club                           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  TournamentRegistrationMember TournamentRegistrationMember[]
 
   @@map("tournament_registrations")
+}
+
+model TournamentRegistrationMember {
+  id                       String   @id @default(cuid())
+  tournamentRegistrationId String
+  userId                   String
+  isHost                   Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now()) @updatedAt
+
+  tournamentRegistration TournamentRegistration @relation(fields: [tournamentRegistrationId], references: [id], onDelete: Cascade)
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("tournament_registration_members")
 }

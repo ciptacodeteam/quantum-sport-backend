@@ -2,92 +2,23 @@ import {
   sendPhoneVerificationOtpHandler,
   verifyPhoneVerificationOtpHandler,
 } from '@/handlers/phone.handler'
-import { phoneSchema, verifyOtpPayloadSchema } from '@/lib/validation'
+import { validateHook } from '@/helpers/validate-hook'
 
-import jsonContent from '@/helpers/json-content'
-import jsonContentRequired from '@/helpers/json-content-required'
-import createErrorSchema from '@/helpers/schema/create-error-schema'
-import createMessageObjectSchema from '@/helpers/schema/create-message-object'
 import { createRouter } from '@/lib/create-app'
-import { createRoute } from '@hono/zod-openapi'
-import status from 'http-status'
-
-const sendPhoneVerificationOtpRouteDoc = createRoute({
-  path: '/phone/send-otp',
-  method: 'post',
-  summary: 'Send Phone Verification OTP',
-  description: 'Send Phone Verification OTP route',
-  tags: ['Verification'],
-  request: {
-    body: jsonContentRequired(phoneSchema, 'Phone number payload'),
-  },
-  responses: {
-    [status.OK]: jsonContent(
-      createMessageObjectSchema('OTP sent successfully', {
-        phone: '+6281234567890',
-        requestId: 'abc123xyz',
-      }),
-      'Successful Response',
-    ),
-    [status.BAD_REQUEST]: jsonContent(
-      createErrorSchema(phoneSchema),
-      'Bad Request Response',
-    ),
-    [status.TOO_MANY_REQUESTS]: jsonContent(
-      createMessageObjectSchema(
-        'Too many requests. Please try again later.',
-        null,
-        'Detailed error message',
-      ),
-      'Too Many Requests Response',
-    ),
-    [status.INTERNAL_SERVER_ERROR]: jsonContent(
-      createMessageObjectSchema(
-        'Internal Server Error',
-        null,
-        'Detailed error message',
-      ),
-      'Internal Server Error Response',
-    ),
-  },
-})
-
-export type SendPhoneVerificationOtpRouteDoc =
-  typeof sendPhoneVerificationOtpRouteDoc
-
-const verifyPhoneOtpRouteDoc = createRoute({
-  path: '/phone/verify-otp',
-  method: 'post',
-  summary: 'Verify Phone OTP',
-  description: 'Verify Phone OTP route',
-  tags: ['Verification'],
-  request: {
-    body: jsonContent(verifyOtpPayloadSchema, 'Verify OTP payload'),
-  },
-  responses: {
-    [status.OK]: jsonContent(
-      createMessageObjectSchema('Phone number verified successfully'),
-      'Successful Response',
-    ),
-    [status.BAD_REQUEST]: jsonContent(
-      createErrorSchema(verifyOtpPayloadSchema),
-      'Bad Request Response',
-    ),
-    [status.INTERNAL_SERVER_ERROR]: jsonContent(
-      createMessageObjectSchema(
-        'Internal Server Error',
-        null,
-        'Detailed error message',
-      ),
-      'Internal Server Error Response',
-    ),
-  },
-})
-
-export type VerifyPhoneOtpRouteDoc = typeof verifyPhoneOtpRouteDoc
+import { phoneSchema, verifyOtpSchema } from '@/lib/validation'
+import { zValidator } from '@hono/zod-validator'
 
 const phoneVerificationRoute = createRouter()
-  .openapi(sendPhoneVerificationOtpRouteDoc, sendPhoneVerificationOtpHandler)
-  .openapi(verifyPhoneOtpRouteDoc, verifyPhoneVerificationOtpHandler)
+  .basePath('/phone')
+  .post(
+    '/send-otp',
+    zValidator('json', phoneSchema, validateHook),
+    sendPhoneVerificationOtpHandler,
+  )
+  .post(
+    '/verify-otp',
+    zValidator('json', verifyOtpSchema, validateHook),
+    verifyPhoneVerificationOtpHandler,
+  )
 
 export default phoneVerificationRoute

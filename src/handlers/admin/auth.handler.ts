@@ -5,12 +5,10 @@ import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { generateJwtToken } from '@/lib/token'
 import {
-  AdminLoginRouteDoc,
-  AdminLogoutRouteDoc,
-  AdminProfileRouteDoc,
-  AdminRegisterAdminRouteDoc,
-  AdminUpdateProfileRouteDoc,
-} from '@/routes/admin/auth.route'
+  LoginWithEmailSchema,
+  RegisterAdminSchema,
+  UpdateAdminProfileSchema,
+} from '@/lib/validation'
 import { deleteFile, getFilePath, uploadFile } from '@/services/upload.service'
 import { AdminTokenPayload, AppRouteHandler } from '@/types'
 import dayjs from 'dayjs'
@@ -18,11 +16,9 @@ import { AuthTokenType, Role } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
-export const adminRegisterHandler: AppRouteHandler<
-  AdminRegisterAdminRouteDoc
-> = async (c) => {
+export const adminRegisterHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as RegisterAdminSchema
     const { name, email, password } = validated
 
     const existingAdmin = await db.staff.findFirst({
@@ -94,11 +90,9 @@ export const adminRegisterHandler: AppRouteHandler<
   }
 }
 
-export const adminLoginHandler: AppRouteHandler<AdminLoginRouteDoc> = async (
-  c,
-) => {
+export const adminLoginHandler: AppRouteHandler = async (c) => {
   try {
-    const validated = c.req.valid('json')
+    const validated = c.req.valid('json') as LoginWithEmailSchema
     const { email, password } = validated
 
     const user = await db.staff.findUnique({
@@ -175,9 +169,7 @@ export const adminLoginHandler: AppRouteHandler<AdminLoginRouteDoc> = async (
   }
 }
 
-export const adminLogoutHandler: AppRouteHandler<AdminLogoutRouteDoc> = async (
-  c,
-) => {
+export const adminLogoutHandler: AppRouteHandler = async (c) => {
   try {
     const admin = c.get('admin')
     const token = getCookie(c, 'token')
@@ -206,9 +198,7 @@ export const adminLogoutHandler: AppRouteHandler<AdminLogoutRouteDoc> = async (
   }
 }
 
-export const adminProfileHandler: AppRouteHandler<
-  AdminProfileRouteDoc
-> = async (c) => {
+export const adminProfileHandler: AppRouteHandler = async (c) => {
   try {
     const admin = c.get('admin')
 
@@ -247,9 +237,7 @@ export const adminProfileHandler: AppRouteHandler<
   }
 }
 
-export const adminUpdateProfileHandler: AppRouteHandler<
-  AdminUpdateProfileRouteDoc
-> = async (c) => {
+export const adminUpdateProfileHandler: AppRouteHandler = async (c) => {
   try {
     const admin = c.get('admin')
 
@@ -257,7 +245,7 @@ export const adminUpdateProfileHandler: AppRouteHandler<
       throw new UnauthorizedException()
     }
 
-    const validated = c.req.valid('form')
+    const validated = c.req.valid('form') as UpdateAdminProfileSchema
     const { name, phone, email, image } = validated
 
     const existingAdmin = await db.staff.findUnique({
