@@ -152,7 +152,7 @@ export const changePasswordSchema = z
 
 export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>
 
-export const singleBallboyScheduleSchema = z.object({
+export const singleScheduleSchema = z.object({
   date: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
     message: 'Invalid date format, expected YYYY-MM-DD',
   }),
@@ -160,11 +160,9 @@ export const singleBallboyScheduleSchema = z.object({
   isAvailable: z.boolean().optional(),
 })
 
-export type SingleBallboyScheduleSchema = z.infer<
-  typeof singleBallboyScheduleSchema
->
+export type SingleScheduleSchema = z.infer<typeof singleScheduleSchema>
 
-export const rangeBallboyScheduleSchema = z.object({
+export const rangeScheduleSchema = z.object({
   fromDate: z
     .string()
     .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
@@ -190,26 +188,24 @@ export const rangeBallboyScheduleSchema = z.object({
     .optional(),
 })
 
-export type RangeBallboyScheduleSchema = z.infer<
-  typeof rangeBallboyScheduleSchema
->
-
-export const singleCoachScheduleSchema = singleBallboyScheduleSchema
-
-export type SingleCoachScheduleSchema = z.infer<
-  typeof singleCoachScheduleSchema
->
-
-export const rangeCoachScheduleSchema = rangeBallboyScheduleSchema
-
-export type RangeCoachScheduleSchema = z.infer<typeof rangeCoachScheduleSchema>
+export type RangeScheduleSchema = z.infer<typeof rangeScheduleSchema>
 
 export const createBallboyScheduleSchema = z.object({
   type: z.enum(['single', 'range']),
-  single: singleBallboyScheduleSchema.optional(),
-  range: rangeBallboyScheduleSchema.optional(),
+  single: singleScheduleSchema.optional(),
+  range: rangeScheduleSchema.optional(),
 })
 
 export type CreateBallboyScheduleSchema = z.infer<
   typeof createBallboyScheduleSchema
+>
+
+export const createCoachScheduleSchema = z.object({
+  type: z.enum(['single', 'range']),
+  single: singleScheduleSchema.optional(),
+  range: rangeScheduleSchema.optional(),
+})
+
+export type CreateCoachScheduleSchema = z.infer<
+  typeof createCoachScheduleSchema
 >
