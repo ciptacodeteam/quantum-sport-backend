@@ -152,17 +152,8 @@ export const changePasswordSchema = z
 
 export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>
 
-export const singleScheduleSchema = z.object({
-  date: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
-    message: 'Invalid date format, expected YYYY-MM-DD',
-  }),
-  time: z.string().min(5).max(8),
-  isAvailable: z.coerce.boolean().optional(),
-})
-
-export type SingleScheduleSchema = z.infer<typeof singleScheduleSchema>
-
-export const rangeScheduleSchema = z.object({
+export const createCourtCostSchema = z.object({
+  courtId: z.string(),
   fromDate: z
     .string()
     .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
@@ -171,42 +162,20 @@ export const rangeScheduleSchema = z.object({
   toDate: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
     message: 'Invalid date format, expected YYYY-MM-DD',
   }),
-  fromTime: z.string().min(5).max(8),
-  toTime: z.string().min(5).max(8),
-  days: z
-    .array(
-      z.enum([
-        'Sunday',
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-      ]),
-    )
-    .optional(),
-  isAvailable: z.coerce.boolean().optional(),
+  days: z.array(z.number().min(0).max(7)),
+  happyHourPrice: z.bigint().min(0n),
+  peakHourPrice: z.bigint().min(0n),
+  closedHours: z.array(z.number()).optional(),
 })
 
-export type RangeScheduleSchema = z.infer<typeof rangeScheduleSchema>
+export type CreateCourtCostSchema = z.infer<typeof createCourtCostSchema>
 
-export const createBallboyScheduleSchema = z.object({
-  type: z.enum(['single', 'range']),
-  single: singleScheduleSchema.optional(),
-  range: rangeScheduleSchema.optional(),
-})
+export const updateCourtCostSchema = createCourtCostSchema
+  .omit({ courtId: true, fromDate: true, toDate: true, days: true })
+  .extend({
+    date: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      message: 'Invalid date format, expected YYYY-MM-DD',
+    }),
+  })
 
-export type CreateBallboyScheduleSchema = z.infer<
-  typeof createBallboyScheduleSchema
->
-
-export const createCoachScheduleSchema = z.object({
-  type: z.enum(['single', 'range']),
-  single: singleScheduleSchema.optional(),
-  range: rangeScheduleSchema.optional(),
-})
-
-export type CreateCoachScheduleSchema = z.infer<
-  typeof createCoachScheduleSchema
->
+export type UpdateCourtCostSchema = z.infer<typeof updateCourtCostSchema>

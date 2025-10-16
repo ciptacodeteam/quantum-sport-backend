@@ -18,3 +18,4 @@ export const ADMIN_PROFILE_SUBDIR = 'admin-profiles'
 
 export const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 export const DEFAULT_DATETIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+export const JAKARTA_TZ = 'Asia/Jakarta'

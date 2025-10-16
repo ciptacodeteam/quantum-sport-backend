@@ -252,6 +252,7 @@ model CourtCostSchedule {
 
   court Court @relation(fields: [courtId], references: [id])
 
+  @@unique([courtId, startAt], map: "uq_court_cost_start")
   @@index([courtId, startAt, endAt, isAvailable])
   @@map("court_cost_schedules")
 }
