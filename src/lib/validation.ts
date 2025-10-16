@@ -1,5 +1,11 @@
 import z from 'zod'
 
+export const idSchema = z.object({
+  id: z.cuid(),
+})
+
+export type IdSchema = z.infer<typeof idSchema>
+
 export const phoneSchema = z.object({
   phone: z.string().min(10).max(15),
 })
@@ -54,7 +60,7 @@ export const resetPasswordSchema = z.object({
 export type ResetPasswordSchema = z.infer<typeof resetPasswordSchema>
 
 export const loginWithEmailSchema = z.object({
-  email: z.string().email().min(5).max(100),
+  email: z.email().min(5).max(100),
   password: z.string().min(6).max(100),
 })
 
@@ -69,7 +75,7 @@ export type RegisterAdminSchema = z.infer<typeof registerAdminSchema>
 export const updateAdminProfileSchema = z.object({
   name: z.string().min(3).max(100),
   phone: z.string().min(10).max(15).optional(),
-  email: z.string().email().min(5).max(100).optional(),
+  email: z.email().min(5).max(100).optional(),
   image: z.file().optional(),
 })
 
