@@ -11,12 +11,17 @@ import { Hono } from 'hono'
 import { requestId } from 'hono/request-id'
 import { corsMiddlewareOptions } from './cors'
 import { logger } from './logger'
+import { createFactory } from 'hono/factory'
 
 export const createRouter = () => {
   return new Hono<AppEnv>({
     strict: false,
   })
 }
+
+export const factory = createFactory<AppEnv>({
+  defaultAppOptions: { strict: false },
+})
 
 export default function createApp() {
   const app = createRouter()

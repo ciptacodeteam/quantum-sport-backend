@@ -1,175 +1,187 @@
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
+import { validateHook } from '@/helpers/validate-hook'
+import { factory } from '@/lib/create-app'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { generateJwtToken } from '@/lib/token'
 import {
+  loginSchema,
   LoginWithEmailSchema,
+  registerAdminSchema,
   RegisterAdminSchema,
+  updateAdminProfileSchema,
   UpdateAdminProfileSchema,
 } from '@/lib/validation'
 import { deleteFile, getFilePath, uploadFile } from '@/services/upload.service'
-import { AdminTokenPayload, AppRouteHandler } from '@/types'
+import { AdminTokenPayload } from '@/types'
+import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
 import { AuthTokenType, Role } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
-export const adminRegisterHandler: AppRouteHandler = async (c) => {
-  try {
-    const validated = c.req.valid('json') as RegisterAdminSchema
-    const { name, email, password } = validated
+export const registerAdminHandler = factory.createHandlers(
+  zValidator('json', registerAdminSchema, validateHook),
+  async (c) => {
+    try {
+      const validated = c.req.valid('json') as RegisterAdminSchema
+      const { name, email, password } = validated
 
-    const existingAdmin = await db.staff.findFirst({
-      where: { role: Role.ADMIN },
-    })
+      const existingAdmin = await db.staff.findFirst({
+        where: { role: Role.ADMIN },
+      })
 
-    if (existingAdmin) {
-      c.var.logger.debug(
-        'Admin registration attempt when an admin already exists',
-      )
-      return c.json(err('An admin user already exists'), status.CONFLICT)
+      if (existingAdmin) {
+        c.var.logger.debug(
+          'Admin registration attempt when an admin already exists',
+        )
+        return c.json(err('An admin user already exists'), status.CONFLICT)
+      }
+
+      const hashedPassword = await hashPassword(password)
+
+      const newAdmin = await db.staff.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: Role.ADMIN,
+          joinedAt: dayjs().toDate(),
+          isActive: true,
+        },
+      })
+
+      c.var.logger.info(`New admin registered with email: ${email}`)
+
+      const token = await generateJwtToken({
+        id: newAdmin.id,
+        name: newAdmin.name,
+        email: newAdmin.email,
+        role: newAdmin.role,
+      } as AdminTokenPayload)
+
+      const refreshToken = await generateJwtToken({
+        id: newAdmin.id,
+        name: newAdmin.name,
+        email: newAdmin.email,
+        role: newAdmin.role,
+      } as AdminTokenPayload)
+
+      await db.authToken.create({
+        data: {
+          staffId: newAdmin.id,
+          type: AuthTokenType.STAFF,
+          refreshToken: refreshToken,
+          refreshExpiresAt: dayjs()
+            .add(Number(env.jwt.refreshExpires), 'days')
+            .toDate(),
+        },
+      })
+
+      setCookie(c, 'token', token, {
+        httpOnly: true,
+        secure: env.nodeEnv === 'production',
+        sameSite: 'Lax',
+      })
+      setCookie(c, 'refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: env.nodeEnv === 'production',
+        sameSite: 'Lax',
+      })
+
+      return c.json(ok(null, 'Admin registered successfully'), status.CREATED)
+    } catch (err) {
+      c.var.logger.fatal(`Error in registerAdminHandler: ${err}`)
+      throw err
     }
+  },
+)
 
-    const hashedPassword = await hashPassword(password)
+export const loginAdminHandler = factory.createHandlers(
+  zValidator('json', loginSchema, validateHook),
+  async (c) => {
+    try {
+      const validated = c.req.valid('json') as LoginWithEmailSchema
+      const { email, password } = validated
 
-    const newAdmin = await db.staff.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: Role.ADMIN,
-        joinedAt: dayjs().toDate(),
-        isActive: true,
-      },
-    })
+      const user = await db.staff.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          password: true,
+          role: true,
+          isActive: true,
+        },
+      })
 
-    c.var.logger.info(`New admin registered with email: ${email}`)
+      if (!user) {
+        c.var.logger.error(`Login attempt failed for email: ${email}`)
+        return c.json(
+          err('Invalid email or password', status.UNAUTHORIZED),
+          status.UNAUTHORIZED,
+        )
+      }
 
-    const token = await generateJwtToken({
-      id: newAdmin.id,
-      name: newAdmin.name,
-      email: newAdmin.email,
-      role: newAdmin.role,
-    } as AdminTokenPayload)
+      const isPasswordValid = await verifyPassword(password, user.password)
 
-    const refreshToken = await generateJwtToken({
-      id: newAdmin.id,
-      name: newAdmin.name,
-      email: newAdmin.email,
-      role: newAdmin.role,
-    } as AdminTokenPayload)
+      if (!isPasswordValid) {
+        c.var.logger.error(`Login attempt failed for email: ${email}`)
+        return c.json(
+          err('Invalid email or password', status.UNAUTHORIZED),
+          status.UNAUTHORIZED,
+        )
+      }
 
-    await db.authToken.create({
-      data: {
-        staffId: newAdmin.id,
-        type: AuthTokenType.STAFF,
-        refreshToken: refreshToken,
-        refreshExpiresAt: dayjs()
-          .add(Number(env.jwt.refreshExpires), 'days')
-          .toDate(),
-      },
-    })
+      const token = await generateJwtToken({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      } as AdminTokenPayload)
 
-    setCookie(c, 'token', token, {
-      httpOnly: true,
-      secure: env.nodeEnv === 'production',
-      sameSite: 'Lax',
-    })
-    setCookie(c, 'refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: env.nodeEnv === 'production',
-      sameSite: 'Lax',
-    })
+      const refreshToken = await generateJwtToken({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      } as AdminTokenPayload)
 
-    return c.json(ok(null, 'Admin registered successfully'), status.CREATED)
-  } catch (err) {
-    c.var.logger.fatal(`Error in registerAdminHandler: ${err}`)
-    throw err
-  }
-}
+      await db.authToken.create({
+        data: {
+          staffId: user.id,
+          type: AuthTokenType.STAFF,
+          refreshToken: refreshToken,
+          refreshExpiresAt: dayjs()
+            .add(Number(env.jwt.refreshExpires), 'days')
+            .toDate(),
+        },
+      })
 
-export const adminLoginHandler: AppRouteHandler = async (c) => {
-  try {
-    const validated = c.req.valid('json') as LoginWithEmailSchema
-    const { email, password } = validated
+      setCookie(c, 'token', token, {
+        httpOnly: true,
+        secure: env.nodeEnv === 'production',
+        sameSite: 'Lax',
+      })
+      setCookie(c, 'refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: env.nodeEnv === 'production',
+        sameSite: 'Lax',
+      })
 
-    const user = await db.staff.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        password: true,
-        role: true,
-        isActive: true,
-      },
-    })
-
-    if (!user) {
-      c.var.logger.error(`Login attempt failed for email: ${email}`)
-      return c.json(
-        err('Invalid email or password', status.UNAUTHORIZED),
-        status.UNAUTHORIZED,
-      )
+      return c.json(ok(null, 'Login successful'), status.OK)
+    } catch (err) {
+      c.var.logger.fatal(`Error in adminLoginHandler: ${err}`)
+      throw err
     }
+  },
+)
 
-    const isPasswordValid = await verifyPassword(password, user.password)
-
-    if (!isPasswordValid) {
-      c.var.logger.error(`Login attempt failed for email: ${email}`)
-      return c.json(
-        err('Invalid email or password', status.UNAUTHORIZED),
-        status.UNAUTHORIZED,
-      )
-    }
-
-    const token = await generateJwtToken({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    } as AdminTokenPayload)
-
-    const refreshToken = await generateJwtToken({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    } as AdminTokenPayload)
-
-    await db.authToken.create({
-      data: {
-        staffId: user.id,
-        type: AuthTokenType.STAFF,
-        refreshToken: refreshToken,
-        refreshExpiresAt: dayjs()
-          .add(Number(env.jwt.refreshExpires), 'days')
-          .toDate(),
-      },
-    })
-
-    setCookie(c, 'token', token, {
-      httpOnly: true,
-      secure: env.nodeEnv === 'production',
-      sameSite: 'Lax',
-    })
-    setCookie(c, 'refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: env.nodeEnv === 'production',
-      sameSite: 'Lax',
-    })
-
-    return c.json(ok(null, 'Login successful'), status.OK)
-  } catch (err) {
-    c.var.logger.fatal(`Error in adminLoginHandler: ${err}`)
-    throw err
-  }
-}
-
-export const adminLogoutHandler: AppRouteHandler = async (c) => {
+export const logoutAdminHandler = factory.createHandlers(async (c) => {
   try {
     const admin = c.get('admin')
     const token = getCookie(c, 'token')
@@ -196,9 +208,9 @@ export const adminLogoutHandler: AppRouteHandler = async (c) => {
     c.var.logger.fatal(`Error during logout: ${err}`)
     throw err
   }
-}
+})
 
-export const adminProfileHandler: AppRouteHandler = async (c) => {
+export const getAdminProfileHandler = factory.createHandlers(async (c) => {
   try {
     const admin = c.get('admin')
 
@@ -235,104 +247,109 @@ export const adminProfileHandler: AppRouteHandler = async (c) => {
     c.var.logger.fatal(`Error in getProfileHandler: ${err}`)
     throw err
   }
-}
+})
 
-export const adminUpdateProfileHandler: AppRouteHandler = async (c) => {
-  try {
-    const admin = c.get('admin')
+export const updateAdminProfileHandler = factory.createHandlers(
+  zValidator('form', updateAdminProfileSchema, validateHook),
+  async (c) => {
+    try {
+      const admin = c.get('admin')
 
-    if (!admin || !admin.id) {
-      throw new UnauthorizedException()
-    }
-
-    const validated = c.req.valid('form') as UpdateAdminProfileSchema
-    const { name, phone, email, image } = validated
-
-    const existingAdmin = await db.staff.findUnique({
-      where: { id: admin.id },
-    })
-
-    if (!existingAdmin) {
-      throw new UnauthorizedException()
-    }
-
-    if (email && email !== existingAdmin.email) {
-      const emailTaken = await db.staff.findUnique({
-        where: { email },
-      })
-      if (emailTaken) {
-        return c.json(
-          err('Email is already taken', status.CONFLICT),
-          status.CONFLICT,
-        )
+      if (!admin || !admin.id) {
+        throw new UnauthorizedException()
       }
-    }
 
-    let imageUrl = existingAdmin.image
+      const validated = c.req.valid('form') as UpdateAdminProfileSchema
+      const { name, phone, email, image } = validated
 
-    if (image) {
-      if (existingAdmin.image) {
-        const deleted = await deleteFile(existingAdmin.image)
-        if (deleted) {
-          c.var.logger.info(
-            `Old profile image deleted for admin ID: ${admin.id}`,
-          )
-        } else {
-          c.var.logger.warn(
-            `Failed to delete old profile image for admin ID: ${admin.id}`,
+      const existingAdmin = await db.staff.findUnique({
+        where: { id: admin.id },
+      })
+
+      if (!existingAdmin) {
+        throw new UnauthorizedException()
+      }
+
+      if (email && email !== existingAdmin.email) {
+        const emailTaken = await db.staff.findUnique({
+          where: { email },
+        })
+        if (emailTaken) {
+          return c.json(
+            err('Email is already taken', status.CONFLICT),
+            status.CONFLICT,
           )
         }
       }
 
-      const uploaded = await uploadFile(image, {
-        subdir: 'admin-profiles',
-      })
+      let imageUrl = existingAdmin.image
 
-      if (!uploaded) {
-        c.var.logger.error(
-          `Failed to upload new profile image for admin ID: ${admin.id}`,
-        )
-        return c.json(
-          err('Failed to upload profile image', status.INTERNAL_SERVER_ERROR),
-          status.INTERNAL_SERVER_ERROR,
+      if (image) {
+        if (existingAdmin.image) {
+          const deleted = await deleteFile(existingAdmin.image)
+          if (deleted) {
+            c.var.logger.info(
+              `Old profile image deleted for admin ID: ${admin.id}`,
+            )
+          } else {
+            c.var.logger.warn(
+              `Failed to delete old profile image for admin ID: ${admin.id}`,
+            )
+          }
+        }
+
+        const uploaded = await uploadFile(image, {
+          subdir: 'admin-profiles',
+        })
+
+        if (!uploaded) {
+          c.var.logger.error(
+            `Failed to upload new profile image for admin ID: ${admin.id}`,
+          )
+          return c.json(
+            err('Failed to upload profile image', status.INTERNAL_SERVER_ERROR),
+            status.INTERNAL_SERVER_ERROR,
+          )
+        }
+
+        imageUrl = uploaded.relativePath
+        c.var.logger.info(
+          `New profile image uploaded for admin ID: ${admin.id}`,
         )
       }
 
-      imageUrl = uploaded.relativePath
-      c.var.logger.info(`New profile image uploaded for admin ID: ${admin.id}`)
+      const updatedAdmin = await db.staff.update({
+        where: { id: admin.id },
+        data: {
+          name: name ?? existingAdmin.name,
+          phone: phone ?? existingAdmin.phone,
+          email: email ?? existingAdmin.email,
+          image: imageUrl,
+        },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          image: true,
+          createdAt: true,
+          role: true,
+          isActive: true,
+          joinedAt: true,
+        },
+      })
+
+      if (updatedAdmin.image) {
+        const imageUrl = await getFilePath(updatedAdmin.image)
+        updatedAdmin.image = imageUrl
+      }
+
+      c.var.logger.info(`Admin profile updated for admin ID: ${admin.id}`)
+
+      return c.json(ok(updatedAdmin, 'Profile updated successfully'), status.OK)
+    } catch (err) {
+      c.var.logger.fatal(`Error in updateProfileHandler: ${err}`)
+      throw err
     }
-
-    const updatedAdmin = await db.staff.update({
-      where: { id: admin.id },
-      data: {
-        name: name ?? existingAdmin.name,
-        phone: phone ?? existingAdmin.phone,
-        email: email ?? existingAdmin.email,
-        image: imageUrl,
-      },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        email: true,
-        image: true,
-        createdAt: true,
-        role: true,
-        isActive: true,
-        joinedAt: true,
-      },
-    })
-
-    if (updatedAdmin.image) {
-      const imageUrl = await getFilePath(updatedAdmin.image)
-      updatedAdmin.image = imageUrl
-    }
-
-    c.var.logger.info(`Admin profile updated for admin ID: ${admin.id}`)
-
-    return c.json(ok(updatedAdmin, 'Profile updated successfully'), status.OK)
-  } catch (err) {
-    c.var.logger.fatal(`Error in updateProfileHandler: ${err}`)
-    throw err
-  }
-}
+  },
+)
