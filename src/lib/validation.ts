@@ -117,6 +117,9 @@ export const createStaffSchema = z
     confirmPassword: z.string().min(6).max(100),
     joinedAt: z
       .string()
+      .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+        message: 'Invalid date format, expected YYYY-MM-DD',
+      })
       .optional()
       .default(dayjs().format(DEFAULT_DATE_FORMAT)),
     role: z.enum(Role).default(Role.ADMIN),
@@ -148,3 +151,65 @@ export const changePasswordSchema = z
   })
 
 export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>
+
+export const singleBallboyScheduleSchema = z.object({
+  date: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+    message: 'Invalid date format, expected YYYY-MM-DD',
+  }),
+  time: z.string().min(5).max(8),
+  isAvailable: z.boolean().optional(),
+})
+
+export type SingleBallboyScheduleSchema = z.infer<
+  typeof singleBallboyScheduleSchema
+>
+
+export const rangeBallboyScheduleSchema = z.object({
+  fromDate: z
+    .string()
+    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      message: 'Invalid date format, expected YYYY-MM-DD',
+    }),
+  toDate: z.string().refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+    message: 'Invalid date format, expected YYYY-MM-DD',
+  }),
+  fromTime: z.string().min(5).max(8),
+  toTime: z.string().min(5).max(8),
+  days: z
+    .array(
+      z.enum([
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ]),
+    )
+    .optional(),
+})
+
+export type RangeBallboyScheduleSchema = z.infer<
+  typeof rangeBallboyScheduleSchema
+>
+
+export const singleCoachScheduleSchema = singleBallboyScheduleSchema
+
+export type SingleCoachScheduleSchema = z.infer<
+  typeof singleCoachScheduleSchema
+>
+
+export const rangeCoachScheduleSchema = rangeBallboyScheduleSchema
+
+export type RangeCoachScheduleSchema = z.infer<typeof rangeCoachScheduleSchema>
+
+export const createBallboyScheduleSchema = z.object({
+  type: z.enum(['single', 'range']),
+  single: singleBallboyScheduleSchema.optional(),
+  range: rangeBallboyScheduleSchema.optional(),
+})
+
+export type CreateBallboyScheduleSchema = z.infer<
+  typeof createBallboyScheduleSchema
+>

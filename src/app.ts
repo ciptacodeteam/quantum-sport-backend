@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import 'dayjs/locale/id'
 import duration from 'dayjs/plugin/duration'
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
 
 import { serveStatic } from '@hono/node-server/serve-static'
 import createApp from './lib/create-app'
@@ -12,8 +13,12 @@ import authRoute from './routes/auth.route'
 import healthRoute from './routes/health.route'
 import homeRoute from './routes/home.route'
 import phoneVerificationRoute from './routes/phone.route'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
 
-dayjs.extend(duration).locale('id')
+dayjs.locale('id')
+dayjs.extend(duration)
+dayjs.extend(isSameOrBefore)
+dayjs.extend(customParseFormat)
 
 const app = createApp()
 

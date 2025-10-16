@@ -2,12 +2,15 @@ import { ADMIN_PROFILE_SUBDIR } from '@/config'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
+import { getScheduleFromDateRange } from '@/lib/day'
 import { hashPassword } from '@/lib/password'
 import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
 import { ok } from '@/lib/response'
 import { formatPhone } from '@/lib/utils'
 import {
+  CreateBallboyScheduleSchema,
+  createBallboyScheduleSchema,
   createStaffSchema,
   CreateStaffSchema,
   IdSchema,
@@ -19,6 +22,7 @@ import {
 import { deleteFile, getFilePath, uploadFile } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
+import { Prisma, Role } from 'generated/prisma'
 import status from 'http-status'
 
 export const getAllStaffHandler = factory.createHandlers(
@@ -333,6 +337,175 @@ export const revokeStaffTokenHandler = factory.createHandlers(
       return c.json(ok(null, 'Staff tokens revoked successfully'), status.OK)
     } catch (err) {
       c.var.logger.fatal(`Error revoking staff tokens: ${err}`)
+      throw err
+    }
+  },
+)
+
+export const createBallboyScheduleHandler = factory.createHandlers(
+  zValidator('param', idSchema, validateHook),
+  zValidator('json', createBallboyScheduleSchema, validateHook),
+  async (c) => {
+    try {
+      const validatedParam = c.req.valid('param') as IdSchema
+      const staffId = validatedParam.id
+      const validatedForm = c.req.valid('json') as CreateBallboyScheduleSchema
+
+      const { type, single, range } = validatedForm
+
+      const existingStaff = await db.staff.findUnique({
+        where: { id: staffId },
+      })
+
+      if (!existingStaff) {
+        throw new NotFoundException('Staff not found')
+      }
+
+      if (existingStaff.role !== Role.BALLBOY) {
+        throw new BadRequestException('Staff is not a ballboy')
+      }
+
+      if (type === 'single') {
+        if (!single) {
+          throw new BadRequestException('Single schedule data is required')
+        }
+
+        const { date, time, isAvailable } = single
+
+        const existingSchedule = await db.ballboySchedule.findFirst({
+          where: {
+            staffId,
+            date: dayjs(date).toDate(),
+            time,
+          },
+        })
+
+        if (existingSchedule) {
+          throw new BadRequestException(
+            'Schedule already exists for the given date and time',
+          )
+        }
+
+        const newSchedule = await db.ballboySchedule.create({
+          data: {
+            staffId,
+            date: dayjs(date).toDate(),
+            time,
+            isAvailable,
+          },
+          select: {
+            id: true,
+            date: true,
+            time: true,
+            isAvailable: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+
+        return c.json(
+          ok(newSchedule, 'Ballboy schedule created successfully'),
+          status.CREATED,
+        )
+      } else if (type === 'range') {
+        if (!range) {
+          throw new BadRequestException('Range schedule data is required')
+        }
+
+        const { fromDate, toDate, fromTime, toTime, days } = range
+
+        const schedulesToCreate: Array<Prisma.BallboyScheduleCreateManyInput> =
+          []
+
+        const generatedSchedules = getScheduleFromDateRange(
+          fromDate,
+          toDate,
+          fromTime,
+          toTime,
+          days,
+        )
+
+        c.var.logger.debug(
+          `Generated ${generatedSchedules.length} schedules from range`,
+        )
+
+        if (generatedSchedules.length === 0) {
+          throw new BadRequestException('No schedules generated from the range')
+        }
+
+        c.var.logger.debug(
+          `Generated Schedules: ${JSON.stringify(generatedSchedules)}`,
+        )
+
+        const existingSchedules = await db.ballboySchedule.findMany({
+          where: {
+            staffId,
+            date: {
+              gte: dayjs(fromDate).toDate(),
+              lte: dayjs(toDate).toDate(),
+            },
+          },
+        })
+        console.log('🚀 ~ existingSchedules:', existingSchedules)
+
+        if (existingSchedules.length > 0) {
+          c.var.logger.debug(
+            `Found ${existingSchedules.length} existing schedules in the range`,
+          )
+        }
+
+        const existingScheduleSet = new Set(
+          existingSchedules.map(
+            (s) => `${dayjs(s.date).format('YYYY-MM-DD')}-${s.time}`,
+          ),
+        )
+
+        for (const sched of generatedSchedules) {
+          const key = `${sched.date}-${sched.time}`
+          if (!existingScheduleSet.has(key)) {
+            schedulesToCreate.push({
+              staffId,
+              date: dayjs(sched.date, 'YYYY-MM-DD', true)
+                .add(1, 'day')
+                .toDate(),
+              time: sched.time,
+              isAvailable: true,
+            })
+          }
+        }
+
+        if (schedulesToCreate.length === 0) {
+          throw new BadRequestException(
+            'No new schedules to create in the given range',
+          )
+        }
+
+        c.var.logger.debug(
+          `Creating ${schedulesToCreate.length} schedules for ballboy ID ${staffId}`,
+        )
+        c.var.logger.debug(`Schedules: ${JSON.stringify(schedulesToCreate)}`)
+
+        const createdSchedules = await db.ballboySchedule.createMany({
+          data: schedulesToCreate,
+        })
+
+        c.var.logger.debug(
+          `Created ${createdSchedules.count} schedules for ballboy ID ${staffId}`,
+        )
+
+        c.var.logger.debug(
+          `Created Schedules: ${JSON.stringify(createdSchedules)}`,
+        )
+
+        return c.json(
+          ok(createdSchedules, 'Ballboy schedules created successfully'),
+          status.CREATED,
+        )
+      } else {
+        throw new BadRequestException('Invalid schedule type')
+      }
+    } catch (err) {
+      c.var.logger.fatal(`Error creating ballboy schedule: ${err}`)
       throw err
     }
   },

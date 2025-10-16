@@ -33,3 +33,27 @@ export type AppContext<P extends string = string, S = any> = Context<
 export type AppRouteHandler<P extends string = string, S = any> = (
   c: AppContext<P, S>,
 ) => Promise<Response> | Response
+
+export type DayToken =
+  | number
+  | 'Sunday'
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sun'
+  | 'Mon'
+  | 'Tue'
+  | 'Wed'
+  | 'Thu'
+  | 'Fri'
+  | 'Sat'
+  | 'Minggu'
+  | 'Senin'
+  | 'Selasa'
+  | 'Rabu'
+  | 'Kamis'
+  | 'Jumat'
+  | 'Sabtu'
