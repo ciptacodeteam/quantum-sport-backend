@@ -227,3 +227,25 @@ export const overrideSingleBallboyCostSchema = overrideSingleCourtCostSchema
 export type OverrideSingleBallboyCostSchema = z.infer<
   typeof overrideSingleBallboyCostSchema
 >
+
+export const createCoachCostSchema = createCourtCostSchema
+  .omit({ courtId: true })
+  .extend({
+    coachId: z.string(),
+  })
+
+export type CreateCoachCostSchema = z.infer<typeof createCoachCostSchema>
+
+export const updateCoachCostSchema = updateCourtCostSchema
+
+export type UpdateCoachCostSchema = z.infer<typeof updateCoachCostSchema>
+
+export const overrideSingleCoachCostSchema = overrideSingleCourtCostSchema
+  .omit({ courtId: true })
+  .extend({
+    coachId: z.string(),
+  })
+
+export type OverrideSingleCoachCostSchema = z.infer<
+  typeof overrideSingleCoachCostSchema
+>
