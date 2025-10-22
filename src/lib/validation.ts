@@ -1,6 +1,8 @@
 import { DEFAULT_DATE_FORMAT } from '@/config'
 import dayjs from 'dayjs'
 import { Role } from 'generated/prisma'
+import { startTime } from 'pino-http'
+import { start } from 'repl'
 import z from 'zod'
 
 export const idSchema = z.object({
@@ -249,3 +251,94 @@ export const overrideSingleCoachCostSchema = overrideSingleCourtCostSchema
 export type OverrideSingleCoachCostSchema = z.infer<
   typeof overrideSingleCoachCostSchema
 >
+
+// Banner Schemas
+export const createBannerSchema = z.object({
+  image: z.file(),
+  link: z.string().url().optional(),
+  isActive: z.coerce.boolean().optional(),
+  startAt: z
+    .string()
+    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      message: 'Invalid date format, expected YYYY-MM-DD',
+    })
+    .optional(),
+  endAt: z
+    .string()
+    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      message: 'Invalid date format, expected YYYY-MM-DD',
+    })
+    .optional(),
+  sequence: z.number().min(0).optional(),
+})
+
+export type CreateBannerSchema = z.infer<typeof createBannerSchema>
+
+export const updateBannerSchema = createBannerSchema.partial()
+
+export type UpdateBannerSchema = z.infer<typeof updateBannerSchema>
+
+// Class schema
+export const createClassSchema = z.object({
+  name: z.string().min(3).max(100),
+  description: z.string().min(3).max(500).optional(),
+  content: z.string().min(3).max(2000).optional(),
+  organizerName: z.string().min(3).max(100).optional(),
+  speakerName: z.string().min(3).max(100).optional(),
+  image: z.file().optional(),
+  startDate: z
+    .string()
+    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      message: 'Invalid date format, expected YYYY-MM-DD',
+    })
+    ,
+  endDate: z
+    .string()
+    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      message: 'Invalid date format, expected YYYY-MM-DD',
+    })
+    ,
+  startTime: z
+    .string()
+    .refine((val) => dayjs(val, 'HH:mm', true).isValid(), {
+      message: 'Invalid time format, expected HH:mm',
+    })
+    ,
+  endTime: z
+    .string()
+    .refine((val) => dayjs(val, 'HH:mm', true).isValid(), {
+      message: 'Invalid time format, expected HH:mm',
+    })
+    ,
+  price: z.number().min(0),
+  sessions: z.number().min(1),
+  capacity: z.number().min(1),
+  remaining: z.number().min(0),
+  maxBookingPax: z.number().min(1),
+  gender: z.enum(['ALL', 'MALE', 'FEMALE']),
+  ageMin: z.number().min(0),
+  isActive: z.coerce.boolean(),
+})
+
+export type CreateClassSchema = z.infer<typeof createClassSchema>
+
+export const updateClassSchema = createClassSchema.partial()
+
+export type UpdateClassSchema = z.infer<typeof updateClassSchema>
+
+// Club schema
+export const createClubSchema = z.object({
+  name: z.string().min(3).max(100),
+  logo: z.file().optional(),
+  description: z.string().min(3).max(500).optional(),
+  rules: z.string().min(3).max(2000).optional(),
+  leaderId: z.string(),
+  visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
+  isActive: z.coerce.boolean().optional(),
+})
+
+export type CreateClubSchema = z.infer<typeof createClubSchema>
+
+export const updateClubSchema = createClubSchema.partial()
+
+export type UpdateClubSchema = z.infer<typeof updateClubSchema>
