@@ -20,6 +20,11 @@ import adminCourtCostRoute from './routes/admin/court-cost.route'
 import adminCourtRoute from './routes/admin/court.route'
 import adminBallboyCostRoute from './routes/admin/ballboy-cost.route'
 import adminCoachCostRoute from './routes/admin/coach-cost.route'
+import bannerRoute from './routes/banner.route'
+import adminBannerRoute from './routes/admin/banner.route'
+import courtRoute from './routes/court.route'
+import adminClassRoute from './routes/admin/class.route'
+import classRouter from './routes/class.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -33,7 +38,15 @@ const app = createApp()
 app.use('/storage/*', serveStatic({ root: './src' }))
 
 // ADD NEW ROUTES HERE
-const routes = [homeRoute, healthRoute, phoneVerificationRoute, authRoute]
+const routes = [
+  homeRoute,
+  healthRoute,
+  phoneVerificationRoute,
+  authRoute,
+  bannerRoute,
+  courtRoute,
+  classRouter,
+]
 
 // ADD NEW ADMIN ROUTES HERE
 const adminRoutes = [
@@ -45,6 +58,8 @@ const adminRoutes = [
   adminCourtCostRoute,
   adminBallboyCostRoute,
   adminCoachCostRoute,
+  adminBannerRoute,
+  adminClassRoute,
 ]
 
 routes.forEach((route) => {

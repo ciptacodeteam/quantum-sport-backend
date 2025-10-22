@@ -18,5 +18,9 @@ export const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD'
 export const DEFAULT_DATETIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 export const JAKARTA_TZ = 'Asia/Jakarta'
 
+// Subdirectory constants for different file types, and declared only for database with public URL usage
 export const ADMIN_PROFILE_SUBDIR = 'admin-profiles'
 export const COURT_SUBDIR = 'courts'
+export const BANNER_SUBDIR = 'banners'
+export const CLASS_SUBDIR = 'classes'
+export const CLUB_SUBDIR = 'clubs'
