@@ -354,3 +354,21 @@ export const updateAdminProfileHandler = factory.createHandlers(
     }
   },
 )
+
+export const checkAdminAccountHandler = factory.createHandlers(async (c) => {
+  try {
+    const existingAdmin = await db.staff.findFirst({
+      where: { role: Role.ADMIN },
+    })
+
+    const hasAdmin = !!existingAdmin
+
+    return c.json(
+      ok({ hasAdmin }, 'Admin account existence checked successfully'),
+      status.OK,
+    )
+  } catch (err) {
+    c.var.logger.fatal(`Error in checkAdminAccountHandler: ${err}`)
+    throw err
+  }
+})

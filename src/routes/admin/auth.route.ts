@@ -1,4 +1,5 @@
 import {
+  checkAdminAccountHandler,
   getAdminProfileHandler,
   loginAdminHandler,
   logoutAdminHandler,
@@ -10,6 +11,7 @@ import { createRouter } from '@/lib/create-app'
 const adminAuthRoute = createRouter()
   .basePath('/auth')
   .post('/login', ...loginAdminHandler)
+  .get('/check-account', ...checkAdminAccountHandler)
   .post('/register', ...registerAdminHandler)
   .post('/logout', ...logoutAdminHandler)
   .get('/profile', ...getAdminProfileHandler)

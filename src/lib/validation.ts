@@ -1,8 +1,6 @@
 import { DEFAULT_DATE_FORMAT } from '@/config'
 import dayjs from 'dayjs'
 import { Role } from 'generated/prisma'
-import { startTime } from 'pino-http'
-import { start } from 'repl'
 import z from 'zod'
 
 export const idSchema = z.object({
@@ -71,9 +69,16 @@ export const loginWithEmailSchema = z.object({
 
 export type LoginWithEmailSchema = z.infer<typeof loginWithEmailSchema>
 
-export const registerAdminSchema = loginWithEmailSchema.extend({
-  name: z.string().min(3).max(100),
-})
+export const registerAdminSchema = loginWithEmailSchema
+  .extend({
+    name: z.string().min(3).max(100),
+    email: z.email().min(5).max(100),
+    password: z.string().min(6).max(100),
+    confirmPassword: z.string().min(6).max(100),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+  })
 
 export type RegisterAdminSchema = z.infer<typeof registerAdminSchema>
 
@@ -290,26 +295,18 @@ export const createClassSchema = z.object({
     .string()
     .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
       message: 'Invalid date format, expected YYYY-MM-DD',
-    })
-    ,
+    }),
   endDate: z
     .string()
     .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
       message: 'Invalid date format, expected YYYY-MM-DD',
-    })
-    ,
-  startTime: z
-    .string()
-    .refine((val) => dayjs(val, 'HH:mm', true).isValid(), {
-      message: 'Invalid time format, expected HH:mm',
-    })
-    ,
-  endTime: z
-    .string()
-    .refine((val) => dayjs(val, 'HH:mm', true).isValid(), {
-      message: 'Invalid time format, expected HH:mm',
-    })
-    ,
+    }),
+  startTime: z.string().refine((val) => dayjs(val, 'HH:mm', true).isValid(), {
+    message: 'Invalid time format, expected HH:mm',
+  }),
+  endTime: z.string().refine((val) => dayjs(val, 'HH:mm', true).isValid(), {
+    message: 'Invalid time format, expected HH:mm',
+  }),
   price: z.number().min(0),
   sessions: z.number().min(1),
   capacity: z.number().min(1),
