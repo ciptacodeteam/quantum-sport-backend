@@ -1,4 +1,4 @@
-import { OTP_LENGTH } from '@/constants'
+import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -28,7 +28,7 @@ import {
   ResetPasswordSchema,
 } from '@/lib/validation'
 import { validateOtp } from '@/services/otp.service'
-import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
+import { sendPhoneOtp } from '@/services/phone.service'
 import { getFileUrl } from '@/services/upload.service'
 import { AppRouteHandler, UserTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
@@ -386,30 +386,36 @@ export const forgotPasswordHandler = factory.createHandlers(
         )
       }
 
-      // Here you would typically initiate the forgot password process,
-      // such as sending a password reset email or SMS.
-      const otp = await generateOtp(OTP_LENGTH)
-      c.var.logger.info(`Generated OTP for ${formattedPhone}: ${otp}`)
+      let code = DEFAULT_OTP_CODE
+      let requestId = Math.random().toString(36).substring(2, 30)
 
-      const requestId = await sendPhoneOtp(formattedPhone, otp)
+      if (env.nodeEnv === 'production') {
+        code = await generateOtp(OTP_LENGTH)
+        requestId = await sendPhoneOtp(formattedPhone, code)
 
-      if (!requestId) {
-        c.var.logger.error(
-          `Failed to send OTP to phone number: ${formattedPhone}`,
-        )
-        return c.json(
-          err('Failed to send OTP', status.INTERNAL_SERVER_ERROR),
-          status.INTERNAL_SERVER_ERROR,
-        )
+        if (!requestId) {
+          c.var.logger.error(
+            `Failed to find OTP request ID for phone ${formattedPhone}`,
+          )
+          throw new Error('Failed to send OTP')
+        }
       }
 
-      await db.phoneVerification.create({
-        data: {
-          phone: formattedPhone,
+      await db.phoneVerification.upsert({
+        where: { phone: formattedPhone },
+        update: {
           requestId,
-          code: otp,
-          type: PhoneVerificationType.FORGOT_PASSWORD,
+          code,
           isUsed: false,
+          type: PhoneVerificationType.FORGOT_PASSWORD,
+          expiresAt: dayjs().add(5, 'minute').toDate(),
+        },
+        create: {
+          requestId,
+          phone: formattedPhone,
+          code,
+          isUsed: false,
+          type: PhoneVerificationType.FORGOT_PASSWORD,
           expiresAt: dayjs().add(5, 'minute').toDate(),
         },
       })
@@ -435,7 +441,7 @@ export const resetPasswordHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('json') as ResetPasswordSchema
-      const { phone, code, requestId, newPassword } = validated
+      const { phone, requestId, newPassword } = validated
 
       const formattedPhone = await formatPhone(phone)
 
@@ -451,26 +457,11 @@ export const resetPasswordHandler = factory.createHandlers(
         )
       }
 
-      const validOtp = await validateOtp(formattedPhone, requestId, code)
-
-      if (env.nodeEnv === 'production') {
-        const successVerifyOtp = await verifyPhoneOtp(requestId, code)
-
-        if (!successVerifyOtp) {
-          c.var.logger.error(
-            `Failed to verify OTP for phone number: ${formattedPhone}`,
-          )
-          return c.json(
-            err('Failed to verify OTP', status.BAD_REQUEST),
-            status.BAD_REQUEST,
-          )
-        }
-      }
-
       // Mark the OTP as used
       await db.phoneVerification.update({
         where: {
-          id: validOtp.id,
+          requestId: requestId,
+          phone: formattedPhone,
         },
         data: {
           type: PhoneVerificationType.FORGOT_PASSWORD,

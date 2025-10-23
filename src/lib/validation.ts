@@ -56,7 +56,6 @@ export type ForgotPasswordSchema = z.infer<typeof forgotPasswordSchema>
 
 export const resetPasswordSchema = z.object({
   phone: z.string().min(10).max(15),
-  code: z.string().length(4),
   requestId: z.string(),
   newPassword: z.string().min(6).max(100),
 })
