@@ -14,7 +14,7 @@ import { createRouter } from '@/lib/create-app'
 
 const authRoute = createRouter()
   .basePath('/auth')
-  .post('/send-login-otp', ...sendLoginOtpHandler)
+  .post('/send-login-otp', ...sendLoginOtpHandler) // USE FOR LOGIN ONLY
   .post('/login', ...loginHandler)
   .post('/register', ...registerHandler)
   .post('/login/email', ...loginWithEmailHandler)
