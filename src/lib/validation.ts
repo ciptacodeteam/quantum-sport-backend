@@ -35,18 +35,12 @@ export const loginSchema = phoneSchema.extend({
 
 export type LoginSchema = z.infer<typeof loginSchema>
 
-export const registerSchema = phoneSchema
-  .extend({
-    name: z.string().min(3).max(100),
-    code: z.string().length(4),
-    requestId: z.string(),
-    password: z.string().min(6).max(100),
-    confirmPassword: z.string().min(6).max(100),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  })
+export const registerSchema = phoneSchema.extend({
+  name: z.string().min(3).max(100),
+  code: z.string().length(4),
+  requestId: z.string(),
+  password: z.string().min(6).max(100),
+})
 
 export type RegisterSchema = z.infer<typeof registerSchema>
 

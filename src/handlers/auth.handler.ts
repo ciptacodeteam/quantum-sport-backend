@@ -1,4 +1,4 @@
-import { OTP_LENGTH } from '@/constants'
+import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -58,26 +58,26 @@ export const sendLoginOtpHandler = factory.createHandlers(
         )
       }
 
-      const otp = await generateOtp(OTP_LENGTH)
-      c.var.logger.info(`Generated OTP for ${formattedPhone}: ${otp}`)
+      let code = DEFAULT_OTP_CODE
+      let requestId = Math.random().toString(36).substring(2, 30)
 
-      const requestId = await sendPhoneOtp(formattedPhone, otp)
+      if (env.nodeEnv === 'production') {
+        code = await generateOtp(OTP_LENGTH)
+        requestId = await sendPhoneOtp(formattedPhone, code)
 
-      if (!requestId) {
-        c.var.logger.error(
-          `Failed to send OTP to phone number: ${formattedPhone}`,
-        )
-        return c.json(
-          err('Failed to send OTP', status.INTERNAL_SERVER_ERROR),
-          status.INTERNAL_SERVER_ERROR,
-        )
+        if (!requestId) {
+          c.var.logger.error(
+            `Failed to find OTP request ID for phone ${formattedPhone}`,
+          )
+          throw new Error('Failed to send OTP')
+        }
       }
 
       await db.phoneVerification.create({
         data: {
           phone: formattedPhone,
           requestId,
-          code: otp,
+          code,
           type: PhoneVerificationType.LOGIN,
           isUsed: false,
           expiresAt: dayjs().add(5, 'minute').toDate(),
