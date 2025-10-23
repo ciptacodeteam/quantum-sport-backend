@@ -10,7 +10,6 @@ import {
   generateJwtToken,
   generateRefreshToken,
   validateRefreshToken,
-  validateToken,
 } from '@/lib/token'
 import { formatPhone, generateOtp } from '@/lib/utils'
 import {
@@ -123,18 +122,20 @@ export const loginHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'token', token, {
-        httpOnly: true,
-        secure: env.nodeEnv === 'production',
-        sameSite: 'Lax',
-      })
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
       })
 
-      return c.json(ok(null, 'Login successful'))
+      return c.json(
+        ok(
+          {
+            token,
+          },
+          'Login successful',
+        ),
+      )
     } catch (err) {
       c.var.logger.fatal(`Error during login: ${err}`)
       throw err
@@ -220,18 +221,21 @@ export const registerHandler = factory.createHandlers(
         }
       })
 
-      setCookie(c, 'token', token, {
-        httpOnly: true,
-        secure: env.nodeEnv === 'production',
-        sameSite: 'Lax',
-      })
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
       })
 
-      return c.json(ok(null, 'Registration successful'), status.CREATED)
+      return c.json(
+        ok(
+          {
+            token,
+          },
+          'Registration successful',
+        ),
+        status.CREATED,
+      )
     } catch (err) {
       c.var.logger.fatal(`Error during registration: ${err}`)
       throw err
@@ -270,32 +274,10 @@ export const logoutHandler = factory.createHandlers(async (c) => {
 
 export const refreshTokenHandler = factory.createHandlers(async (c) => {
   try {
-    const token = getCookie(c, 'token')
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
       throw new UnauthorizedException()
-    }
-
-    // If the token is still valid, no need to refresh
-    if (token) {
-      const validatedToken = await validateToken(token)
-
-      if (validatedToken) {
-        setCookie(c, 'token', token, {
-          httpOnly: true,
-          secure: env.nodeEnv === 'production',
-          sameSite: 'Lax',
-        })
-
-        setCookie(c, 'refreshToken', refreshToken, {
-          httpOnly: true,
-          secure: env.nodeEnv === 'production',
-          sameSite: 'Lax',
-        })
-
-        return c.json(ok(null, 'Token is still valid'))
-      }
     }
 
     const validRefreshToken = await validateRefreshToken(refreshToken)
@@ -347,18 +329,20 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
     deleteCookie(c, 'token')
     deleteCookie(c, 'refreshToken')
 
-    setCookie(c, 'token', newToken, {
-      httpOnly: true,
-      secure: env.nodeEnv === 'production',
-      sameSite: 'Lax',
-    })
     setCookie(c, 'refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: env.nodeEnv === 'production',
       sameSite: 'Lax',
     })
 
-    return c.json(ok(null, 'Token refreshed'))
+    return c.json(
+      ok(
+        {
+          token: newToken,
+        },
+        'Token refreshed',
+      ),
+    )
   } catch (err) {
     c.var.logger.fatal(`Error during token refresh: ${err}`)
     throw err
@@ -555,18 +539,20 @@ export const loginWithEmailHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'token', token, {
-        httpOnly: true,
-        secure: env.nodeEnv === 'production',
-        sameSite: 'Lax',
-      })
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
       })
 
-      return c.json(ok(null, 'Login successful'))
+      return c.json(
+        ok(
+          {
+            token,
+          },
+          'Login successful',
+        ),
+      )
     } catch (err) {
       c.var.logger.fatal(`Error during login with email: ${err}`)
       throw err

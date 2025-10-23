@@ -18,8 +18,8 @@ export const env = {
     secret: req('JWT_SECRET'),
     issuer: req('JWT_ISSUER', 'quantum-sport-backend'),
     audience: req('JWT_AUDIENCE', 'quantum-sport-frontend'),
-    expires: req('JWT_EXPIRES', '7'),
-    refreshExpires: req('JWT_REFRESH_EXPIRES', '30'),
+    expires: req('JWT_EXPIRES', '1'), // in minutes
+    refreshExpires: req('JWT_REFRESH_EXPIRES', '30'), // in days
   },
   xendit: {
     apiKey: process.env.XENDIT_API_KEY ?? '',

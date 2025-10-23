@@ -81,18 +81,21 @@ export const registerAdminHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'token', token, {
-        httpOnly: true,
-        secure: env.nodeEnv === 'production',
-        sameSite: 'Lax',
-      })
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
       })
 
-      return c.json(ok(null, 'Admin registered successfully'), status.CREATED)
+      return c.json(
+        ok(
+          {
+            token,
+          },
+          'Admin registered successfully',
+        ),
+        status.CREATED,
+      )
     } catch (err) {
       c.var.logger.fatal(`Error in registerAdminHandler: ${err}`)
       throw err
@@ -163,18 +166,21 @@ export const loginAdminHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'token', token, {
-        httpOnly: true,
-        secure: env.nodeEnv === 'production',
-        sameSite: 'Lax',
-      })
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
       })
 
-      return c.json(ok(null, 'Login successful'), status.OK)
+      return c.json(
+        ok(
+          {
+            token,
+          },
+          'Login successful',
+        ),
+        status.OK,
+      )
     } catch (err) {
       c.var.logger.fatal(`Error in adminLoginHandler: ${err}`)
       throw err
@@ -429,18 +435,21 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
       },
     })
 
-    setCookie(c, 'token', newToken, {
-      httpOnly: true,
-      secure: env.nodeEnv === 'production',
-      sameSite: 'Lax',
-    })
     setCookie(c, 'refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: env.nodeEnv === 'production',
       sameSite: 'Lax',
     })
 
-    return c.json(ok(null, 'Token refreshed successfully'), status.OK)
+    return c.json(
+      ok(
+        {
+          token: newToken,
+        },
+        'Token refreshed successfully',
+      ),
+      status.OK,
+    )
   } catch (err) {
     c.var.logger.fatal(`Error in refreshTokenAdminHandler: ${err}`)
     throw err

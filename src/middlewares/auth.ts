@@ -3,32 +3,30 @@ import { validateToken } from '@/lib/token'
 import { AdminTokenPayload, UserTokenPayload } from '@/types'
 import { Role } from 'generated/prisma'
 import { MiddlewareHandler } from 'hono'
-import { deleteCookie, getCookie } from 'hono/cookie'
 
 export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
-  const token = getCookie(c, 'token') as string | undefined
+  const authorization = c.req.header('Authorization')
+    ? c.req.header('Authorization')
+    : null
+
+  if (!authorization || !authorization.startsWith('Bearer ')) {
+    c.set('user', null)
+    c.set('admin', null)
+    return next()
+  }
+
+  const token = authorization.replace('Bearer ', '')
+
   c.var.logger.debug(`Global auth middleware - token: ${token}`)
 
   if (!token) {
     c.set('user', null)
-
-    deleteCookie(c, 'token')
-    deleteCookie(c, 'refreshToken')
-
+    c.set('admin', null)
     return next()
   }
 
   const session = await validateToken(token)
   const payload = session?.data as UserTokenPayload | AdminTokenPayload | null
-
-  if (!payload?.id) {
-    c.set('user', null)
-
-    deleteCookie(c, 'token')
-    deleteCookie(c, 'refreshToken')
-
-    return next()
-  }
 
   // clear both contexts initially
   c.set('admin', null)

@@ -11,7 +11,7 @@ export async function generateJwtToken(payloadData: Record<string, any>) {
       iss: env.jwt.issuer,
       aud: env.jwt.audience,
       iat: now.unix(),
-      exp: now.add(Number(env.jwt.expires), 'days').unix(),
+      exp: now.add(Number(env.jwt.expires), 'minutes').unix(),
       data: payloadData,
     }
     log.debug(`Generating JWT token with payload: ${JSON.stringify(payload)}`)
@@ -53,6 +53,10 @@ export async function validateToken(token: string) {
     const secret = env.jwt.secret
     log.debug(`Validating JWT token: ${token}`)
     const payload = await verify(token, secret)
+    if (payload && payload.type === 'refresh') {
+      log.error(`Invalid JWT token: token is a refresh token`)
+      return null
+    }
     log.debug(`Validated JWT token with payload: ${JSON.stringify(payload)}`)
     return payload
   } catch (err) {
