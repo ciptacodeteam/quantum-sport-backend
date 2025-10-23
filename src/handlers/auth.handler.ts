@@ -193,7 +193,7 @@ export const registerHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('json') as RegisterSchema
-      const { phone, code, requestId } = validated
+      const { phone, code, requestId, password, name } = validated
 
       const formattedPhone = await formatPhone(phone)
 
@@ -223,10 +223,13 @@ export const registerHandler = factory.createHandlers(
           },
         })
 
+        const hashPwd = await hashPassword(password)
+
         const user = await tx.user.create({
           data: {
+            name,
             phone: formattedPhone,
-            name: 'New User', // Default name, you might want to change this
+            password: hashPwd,
           },
         })
 
