@@ -29,8 +29,8 @@ export const verifyOtpSchema = z.object({
 export type VerifyOtpSchema = z.infer<typeof verifyOtpSchema>
 
 export const loginSchema = phoneSchema.extend({
-  code: z.string().length(4),
-  requestId: z.string(),
+  phone: z.string().min(10).max(15),
+  password: z.string().min(6).max(100),
 })
 
 export type LoginSchema = z.infer<typeof loginSchema>

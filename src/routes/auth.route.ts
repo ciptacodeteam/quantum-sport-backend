@@ -1,4 +1,5 @@
 import {
+  checkAccountHandler,
   forgotPasswordHandler,
   getProfileHandler,
   loginHandler,
@@ -7,14 +8,13 @@ import {
   refreshTokenHandler,
   registerHandler,
   resetPasswordHandler,
-  sendLoginOtpHandler,
 } from '@/handlers/auth.handler'
 
 import { createRouter } from '@/lib/create-app'
 
 const authRoute = createRouter()
   .basePath('/auth')
-  .post('/send-login-otp', ...sendLoginOtpHandler) // USE FOR LOGIN ONLY
+  .post('/check-account', ...checkAccountHandler) // USE FOR CHECKING ACCOUNT EXISTS
   .post('/login', ...loginHandler)
   .post('/register', ...registerHandler)
   .post('/login/email', ...loginWithEmailHandler)

@@ -1,4 +1,4 @@
-import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
+import { OTP_LENGTH } from '@/constants'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -37,7 +37,7 @@ import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
-export const sendLoginOtpHandler = factory.createHandlers(
+export const checkAccountHandler = factory.createHandlers(
   zValidator('json', phoneSchema, validateHook),
   async (c) => {
     try {
@@ -50,51 +50,17 @@ export const sendLoginOtpHandler = factory.createHandlers(
         where: { phone: formattedPhone },
       })
 
-      if (!existingUser) {
-        c.var.logger.error(`No user found with phone number: ${formattedPhone}`)
-        return c.json(
-          err('Phone number is incorrect', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
-
-      let code = DEFAULT_OTP_CODE
-      let requestId = Math.random().toString(36).substring(2, 30)
-
-      if (env.nodeEnv === 'production') {
-        code = await generateOtp(OTP_LENGTH)
-        requestId = await sendPhoneOtp(formattedPhone, code)
-
-        if (!requestId) {
-          c.var.logger.error(
-            `Failed to find OTP request ID for phone ${formattedPhone}`,
-          )
-          throw new Error('Failed to send OTP')
-        }
-      }
-
-      await db.phoneVerification.create({
-        data: {
-          phone: formattedPhone,
-          requestId,
-          code,
-          type: PhoneVerificationType.LOGIN,
-          isUsed: false,
-          expiresAt: dayjs().add(5, 'minute').toDate(),
-        },
-      })
-
       return c.json(
         ok(
           {
             phone: formattedPhone,
-            requestId,
+            exists: !!existingUser,
           },
-          'OTP sent successfully',
+          existingUser ? 'Account exists' : 'Account does not exist',
         ),
       )
     } catch (err) {
-      c.var.logger.fatal(`Error during sending login OTP: ${err}`)
+      c.var.logger.fatal(`Error during account check: ${err}`)
       throw err
     }
   },
@@ -105,7 +71,7 @@ export const loginHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('json') as LoginSchema
-      const { phone, code, requestId } = validated
+      const { phone, password } = validated
 
       const formattedPhone = await formatPhone(phone)
 
@@ -121,32 +87,20 @@ export const loginHandler = factory.createHandlers(
         )
       }
 
-      const validOtp = await validateOtp(formattedPhone, requestId, code)
+      const validPassword = await verifyPassword(
+        password,
+        existingUser.password!,
+      )
 
-      if (env.nodeEnv === 'production') {
-        const successVerifyOtp = await verifyPhoneOtp(requestId, code)
-
-        if (!successVerifyOtp) {
-          c.var.logger.error(
-            `Failed to verify OTP for phone number: ${formattedPhone}`,
-          )
-          return c.json(
-            err('Failed to verify OTP', status.BAD_REQUEST),
-            status.BAD_REQUEST,
-          )
-        }
+      if (!validPassword) {
+        c.var.logger.error(
+          `Invalid password for phone number: ${formattedPhone}`,
+        )
+        return c.json(
+          err('Phone number or password is incorrect', status.UNAUTHORIZED),
+          status.UNAUTHORIZED,
+        )
       }
-
-      // Mark the OTP as used
-      await db.phoneVerification.update({
-        where: {
-          id: validOtp.id,
-        },
-        data: {
-          type: PhoneVerificationType.LOGIN,
-          isUsed: true,
-        },
-      })
 
       // Here you would typically create a session or JWT token for the user
       const token = await generateJwtToken({
