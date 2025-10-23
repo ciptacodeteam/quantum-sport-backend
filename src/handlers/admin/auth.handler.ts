@@ -6,7 +6,7 @@ import { factory } from '@/lib/create-app'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
-import { generateJwtToken } from '@/lib/token'
+import { generateJwtToken, validateRefreshToken } from '@/lib/token'
 import {
   loginWithEmailSchema,
   LoginWithEmailSchema,
@@ -384,24 +384,29 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
-      return c.json(
-        err('Refresh token is missing', status.UNAUTHORIZED),
-        status.UNAUTHORIZED,
-      )
+      throw new UnauthorizedException()
     }
 
-    const existingToken = await db.authToken.findUnique({
+    const validRefreshToken = await validateRefreshToken(refreshToken)
+
+    if (!validRefreshToken) {
+      throw new UnauthorizedException()
+    }
+
+    const authToken = await db.authToken.findFirst({
       where: { refreshToken },
-      include: {
-        staff: true,
-      },
+      include: { staff: true },
     })
 
+    if (!authToken || !authToken.staff) {
+      throw new UnauthorizedException()
+    }
+
     if (
-      !existingToken ||
-      !existingToken.staff ||
-      existingToken.type !== AuthTokenType.STAFF ||
-      dayjs().isAfter(dayjs(existingToken.refreshExpiresAt))
+      !authToken ||
+      !authToken.staff ||
+      authToken.type !== AuthTokenType.STAFF ||
+      dayjs().isAfter(dayjs(authToken.refreshExpiresAt))
     ) {
       return c.json(
         err('Invalid or expired refresh token', status.UNAUTHORIZED),
@@ -409,7 +414,18 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
       )
     }
 
-    const admin = existingToken.staff
+    if (dayjs().isAfter(authToken.refreshExpiresAt)) {
+      deleteCookie(c, 'token')
+      deleteCookie(c, 'refreshToken')
+
+      await db.authToken.deleteMany({
+        where: { staffId: authToken.staff.id },
+      })
+
+      throw new UnauthorizedException()
+    }
+
+    const admin = authToken.staff
 
     const newToken = await generateJwtToken({
       id: admin.id,
@@ -426,7 +442,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     } as AdminTokenPayload)
 
     await db.authToken.update({
-      where: { id: existingToken.id },
+      where: { id: authToken.id },
       data: {
         refreshToken: newRefreshToken,
         refreshExpiresAt: dayjs()
