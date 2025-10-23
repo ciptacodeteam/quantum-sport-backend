@@ -4,7 +4,7 @@ import {
   getCourtCostHandler,
   overrideSingleCourtCostHandler,
   updateCourtCostHandler,
-} from '@/services/court-cost.service'
+} from '@/handlers/admin/court-cost.handler'
 
 const adminCourtCostRoute = createRouter()
   .basePath('/court-costs')

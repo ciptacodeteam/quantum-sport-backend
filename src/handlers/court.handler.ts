@@ -38,8 +38,8 @@ export const getAllCourtHandler = factory.createHandlers(
 
       return c.json(ok(courts), status.OK)
     } catch (error) {
-      console.error('Error fetching courts:', error)
-      return c.json({ error: 'Failed to fetch courts' }, status.INTERNAL_SERVER_ERROR)
+      c.var.logger.fatal(`Error in getCourtItemsHandler: ${error}`)
+      throw error
     }
   },
 )
@@ -65,8 +65,8 @@ export const getCourtHandler = factory.createHandlers(
 
       return c.json(ok(court), status.OK)
     } catch (error) {
-      console.error('Error fetching court:', error)
-      return c.json({ error: 'Failed to fetch court' }, status.INTERNAL_SERVER_ERROR)
+      c.var.logger.fatal(`Error in getCourtHandler: ${error}`)
+      throw error
     }
   },
 )

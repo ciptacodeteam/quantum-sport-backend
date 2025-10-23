@@ -4,7 +4,7 @@ import {
   getBallboyCostHandler,
   overrideSingleBallboyCostHandler,
   updateBallboyCostHandler,
-} from '@/services/ballboy-cost.service'
+} from '@/handlers/admin/ballboy-cost.handler'
 
 const adminBallboyCostRoute = createRouter()
   .basePath('/ballboy-costs')

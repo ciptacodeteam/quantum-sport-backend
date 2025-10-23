@@ -1,5 +1,5 @@
 import { CLASS_SUBDIR } from '@/config'
-import { BadRequestException, NotFoundException } from '@/exceptions'
+import { NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -84,9 +84,9 @@ export const createClassHandler = factory.createHandlers(
       let imageUrl: string | undefined = undefined
       if (classData.image) {
         const uploadResult = await uploadFile(classData.image, {
-            subdir: CLASS_SUBDIR,
-        }) 
-        imageUrl = await getFileUrl(uploadResult.relativePath)
+          subdir: CLASS_SUBDIR,
+        })
+        imageUrl = uploadResult.relativePath
       }
 
       const newClass = await db.class.create({
@@ -142,9 +142,9 @@ export const updateClassHandler = factory.createHandlers(
           await deleteFile(existingClass.image)
         }
         const uploadResult = await uploadFile(classData.image, {
-            subdir: CLASS_SUBDIR,
-        }) 
-        imageUrl = await getFileUrl(uploadResult.relativePath)
+          subdir: CLASS_SUBDIR,
+        })
+        imageUrl = uploadResult.relativePath
       }
 
       const updatedClass = await db.class.update({
@@ -168,8 +168,7 @@ export const updateClassHandler = factory.createHandlers(
           sessions: classData.sessions ?? existingClass.sessions,
           capacity: classData.capacity ?? existingClass.capacity,
           remaining: classData.remaining ?? existingClass.remaining,
-          maxBookingPax:
-            classData.maxBookingPax ?? existingClass.maxBookingPax,
+          maxBookingPax: classData.maxBookingPax ?? existingClass.maxBookingPax,
           gender: classData.gender ?? existingClass.gender,
           ageMin: classData.ageMin ?? existingClass.ageMin,
         },

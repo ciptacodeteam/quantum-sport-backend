@@ -23,7 +23,7 @@ import {
   overrideStaffHourPrice,
   setStaffPricingRange,
   updateStaffPricing,
-} from './costing.service'
+} from '../../services/costing.service'
 import dayjs from 'dayjs'
 import { DATETIME_FORMAT } from '@/constants'
 

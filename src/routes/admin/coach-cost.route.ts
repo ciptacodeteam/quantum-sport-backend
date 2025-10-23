@@ -4,7 +4,7 @@ import {
   getCoachCostHandler,
   overrideSingleCoachCostHandler,
   updateCoachCostHandler,
-} from '@/services/coach-cost.service'
+} from '@/handlers/admin/coach-cost.handler'
 
 const adminCoachCostRoute = createRouter()
   .basePath('/coach-costs')

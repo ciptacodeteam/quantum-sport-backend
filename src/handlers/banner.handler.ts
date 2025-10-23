@@ -38,11 +38,8 @@ export const getAllBannerHandler = factory.createHandlers(
 
       return c.json(ok(items), status.OK)
     } catch (error) {
-      console.error('Error fetching banners:', error)
-      return c.json(
-        { error: 'Failed to fetch banners' },
-        status.INTERNAL_SERVER_ERROR,
-      )
+      c.var.logger.fatal(`Error in getBannerItemsHandler: ${error}`)
+      throw error
     }
   },
 )
@@ -69,11 +66,8 @@ export const getBannerHandler = factory.createHandlers(
 
       return c.json(ok(banner), status.OK)
     } catch (error) {
-      console.error('Error fetching banner:', error)
-      return c.json(
-        { error: 'Failed to fetch banner' },
-        status.INTERNAL_SERVER_ERROR,
-      )
+      c.var.logger.fatal(`Error in getBannerHandler: ${error}`)
+      throw error
     }
   },
 )

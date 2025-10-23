@@ -17,7 +17,7 @@ import {
   overrideSingleCourtHourPrice,
   setCourtPricing,
   updateCourtPricing,
-} from './costing.service'
+} from '../../services/costing.service'
 import { err, ok } from '@/lib/response'
 import status from 'http-status'
 import { db } from '@/lib/prisma'
