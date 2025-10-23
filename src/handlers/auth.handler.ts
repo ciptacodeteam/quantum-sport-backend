@@ -20,6 +20,8 @@ import {
   LoginSchema,
   loginWithEmailSchema,
   LoginWithEmailSchema,
+  PhoneSchema,
+  phoneSchema,
   registerSchema,
   RegisterSchema,
   resetPasswordSchema,
@@ -34,6 +36,69 @@ import dayjs from 'dayjs'
 import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
+
+export const sendLoginOtpHandler = factory.createHandlers(
+  zValidator('json', phoneSchema, validateHook),
+  async (c) => {
+    try {
+      const validated = c.req.valid('json') as PhoneSchema
+      const { phone } = validated
+
+      const formattedPhone = await formatPhone(phone)
+
+      const existingUser = await db.user.findUnique({
+        where: { phone: formattedPhone },
+      })
+
+      if (!existingUser) {
+        c.var.logger.error(`No user found with phone number: ${formattedPhone}`)
+        return c.json(
+          err('Phone number is incorrect', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
+
+      const otp = await generateOtp(OTP_LENGTH)
+      c.var.logger.info(`Generated OTP for ${formattedPhone}: ${otp}`)
+
+      const requestId = await sendPhoneOtp(formattedPhone, otp)
+
+      if (!requestId) {
+        c.var.logger.error(
+          `Failed to send OTP to phone number: ${formattedPhone}`,
+        )
+        return c.json(
+          err('Failed to send OTP', status.INTERNAL_SERVER_ERROR),
+          status.INTERNAL_SERVER_ERROR,
+        )
+      }
+
+      await db.phoneVerification.create({
+        data: {
+          phone: formattedPhone,
+          requestId,
+          code: otp,
+          type: PhoneVerificationType.LOGIN,
+          isUsed: false,
+          expiresAt: dayjs().add(5, 'minute').toDate(),
+        },
+      })
+
+      return c.json(
+        ok(
+          {
+            phone: formattedPhone,
+            requestId,
+          },
+          'OTP sent successfully',
+        ),
+      )
+    } catch (err) {
+      c.var.logger.fatal(`Error during sending login OTP: ${err}`)
+      throw err
+    }
+  },
+)
 
 export const loginHandler = factory.createHandlers(
   zValidator('json', loginSchema, validateHook),

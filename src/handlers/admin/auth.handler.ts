@@ -372,3 +372,77 @@ export const checkAdminAccountHandler = factory.createHandlers(async (c) => {
     throw err
   }
 })
+
+export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
+  try {
+    const refreshToken = getCookie(c, 'refreshToken')
+
+    if (!refreshToken) {
+      return c.json(
+        err('Refresh token is missing', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
+      )
+    }
+
+    const existingToken = await db.authToken.findUnique({
+      where: { refreshToken },
+      include: {
+        staff: true,
+      },
+    })
+
+    if (
+      !existingToken ||
+      !existingToken.staff ||
+      existingToken.type !== AuthTokenType.STAFF ||
+      dayjs().isAfter(dayjs(existingToken.refreshExpiresAt))
+    ) {
+      return c.json(
+        err('Invalid or expired refresh token', status.UNAUTHORIZED),
+        status.UNAUTHORIZED,
+      )
+    }
+
+    const admin = existingToken.staff
+
+    const newToken = await generateJwtToken({
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+    } as AdminTokenPayload)
+
+    const newRefreshToken = await generateJwtToken({
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+    } as AdminTokenPayload)
+
+    await db.authToken.update({
+      where: { id: existingToken.id },
+      data: {
+        refreshToken: newRefreshToken,
+        refreshExpiresAt: dayjs()
+          .add(Number(env.jwt.refreshExpires), 'days')
+          .toDate(),
+      },
+    })
+
+    setCookie(c, 'token', newToken, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
+    setCookie(c, 'refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: 'Lax',
+    })
+
+    return c.json(ok(null, 'Token refreshed successfully'), status.OK)
+  } catch (err) {
+    c.var.logger.fatal(`Error in refreshTokenAdminHandler: ${err}`)
+    throw err
+  }
+})

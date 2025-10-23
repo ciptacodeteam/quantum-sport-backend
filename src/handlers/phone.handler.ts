@@ -26,6 +26,19 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
 
       const formattedPhone = await formatPhone(phone)
 
+      const existingPhone = await db.user.findFirst({
+        where: {
+          phone: formattedPhone,
+        },
+      })
+
+      if (!existingPhone) {
+        return c.json(
+          err('Phone number not registered', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
+
       const existingRecord = await db.phoneVerification.findFirst({
         where: {
           phone: formattedPhone,
