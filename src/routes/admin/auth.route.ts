@@ -1,4 +1,5 @@
 import {
+  changePasswordAdminHandler,
   checkAdminAccountHandler,
   getAdminProfileHandler,
   loginAdminHandler,
@@ -18,5 +19,6 @@ const adminAuthRoute = createRouter()
   .post('/logout', ...logoutAdminHandler)
   .get('/profile', ...getAdminProfileHandler)
   .post('/profile', ...updateAdminProfileHandler)
+  .post('/change-password', ...changePasswordAdminHandler)
 
 export default adminAuthRoute

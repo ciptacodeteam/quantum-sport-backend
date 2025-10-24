@@ -12,6 +12,8 @@ import {
   validateRefreshToken,
 } from '@/lib/token'
 import {
+  ChangePasswordSchema,
+  changePasswordSchema,
   loginWithEmailSchema,
   LoginWithEmailSchema,
   registerAdminSchema,
@@ -475,3 +477,55 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     throw err
   }
 })
+
+export const changePasswordAdminHandler = factory.createHandlers(
+  zValidator('json', changePasswordSchema, validateHook),
+  async (c) => {
+    try {
+      const admin = c.get('admin')
+
+      if (!admin || !admin.id) {
+        throw new UnauthorizedException()
+      }
+
+      const validated = c.req.valid('json') as ChangePasswordSchema
+      const { currentPassword, newPassword } = validated
+
+      const existingAdmin = await db.staff.findUnique({
+        where: { id: admin.id },
+      })
+
+      if (!existingAdmin) {
+        throw new UnauthorizedException()
+      }
+
+      const isCurrentPasswordValid = await verifyPassword(
+        currentPassword,
+        existingAdmin.password,
+      )
+
+      if (!isCurrentPasswordValid) {
+        return c.json(
+          err('Current password is incorrect', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
+
+      const hashedNewPassword = await hashPassword(newPassword)
+
+      await db.staff.update({
+        where: { id: admin.id },
+        data: {
+          password: hashedNewPassword,
+        },
+      })
+
+      c.var.logger.info(`Admin password changed for admin ID: ${admin.id}`)
+
+      return c.json(ok(null, 'Password changed successfully'), status.OK)
+    } catch (err) {
+      c.var.logger.fatal(`Error in changePasswordAdminHandler: ${err}`)
+      throw err
+    }
+  },
+)
