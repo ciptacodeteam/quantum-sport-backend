@@ -126,6 +126,7 @@ export const loginHandler = factory.createHandlers(
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
+        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
       return c.json(
@@ -225,6 +226,7 @@ export const registerHandler = factory.createHandlers(
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
+        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
       return c.json(
@@ -339,6 +341,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
       httpOnly: true,
       secure: env.nodeEnv === 'production',
       sameSite: 'Lax',
+      expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
     })
 
     return c.json(
@@ -549,6 +552,7 @@ export const loginWithEmailHandler = factory.createHandlers(
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
+        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
       return c.json(

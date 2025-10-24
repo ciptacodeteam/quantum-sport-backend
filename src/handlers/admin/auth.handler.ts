@@ -6,7 +6,11 @@ import { factory } from '@/lib/create-app'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
-import { generateJwtToken, validateRefreshToken } from '@/lib/token'
+import {
+  generateJwtToken,
+  generateRefreshToken,
+  validateRefreshToken,
+} from '@/lib/token'
 import {
   loginWithEmailSchema,
   LoginWithEmailSchema,
@@ -63,7 +67,7 @@ export const registerAdminHandler = factory.createHandlers(
         role: newAdmin.role,
       } as AdminTokenPayload)
 
-      const refreshToken = await generateJwtToken({
+      const refreshToken = await generateRefreshToken({
         id: newAdmin.id,
         name: newAdmin.name,
         email: newAdmin.email,
@@ -85,6 +89,7 @@ export const registerAdminHandler = factory.createHandlers(
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
+        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
       return c.json(
@@ -148,7 +153,7 @@ export const loginAdminHandler = factory.createHandlers(
         role: user.role,
       } as AdminTokenPayload)
 
-      const refreshToken = await generateJwtToken({
+      const refreshToken = await generateRefreshToken({
         id: user.id,
         name: user.name,
         email: user.email,
@@ -170,6 +175,7 @@ export const loginAdminHandler = factory.createHandlers(
         httpOnly: true,
         secure: env.nodeEnv === 'production',
         sameSite: 'Lax',
+        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
       return c.json(
@@ -431,7 +437,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
       role: admin.role,
     } as AdminTokenPayload)
 
-    const newRefreshToken = await generateJwtToken({
+    const newRefreshToken = await generateRefreshToken({
       id: admin.id,
       name: admin.name,
       email: admin.email,
@@ -452,6 +458,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
       httpOnly: true,
       secure: env.nodeEnv === 'production',
       sameSite: 'Lax',
+      expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
     })
 
     return c.json(

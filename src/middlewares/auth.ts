@@ -38,10 +38,12 @@ export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
     return !!p && (p as AdminTokenPayload).role !== undefined
   }
 
-  if (isAdminPayload(payload)) {
-    c.set('admin', payload)
-  } else {
-    c.set('user', payload as UserTokenPayload)
+  if (payload) {
+    if (isAdminPayload(payload)) {
+      c.set('admin', payload)
+    } else {
+      c.set('user', payload as UserTokenPayload)
+    }
   }
 
   return next()
