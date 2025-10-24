@@ -19,9 +19,8 @@ export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
 
   c.var.logger.debug(`Global auth middleware - token: ${token}`)
 
-  if (!token) {
-    c.set('user', null)
-    c.set('admin', null)
+  if (c.req.url.includes('/auth/refresh-token')) {
+    console.log('🚀 ~ Skipping token validation for refresh-token endpoint')
     return next()
   }
 

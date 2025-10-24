@@ -384,12 +384,18 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
+      deleteCookie(c, 'token')
+      deleteCookie(c, 'refreshToken')
+
       throw new UnauthorizedException()
     }
 
     const validRefreshToken = await validateRefreshToken(refreshToken)
 
     if (!validRefreshToken) {
+      deleteCookie(c, 'token')
+      deleteCookie(c, 'refreshToken')
+
       throw new UnauthorizedException()
     }
 
@@ -403,18 +409,9 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     }
 
     if (
-      !authToken ||
-      !authToken.staff ||
-      authToken.type !== AuthTokenType.STAFF ||
-      dayjs().isAfter(dayjs(authToken.refreshExpiresAt))
+      authToken.type === AuthTokenType.USER ||
+      dayjs().isAfter(authToken.refreshExpiresAt)
     ) {
-      return c.json(
-        err('Invalid or expired refresh token', status.UNAUTHORIZED),
-        status.UNAUTHORIZED,
-      )
-    }
-
-    if (dayjs().isAfter(authToken.refreshExpiresAt)) {
       deleteCookie(c, 'token')
       deleteCookie(c, 'refreshToken')
 

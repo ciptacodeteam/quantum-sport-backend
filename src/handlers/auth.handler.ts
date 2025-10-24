@@ -277,12 +277,18 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
+      deleteCookie(c, 'token')
+      deleteCookie(c, 'refreshToken')
+
       throw new UnauthorizedException()
     }
 
     const validRefreshToken = await validateRefreshToken(refreshToken)
 
     if (!validRefreshToken) {
+      deleteCookie(c, 'token')
+      deleteCookie(c, 'refreshToken')
+
       throw new UnauthorizedException()
     }
 
