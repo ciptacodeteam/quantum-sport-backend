@@ -26,7 +26,7 @@ export async function generateJwtToken(payloadData: Record<string, any>) {
 
 export async function generateRefreshToken(payloadData: Record<string, any>) {
   try {
-    const secret = env.jwt.secret
+    const secret = env.jwt.refreshSecret
     const now = dayjs()
     const payload = {
       iss: env.jwt.issuer,
@@ -67,7 +67,7 @@ export async function validateToken(token: string) {
 
 export async function validateRefreshToken(token: string) {
   try {
-    const secret = env.jwt.secret
+    const secret = env.jwt.refreshSecret
     log.debug(`Validating refresh token: ${token}`)
     const payload = await verify(token, secret)
     log.debug(

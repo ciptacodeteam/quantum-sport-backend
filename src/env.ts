@@ -16,6 +16,7 @@ export const env = {
   redisUrl: process.env.REDIS_URL,
   jwt: {
     secret: req('JWT_SECRET'),
+    refreshSecret: req('JWT_REFRESH_SECRET'),
     issuer: req('JWT_ISSUER', 'quantum-sport-backend'),
     audience: req('JWT_AUDIENCE', 'quantum-sport-frontend'),
     expires: req('JWT_EXPIRES', '1'), // in minutes
