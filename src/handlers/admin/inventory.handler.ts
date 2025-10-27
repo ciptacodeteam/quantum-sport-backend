@@ -66,6 +66,20 @@ export const createInventoryHandler = factory.createHandlers(
       const body = c.req.valid('json') as CreateInventorySchema
       const { name, description, quantity } = body
 
+      const existingName = await db.inventory.findFirst({
+        where: { name },
+      })
+
+      if (existingName) {
+        return c.json(
+          err(
+            'Inventory item with this name already exists.',
+            status.BAD_REQUEST,
+          ),
+          status.BAD_REQUEST,
+        )
+      }
+
       const newItem = await db.inventory.create({
         data: {
           name,

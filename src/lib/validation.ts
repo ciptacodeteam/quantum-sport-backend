@@ -93,7 +93,7 @@ export type UpdateAdminProfileSchema = z.infer<typeof updateAdminProfileSchema>
 
 export const createInventorySchema = z.object({
   name: z.string().min(3).max(100),
-  description: z.string().min(3).max(500).optional(),
+  description: z.string().max(500).optional(),
   quantity: z.number().min(0),
 })
 
@@ -274,7 +274,7 @@ export const createBannerSchema = z.object({
       message: 'Invalid date format, expected YYYY-MM-DD',
     })
     .optional(),
-  sequence: z.number().min(0).optional(),
+  sequence: z.coerce.number().min(0).optional(),
 })
 
 export type CreateBannerSchema = z.infer<typeof createBannerSchema>
