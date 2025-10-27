@@ -148,6 +148,17 @@ export const updateClubHandler = factory.createHandlers(
         }
       }
 
+      const user = c.get('user')
+
+      const isLeader = existingClub.leaderId === user?.id
+
+      if (!isLeader) {
+        return c.json(
+          err('Only the club leader can update the club'),
+          status.FORBIDDEN,
+        )
+      }
+
       let imageUrl: string | null = existingClub.logo
       if (clubData.logo) {
         if (existingClub.logo) {

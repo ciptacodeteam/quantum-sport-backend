@@ -25,6 +25,9 @@ import adminBannerRoute from './routes/admin/banner.route'
 import courtRoute from './routes/court.route'
 import adminClassRoute from './routes/admin/class.route'
 import classRouter from './routes/class.route'
+import adminMembershipRoute from './routes/admin/membership.route'
+import classRoute from './routes/class.route'
+import membershipRoute from './routes/membership.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -45,7 +48,8 @@ const routes = [
   authRoute,
   bannerRoute,
   courtRoute,
-  classRouter,
+  classRoute,
+  membershipRoute,
 ]
 
 // ADD NEW ADMIN ROUTES HERE
@@ -60,6 +64,7 @@ const adminRoutes = [
   adminCoachCostRoute,
   adminBannerRoute,
   adminClassRoute,
+  adminMembershipRoute
 ]
 
 routes.forEach((route) => {
