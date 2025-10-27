@@ -357,3 +357,22 @@ export type CreateMembershipSchema = z.infer<typeof createMembershipSchema>
 export const updateMembershipSchema = createMembershipSchema.partial()
 
 export type UpdateMembershipSchema = z.infer<typeof updateMembershipSchema>
+
+// Checkout schema
+export const checkoutSchema = z.object({
+  bookingId: z.string().optional(), // Optional: for updating existing DRAFT booking
+  paymentMethodId: z.string(),
+  courtSlots: z.array(z.string()).optional(), // Array of slot IDs for court bookings
+  coachSlots: z.array(z.string()).optional(), // Array of slot IDs for coach bookings
+  ballboySlots: z.array(z.string()).optional(), // Array of slot IDs for ballboy bookings
+  inventories: z
+    .array(
+      z.object({
+        inventoryId: z.string(),
+        quantity: z.number().min(1),
+      }),
+    )
+    .optional(),
+})
+
+export type CheckoutSchema = z.infer<typeof checkoutSchema>

@@ -28,6 +28,7 @@ import classRouter from './routes/class.route'
 import adminMembershipRoute from './routes/admin/membership.route'
 import classRoute from './routes/class.route'
 import membershipRoute from './routes/membership.route'
+import checkoutRoute from './routes/checkout.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -50,6 +51,7 @@ const routes = [
   courtRoute,
   classRoute,
   membershipRoute,
+  checkoutRoute,
 ]
 
 // ADD NEW ADMIN ROUTES HERE
