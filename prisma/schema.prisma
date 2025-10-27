@@ -356,6 +356,20 @@ model Booking {
   @@map("bookings")
 }
 
+/**
+ * Payload Checkout Lapangan (/checkout):
+ * courts: [{ courtId, slotId }], || []
+ * coaches: [{ staffId, slotId, coachTypeId }], || []
+ * ballboys: [{ slotId }], || []
+ * inventories: [{ inventoryId, quantity }] || []
+ */
+
+/**
+ * Payment (/payment):
+ * bookingId
+ * paymentMethodId
+ */
+
 model BookingDetail {
   id        String @id @default(cuid())
   bookingId String

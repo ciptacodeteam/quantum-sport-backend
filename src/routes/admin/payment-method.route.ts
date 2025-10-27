@@ -1,10 +1,16 @@
-import { createPaymentMethodHandler, deletePaymentMethodHandler, getAllPaymentMethodsHandler, getPaymentMethodHandler, updatePaymentMethodHandler } from '@/handlers/admin/payment-method.handler'
+import {
+  createPaymentMethodHandler,
+  deletePaymentMethodHandler,
+  getAllPaymentMethodsHandler,
+  getPaymentMethodHandler,
+  updatePaymentMethodHandler,
+} from '@/handlers/admin/payment-method.handler'
 import { createRouter } from '@/lib/create-app'
-import { requireAuth } from '@/middlewares/auth'
+import { requireAdminAuth } from '@/middlewares/auth'
 
 const paymentMethodRoute = createRouter()
-  .basePath('/admin/payment-methods')
-  .use(requireAuth)
+  .basePath('/payment-methods')
+  .use(requireAdminAuth)
   .get('/', ...getAllPaymentMethodsHandler)
   .get('/:id', ...getPaymentMethodHandler)
   .post('/', ...createPaymentMethodHandler)
