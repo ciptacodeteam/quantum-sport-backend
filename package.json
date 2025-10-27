@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run --hot index.ts",
+    "dev": "bun run --hot serve.ts",
     "build": "tsc && tsc-alias",
     "start": "bun run ./dist/serve.js",
     "lint": "eslint .",
