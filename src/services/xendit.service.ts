@@ -78,7 +78,9 @@ class XenditService {
     }
   }
 
-  async createInvoice(data: CreateInvoiceRequest): Promise<XenditInvoiceResponse> {
+  async createInvoice(
+    data: CreateInvoiceRequest,
+  ): Promise<XenditInvoiceResponse> {
     try {
       log.info(`Creating Xendit invoice for externalId: ${data.externalId}`)
 
@@ -108,7 +110,7 @@ class XenditService {
         throw new Error(`Xendit API error: ${response.status}`)
       }
 
-      const result = await response.json()
+      const result = (await response.json()) as any
       log.info(`Xendit invoice created: ${result.id}`)
       return result
     } catch (error) {
@@ -121,7 +123,9 @@ class XenditService {
     data: CreateVirtualAccountRequest,
   ): Promise<XenditVirtualAccountResponse> {
     try {
-      log.info(`Creating Xendit Virtual Account for externalId: ${data.externalId}`)
+      log.info(
+        `Creating Xendit Virtual Account for externalId: ${data.externalId}`,
+      )
 
       const response = await fetch(`${this.baseUrl}/virtual_accounts`, {
         method: 'POST',
@@ -140,7 +144,7 @@ class XenditService {
         throw new Error(`Xendit VA API error: ${response.status}`)
       }
 
-      const result = await response.json()
+      const result = (await response.json()) as any
       log.info(`Xendit VA created: ${result.id}`)
       return result
     } catch (error) {
@@ -162,7 +166,7 @@ class XenditService {
         throw new Error(`Xendit API error: ${response.status}`)
       }
 
-      return await response.json()
+      return (await response.json()) as any
     } catch (error) {
       log.fatal(`Error getting Xendit invoice: ${error}`)
       throw error
@@ -182,7 +186,7 @@ class XenditService {
         throw new Error(`Xendit VA API error: ${response.status}`)
       }
 
-      return await response.json()
+      return (await response.json()) as any
     } catch (error) {
       log.fatal(`Error getting Xendit Virtual Account: ${error}`)
       throw error
@@ -196,4 +200,3 @@ class XenditService {
 
 export const xenditService = new XenditService()
 export default xenditService
-
