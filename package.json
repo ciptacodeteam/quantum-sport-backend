@@ -20,7 +20,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "vercel:deploy": "vercel",
+    "vercel:dev": "vercel dev"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",
@@ -52,6 +54,7 @@
     "prisma": "^6.17.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1",
+    "vercel": "^48.6.0",
     "vitest": "^3.2.4"
   }
 }
