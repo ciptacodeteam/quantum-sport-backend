@@ -1,9 +1,9 @@
 import dayjs from 'dayjs'
-import 'dayjs/locale/id'
-import duration from 'dayjs/plugin/duration'
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore'
-import timezone from 'dayjs/plugin/timezone'
-import utc from 'dayjs/plugin/utc'
+import 'dayjs/locale/id.js' // Added  extension to fix module resolution in ES modules
+import duration from 'dayjs/plugin/duration.js'
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore.js'
+import timezone from 'dayjs/plugin/timezone.js'
+import utc from 'dayjs/plugin/utc.js'
 
 import { serveStatic } from '@hono/node-server/serve-static'
 import { JAKARTA_TZ } from './config'
@@ -70,7 +70,7 @@ const adminRoutes = [
   adminBannerRoute,
   adminClassRoute,
   adminMembershipRoute,
-  adminPaymentMethodRoute
+  adminPaymentMethodRoute,
 ]
 
 routes.forEach((route) => {

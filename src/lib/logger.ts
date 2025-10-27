@@ -1,65 +1,39 @@
 import { env } from '@/env'
 import { pinoLogger } from 'hono-pino'
-import fs from 'node:fs'
-import path from 'node:path'
 import pino from 'pino'
 import pretty from 'pino-pretty'
 
-const logDir = path.resolve(__dirname, '../storage/logs')
+// In serverless environments (Vercel), we use stdout
+// In local development, we can optionally write to files
+const isVercel = process.env.VERCEL === '1'
+const isProduction = env.nodeEnv === 'production'
 
-// Ensure log directory exists
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true })
+// Configuration for serverless (stdout) or local development
+const getPinoConfig = () => {
+  // On Vercel or production, use stdout (structured logging)
+  if (isVercel || (isProduction && process.env.AWS_LAMBDA_FUNCTION_NAME)) {
+    return {
+      level: env.logLevel || 'info',
+      formatters: {
+        level(label: string) {
+          return { level: label }
+        },
+      },
+    }
+  }
+
+  // Local development with pretty console output
+  return pretty({
+    ignore: 'req.headers.cookie',
+    colorize: true,
+    translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+    levelFirst: true,
+  })
 }
-
-const logFile = path.join(
-  logDir,
-  `${new Date().toISOString().slice(0, 10)}-log.txt`,
-)
 
 export const logger = () =>
   pinoLogger({
-    pino: pino(
-      env.nodeEnv === 'production'
-        ? {
-            level: env.logLevel || 'info',
-            transport: {
-              target: 'pino/file',
-              options: { destination: logFile },
-            },
-            formatters: {
-              level(label) {
-                return { level: label }
-              },
-            },
-          }
-        : pretty({
-            ignore: 'req.headers.cookie',
-            colorize: true,
-            translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-            levelFirst: true,
-          }),
-    ),
+    pino: pino(getPinoConfig()),
   })
 
-export const log = pino(
-  env.nodeEnv === 'production'
-    ? {
-        level: env.logLevel || 'info',
-        transport: {
-          target: 'pino/file',
-          options: { destination: logFile },
-        },
-        formatters: {
-          level(label) {
-            return { level: label }
-          },
-        },
-      }
-    : pretty({
-        ignore: 'req.headers.cookie',
-        colorize: true,
-        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-        levelFirst: true,
-      }),
-)
+export const log = pino(getPinoConfig())

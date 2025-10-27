@@ -1,8 +1,8 @@
 {
   "name": "quantum-sport-backend",
   "private": true,
-  "type": "module",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "dev": "bun run --hot index.ts",
     "build": "tsc && tsc-alias",
