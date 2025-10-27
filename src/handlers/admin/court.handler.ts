@@ -84,7 +84,7 @@ export const createCourtHandler = factory.createHandlers(
   async (c) => {
     try {
       const body = c.req.valid('form') as CreateCourtSchema
-      const { name, description, image } = body
+      const { name, description, image, isActive } = body
 
       let imageUrl: string | undefined
 
@@ -100,7 +100,7 @@ export const createCourtHandler = factory.createHandlers(
           name,
           description,
           image: imageUrl,
-          isActive: false,
+          isActive: isActive ?? false,
         },
       })
 

@@ -11,7 +11,7 @@ const adminCourtRoute = createRouter()
   .basePath('/courts')
   .get('/', ...getAllCourtHandler)
   .get('/:id', ...getCourtHandler)
-  .post('/:id', ...updateCourtHandler)
+  .put('/:id', ...updateCourtHandler)
   .post('/', ...createCourtHandler)
   .delete('/:id', ...deleteCourtHandler)
 
