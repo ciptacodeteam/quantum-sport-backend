@@ -21,5 +21,8 @@
 
     "noImplicitAny": false
   },
+  "tsc-alias": {
+    "resolveFullPaths": true
+  },
   "include": ["src/**/*.ts", "serve.ts", "prisma/**/*.ts", "tests/**/*.ts"]
 }
