@@ -29,6 +29,7 @@ import adminMembershipRoute from './routes/admin/membership.route'
 import classRoute from './routes/class.route'
 import membershipRoute from './routes/membership.route'
 import checkoutRoute from './routes/checkout.route'
+import xenditWebhookRoute from './routes/xendit-webhook.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -52,6 +53,7 @@ const routes = [
   classRoute,
   membershipRoute,
   checkoutRoute,
+  xenditWebhookRoute,
 ]
 
 // ADD NEW ADMIN ROUTES HERE

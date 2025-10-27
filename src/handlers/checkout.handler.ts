@@ -7,10 +7,12 @@ import {
   checkoutSchema,
   CheckoutSchema,
 } from '@/lib/validation'
+import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
 import { BookingStatus, PaymentStatus, SlotType } from 'generated/prisma'
 import dayjs from 'dayjs'
 import status from 'http-status'
+import { env } from '@/env'
 
 const PROCESSING_FEE_PERCENT = 0.02 // 2% processing fee
 
@@ -269,6 +271,12 @@ export const checkoutHandler = factory.createHandlers(
           },
         })
 
+        // Get user details for Xendit
+        const userDetails = await tx.user.findUnique({
+          where: { id: user.id },
+          select: { name: true, email: true, phone: true },
+        })
+
         // Generate invoice number
         const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
@@ -287,6 +295,30 @@ export const checkoutHandler = factory.createHandlers(
           },
         })
 
+        // Create Xendit invoice if API key is configured
+        let xenditInvoiceResponse: any = null
+        if (env.xendit.apiKey) {
+          try {
+            xenditInvoiceResponse = await xenditService.createInvoice({
+              externalId: invoice.id,
+              amount: finalTotal,
+              payerEmail: userDetails?.email || undefined,
+              description: `Payment for booking ${booking.id}`,
+              invoiceDuration: 86400, // 24 hours
+              successRedirectUrl: `${env.baseUrl}/payment/success`,
+              failureRedirectUrl: `${env.baseUrl}/payment/failed`,
+              customer: {
+                givenNames: userDetails?.name || 'Customer',
+                email: userDetails?.email || undefined,
+                mobileNumber: userDetails?.phone || undefined,
+              },
+            })
+          } catch (error) {
+            c.var.logger.error(`Failed to create Xendit invoice: ${error}`)
+            // Continue without Xendit integration
+          }
+        }
+
         // Create payment
         const payment = await tx.payment.create({
           data: {
@@ -295,6 +327,14 @@ export const checkoutHandler = factory.createHandlers(
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
             dueDate: dayjs().add(1, 'day').toDate(),
+            externalRef: xenditInvoiceResponse?.id || null,
+            meta: xenditInvoiceResponse
+              ? JSON.stringify({
+                  invoiceId: xenditInvoiceResponse.id,
+                  invoiceUrl: xenditInvoiceResponse.invoice_url,
+                  status: xenditInvoiceResponse.status,
+                })
+              : undefined,
           },
         })
 
@@ -323,6 +363,7 @@ export const checkoutHandler = factory.createHandlers(
           booking,
           invoice,
           payment,
+          xenditInvoiceUrl: xenditInvoiceResponse?.invoice_url || null,
         }
       })
 
@@ -335,6 +376,7 @@ export const checkoutHandler = factory.createHandlers(
             processingFee: result.booking.processingFee,
             total: result.invoice.total,
             status: result.booking.status,
+            paymentUrl: result.xenditInvoiceUrl,
           },
           'Checkout successful',
         ),
