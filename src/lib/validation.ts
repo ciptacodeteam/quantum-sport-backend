@@ -358,6 +358,20 @@ export const updateMembershipSchema = createMembershipSchema.partial()
 
 export type UpdateMembershipSchema = z.infer<typeof updateMembershipSchema>
 
+// Payment Method schemas
+export const createPaymentMethodSchema = z.object({
+  name: z.string().min(3).max(100),
+  logo: z.file().optional(),
+  fees: z.number().min(0),
+  isActive: z.coerce.boolean().optional().default(true),
+})
+
+export type CreatePaymentMethodSchema = z.infer<typeof createPaymentMethodSchema>
+
+export const updatePaymentMethodSchema = createPaymentMethodSchema.partial()
+
+export type UpdatePaymentMethodSchema = z.infer<typeof updatePaymentMethodSchema>
+
 // Checkout schema
 export const checkoutSchema = z.object({
   bookingId: z.string().optional(), // Optional: for updating existing DRAFT booking

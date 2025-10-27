@@ -30,6 +30,7 @@ import classRoute from './routes/class.route'
 import membershipRoute from './routes/membership.route'
 import checkoutRoute from './routes/checkout.route'
 import xenditWebhookRoute from './routes/xendit-webhook.route'
+import adminPaymentMethodRoute from './routes/admin/payment-method.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -68,7 +69,8 @@ const adminRoutes = [
   adminCoachCostRoute,
   adminBannerRoute,
   adminClassRoute,
-  adminMembershipRoute
+  adminMembershipRoute,
+  adminPaymentMethodRoute
 ]
 
 routes.forEach((route) => {
