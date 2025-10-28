@@ -3,6 +3,7 @@ import {
   IMAGE_MIME_WHITELIST,
   MAX_FILE_SIZE_BYTES,
 } from '@/config'
+import { env } from '@/env'
 import { sniffImageMime } from '@/helpers/sniff-mime'
 import { toWebp } from '@/lib/image'
 import { log } from '@/lib/logger'
@@ -11,7 +12,6 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { buildFilename } from '../lib/filename'
 import { ensureDir, safeJoin } from '../lib/fs'
-import { env } from '@/env'
 
 export type UploadOptions = {
   subdir?: string // e.g. "images", "avatars/2025/10"
@@ -63,7 +63,7 @@ export async function uploadFile(
 
   // Prepare folder
   const dir = safeJoin(subdir)
-  console.log('🚀 ~ uploadFile ~ dir:', dir)
+  log.info(`🚀 ~ uploadFile ~ dir: ${dir}`)
   await ensureDir(dir)
 
   let outBuf = buf
