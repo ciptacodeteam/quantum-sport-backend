@@ -22,7 +22,8 @@
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "vercel:deploy": "vercel",
-    "vercel:dev": "vercel dev"
+    "vercel:dev": "vercel dev",
+    "vercel:prod": "vercel --prod"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",
