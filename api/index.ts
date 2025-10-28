@@ -1,6 +1,6 @@
 import { handle } from 'hono/vercel'
 
-import app from '../dist/src/app.js'
+import app from '../dist/src/index.js'
 
 export const runtime = 'edge'
 
