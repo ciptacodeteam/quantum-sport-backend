@@ -1,6 +1,6 @@
 import { DEFAULT_DATE_FORMAT } from '@/config'
 import dayjs from 'dayjs'
-import { Role } from 'generated/prisma'
+import { Role } from '@prisma/client'
 import z from 'zod'
 
 export const idSchema = z.object({

@@ -23,8 +23,7 @@
     "typecheck": "tsc --noEmit",
     "vercel:deploy": "vercel",
     "vercel:dev": "vercel dev",
-    "vercel:prod": "vercel --prod",
-    "postbuild": "cp -r generated dist/generated"
+    "vercel:prod": "vercel --prod"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",

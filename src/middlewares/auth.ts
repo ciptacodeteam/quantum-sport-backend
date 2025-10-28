@@ -1,7 +1,7 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
 import { validateToken } from '@/lib/token'
 import { AdminTokenPayload, UserTokenPayload } from '@/types'
-import { Role } from 'generated/prisma'
+import { Role } from '@prisma/client'
 import { MiddlewareHandler } from 'hono'
 
 export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {

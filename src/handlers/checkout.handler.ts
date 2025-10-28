@@ -3,13 +3,10 @@ import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
-import {
-  checkoutSchema,
-  CheckoutSchema,
-} from '@/lib/validation'
+import { checkoutSchema, CheckoutSchema } from '@/lib/validation'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
-import { BookingStatus, PaymentStatus, SlotType } from 'generated/prisma'
+import { BookingStatus, PaymentStatus, SlotType } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { env } from '@/env'
@@ -127,7 +124,9 @@ export const checkoutHandler = factory.createHandlers(
           })
 
           if (courtSlotData.length !== courtSlots.length) {
-            throw new BadRequestException('One or more court slots not found or unavailable')
+            throw new BadRequestException(
+              'One or more court slots not found or unavailable',
+            )
           }
 
           for (const slot of courtSlotData) {
@@ -163,7 +162,9 @@ export const checkoutHandler = factory.createHandlers(
           })
 
           if (coachSlotData.length !== coachSlots.length) {
-            throw new BadRequestException('One or more coach slots not found or unavailable')
+            throw new BadRequestException(
+              'One or more coach slots not found or unavailable',
+            )
           }
 
           for (const slot of coachSlotData) {
@@ -206,7 +207,9 @@ export const checkoutHandler = factory.createHandlers(
           })
 
           if (ballboySlotData.length !== ballboySlots.length) {
-            throw new BadRequestException('One or more ballboy slots not found or unavailable')
+            throw new BadRequestException(
+              'One or more ballboy slots not found or unavailable',
+            )
           }
 
           for (const slot of ballboySlotData) {
@@ -234,7 +237,9 @@ export const checkoutHandler = factory.createHandlers(
               where: { id: inv.inventoryId },
             })
             if (!inventory) {
-              throw new NotFoundException(`Inventory ${inv.inventoryId} not found`)
+              throw new NotFoundException(
+                `Inventory ${inv.inventoryId} not found`,
+              )
             }
             if (!inventory.isActive) {
               throw new BadRequestException(
@@ -387,4 +392,3 @@ export const checkoutHandler = factory.createHandlers(
     }
   },
 )
-

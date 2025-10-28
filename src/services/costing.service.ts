@@ -2,7 +2,7 @@ import { JAKARTA_TZ } from '@/config'
 import { log } from '@/lib/logger'
 import { db } from '@/lib/prisma'
 import dayjs from 'dayjs'
-import { SlotType } from 'generated/prisma'
+import { SlotType } from '@prisma/client'
 
 type SetCourtPricingPayload = {
   courtId: string

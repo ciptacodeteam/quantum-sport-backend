@@ -1,4 +1,4 @@
-import { Role } from 'generated/prisma'
+import { Role } from '@prisma/client'
 import { Context } from 'hono'
 import type { PinoLogger } from 'hono-pino'
 

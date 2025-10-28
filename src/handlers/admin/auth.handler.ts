@@ -25,7 +25,7 @@ import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import { AdminTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
-import { AuthTokenType, Role } from 'generated/prisma'
+import { AuthTokenType, Role } from '@prisma/client'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 

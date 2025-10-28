@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/prisma'
+import { PrismaClient } from '@prisma/client'
 
 export const db = new PrismaClient({
   log: ['error', 'warn'],

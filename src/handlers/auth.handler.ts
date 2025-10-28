@@ -32,7 +32,7 @@ import { getFileUrl } from '@/services/upload.service'
 import { AppRouteHandler, UserTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
-import { AuthTokenType, PhoneVerificationType } from 'generated/prisma'
+import { AuthTokenType, PhoneVerificationType } from '@prisma/client'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 

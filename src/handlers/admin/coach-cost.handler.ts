@@ -17,7 +17,7 @@ import {
   updateCoachCostSchema,
 } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
-import { Role, SlotType } from 'generated/prisma'
+import { Role, SlotType } from '@prisma/client'
 import status from 'http-status'
 import {
   overrideStaffHourPrice,

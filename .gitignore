@@ -17,5 +17,4 @@ test-results/
 
 .env*
 !.env.example
-/prisma/generated/prisma
 .vercel

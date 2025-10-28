@@ -19,7 +19,8 @@
       "@/*": ["src/*"]
     },
 
-    "types": ["node", "vitest"],
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"],
 
     "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true

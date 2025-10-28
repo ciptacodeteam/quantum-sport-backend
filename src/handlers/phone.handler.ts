@@ -14,7 +14,7 @@ import {
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
-import { PhoneVerificationType } from 'generated/prisma'
+import { PhoneVerificationType } from '@prisma/client'
 import status from 'http-status'
 
 export const sendPhoneVerificationOtpHandler = factory.createHandlers(
