@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run --hot serve.ts",
-    "build": "bun prisma generate && tsc && tsc-alias",
+    "build": "prisma generate && tsc && tsc-alias",
     "start": "bun run ./dist/serve.js",
     "lint": "eslint .",
     "format": "prettier -w .",

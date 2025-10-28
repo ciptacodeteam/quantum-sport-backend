@@ -4,7 +4,6 @@ dist/
 coverage/
 build/
 tmp/
-generated/
 
 # IDEs and editors
 .cache/
