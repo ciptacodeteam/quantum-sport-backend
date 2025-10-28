@@ -24,7 +24,7 @@
     "vercel:deploy": "vercel",
     "vercel:dev": "vercel dev",
     "vercel:prod": "vercel --prod",
-    "postbuild": "cp -r generated dist/prisma/generated"
+    "postbuild": "cp -r generated dist/generated"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",
