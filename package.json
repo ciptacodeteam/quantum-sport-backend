@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit",
     "vercel:deploy": "vercel",
     "vercel:dev": "vercel dev",
-    "vercel:prod": "vercel --prod"
+    "vercel:prod": "vercel --prod",
+    "postbuild": "cp -r prisma/generated dist/prisma/generated"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",

@@ -18,9 +18,6 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    // "allowImportingTsExtensions": true,
-    // "verbatimModuleSyntax": true,
-    // "noEmit": true,
 
     "types": ["node", "vitest"],
 
@@ -30,5 +27,11 @@
   "tsc-alias": {
     "resolveFullPaths": true
   },
-  "include": ["src/**/*.ts", "serve.ts", "prisma/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "serve.ts",
+    "prisma/**/*.ts",
+    "tests/**/*.ts",
+    "generated/**/*.ts"
+  ]
 }
