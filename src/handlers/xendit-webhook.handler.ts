@@ -3,7 +3,7 @@ import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { xenditService } from '@/services/xendit.service'
-import { BookingStatus, PaymentStatus } from 'generated/prisma'
+import { BookingStatus, PaymentStatus } from '@prisma/client'
 
 interface XenditWebhookPayload {
   id: string
@@ -33,18 +33,17 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
   try {
     // Verify the callback token
     const callbackToken = c.req.header('x-callback-token')
-    
+
     if (!xenditService.verifyCallbackToken(callbackToken || '')) {
       c.var.logger.error('Invalid Xendit callback token')
-      return c.json(
-        { error: 'Invalid callback token' },
-        401,
-      )
+      return c.json({ error: 'Invalid callback token' }, 401)
     }
 
     const payload: XenditWebhookPayload = await c.req.json()
-    
-    c.var.logger.info(`Xendit webhook received: ${payload.status} for ${payload.external_id}`)
+
+    c.var.logger.info(
+      `Xendit webhook received: ${payload.status} for ${payload.external_id}`,
+    )
 
     // Find the invoice by external_id (which is our invoice ID)
     const invoice = await db.invoice.findUnique({
@@ -57,10 +56,7 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
 
     if (!invoice) {
       c.var.logger.error(`Invoice not found: ${payload.external_id}`)
-      return c.json(
-        { error: 'Invoice not found' },
-        404,
-      )
+      return c.json({ error: 'Invoice not found' }, 404)
     }
 
     // Update invoice status
@@ -113,7 +109,9 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
             cancelledAt: new Date(),
           },
         })
-        c.var.logger.info(`Booking cancelled due to expired payment: ${invoice.bookingId}`)
+        c.var.logger.info(
+          `Booking cancelled due to expired payment: ${invoice.bookingId}`,
+        )
       }
     }
 
@@ -131,7 +129,9 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
               status: BookingStatus.CONFIRMED,
             },
           })
-          c.var.logger.info(`Class booking confirmed: ${invoice.classBookingId}`)
+          c.var.logger.info(
+            `Class booking confirmed: ${invoice.classBookingId}`,
+          )
         } else if (payload.status === 'EXPIRED') {
           await db.classBooking.update({
             where: { id: invoice.classBookingId },
@@ -141,7 +141,9 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
               cancelledAt: new Date(),
             },
           })
-          c.var.logger.info(`Class booking cancelled: ${invoice.classBookingId}`)
+          c.var.logger.info(
+            `Class booking cancelled: ${invoice.classBookingId}`,
+          )
         }
       }
     }
@@ -155,10 +157,14 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
       if (membershipUser) {
         if (payload.status === 'PAID') {
           // Membership is already activated, no need to change status
-          c.var.logger.info(`Membership payment confirmed: ${invoice.membershipUserId}`)
+          c.var.logger.info(
+            `Membership payment confirmed: ${invoice.membershipUserId}`,
+          )
         } else if (payload.status === 'EXPIRED') {
           // You might want to handle this differently for memberships
-          c.var.logger.warn(`Membership payment expired: ${invoice.membershipUserId}`)
+          c.var.logger.warn(
+            `Membership payment expired: ${invoice.membershipUserId}`,
+          )
         }
       }
     }
@@ -166,10 +172,6 @@ export const xenditWebhookHandler = factory.createHandlers(async (c) => {
     return c.json(ok(null, 'Webhook processed successfully'))
   } catch (error) {
     c.var.logger.fatal(`Error processing Xendit webhook: ${error}`)
-    return c.json(
-      { error: 'Webhook processing failed' },
-      500,
-    )
+    return c.json({ error: 'Webhook processing failed' }, 500)
   }
 })
-
