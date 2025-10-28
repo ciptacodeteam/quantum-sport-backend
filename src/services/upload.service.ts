@@ -63,6 +63,7 @@ export async function uploadFile(
 
   // Prepare folder
   const dir = safeJoin(subdir)
+  console.log('🚀 ~ uploadFile ~ dir:', dir)
   await ensureDir(dir)
 
   let outBuf = buf
