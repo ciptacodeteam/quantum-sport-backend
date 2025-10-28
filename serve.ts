@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server'
-import app from './src/app'
+import app from './src'
 import { env } from './src/env'
 
 const port = Number(env.port) || 3000
