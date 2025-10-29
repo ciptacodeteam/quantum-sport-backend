@@ -394,3 +394,37 @@ export const checkoutSchema = z.object({
 })
 
 export type CheckoutSchema = z.infer<typeof checkoutSchema>
+
+// Availability queries
+export const availableCoachesQuerySchema = z.object({
+  startAt: z
+    .string()
+    .refine((val) => dayjs(val).isValid(), {
+      message: 'Invalid datetime format for startAt',
+    }),
+  endAt: z
+    .string()
+    .refine((val) => dayjs(val).isValid(), {
+      message: 'Invalid datetime format for endAt',
+    }),
+})
+
+export type AvailableCoachesQuerySchema = z.infer<
+  typeof availableCoachesQuerySchema
+>
+
+export const availableInventoryQuerySchema = z
+  .object({
+    startAt: z.string().optional(),
+    endAt: z.string().optional(),
+  })
+  .refine(
+    (vals) =>
+      (!vals.startAt && !vals.endAt) ||
+      (vals.startAt !== undefined && vals.endAt !== undefined),
+    { message: 'Both startAt and endAt must be provided together' },
+  )
+
+export type AvailableInventoryQuerySchema = z.infer<
+  typeof availableInventoryQuerySchema
+>

@@ -1,0 +1,75 @@
+import { validateHook } from '@/helpers/validate-hook'
+import { factory } from '@/lib/create-app'
+import { db } from '@/lib/prisma'
+import buildFindManyOptions from '@/lib/query'
+import { ok } from '@/lib/response'
+import { searchQuerySchema } from '@/lib/validation'
+import { zValidator } from '@hono/zod-validator'
+import status from 'http-status'
+
+// GET /invoices
+export const getUserInvoicesHandler = factory.createHandlers(
+	zValidator('query', searchQuerySchema, validateHook),
+	async (c) => {
+		try {
+			const user = c.get('user') as { id: string } | null
+			if (!user || !user.id) {
+				return
+			}
+
+			const query = c.req.valid('query') as any
+			const queryOptions = buildFindManyOptions(query, {
+				defaultOrderBy: { createdAt: 'desc' },
+				searchableFields: ['status', 'dueDate'],
+			})
+
+			const invoices = await db.invoice.findMany({
+				...queryOptions,
+				where: {
+					...queryOptions.where,
+					userId: user.id,
+				},
+				include: {
+					booking: {
+						select: {
+							id: true,
+							status: true,
+							totalPrice: true,
+							createdAt: true,
+						},
+					},
+					classBooking: {
+						select: {
+							id: true,
+							status: true,
+							createdAt: true,
+							class: { select: { id: true, name: true } },
+						},
+					},
+					membershipUser: {
+						select: {
+							id: true,
+							startAt: true,
+							endAt: true,
+							membership: { select: { id: true, name: true } },
+						},
+					},
+					tournamentRegistration: {
+						select: {
+							id: true,
+							createdAt: true,
+							teamName: true,
+						},
+					},
+				},
+			})
+
+			return c.json(ok(invoices), status.OK)
+		} catch (error) {
+			c.var.logger.fatal(`Error in getUserInvoicesHandler: ${error}`)
+			throw error
+		}
+	},
+)
+
+

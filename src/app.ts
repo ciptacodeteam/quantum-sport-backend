@@ -28,8 +28,12 @@ import courtRoute from './routes/court.route'
 import healthRoute from './routes/health.route'
 import homeRoute from './routes/home.route'
 import membershipRoute from './routes/membership.route'
+import coachRoute from './routes/coach.route'
+import inventoryRoute from './routes/inventory.route'
+import invoiceRoute from './routes/invoice.route'
 import phoneVerificationRoute from './routes/phone.route'
 import xenditWebhookRoute from './routes/xendit-webhook.route'
+import ballboyRoute from './routes/ballboy.route'
 
 dayjs.locale('id')
 dayjs.extend(utc)
@@ -52,6 +56,10 @@ const routes = [
   courtRoute,
   classRoute,
   membershipRoute,
+  coachRoute,
+  ballboyRoute,
+  inventoryRoute,
+  invoiceRoute,
   checkoutRoute,
   xenditWebhookRoute,
 ]
