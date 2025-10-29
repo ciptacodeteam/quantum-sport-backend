@@ -42,7 +42,6 @@ enum PaymentStatus {
 }
 
 enum BookingStatus {
-  DRAFT // cart-like pre-checkout
   HOLD // temporary hold on slots before payment (expiry)
   CONFIRMED // paid; slots locked
   CANCELLED
@@ -87,14 +86,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  authTokens                   AuthToken[]
-  bookings                     Booking[]
-  membershipUser               MembershipUser[]
-  classBookings                ClassBooking[]
-  clubsLed                     Club[]                         @relation("ClubLeader")
-  clubMember                   ClubMember[]
-  tournamentRegistrationMember TournamentRegistrationMember[]
-  invoice                      Invoice[]
+  authTokens     AuthToken[]
+  bookings       Booking[]
+  membershipUser MembershipUser[]
+  classBookings  ClassBooking[]
+  clubsLed       Club[]           @relation("ClubLeader")
+  clubMember     ClubMember[]
+  invoice        Invoice[]
 
   @@map("user")
 }
@@ -298,12 +296,11 @@ model Payment {
 }
 
 model Invoice {
-  id                       String  @id @default(cuid())
+  id               String  @id @default(cuid())
   // Polymorphic linkage via nullable FKs (exactly one must be set)
-  bookingId                String? @unique
-  classBookingId           String? @unique
-  membershipUserId         String? @unique
-  tournamentRegistrationId String? @unique
+  bookingId        String? @unique
+  classBookingId   String? @unique
+  membershipUserId String? @unique
 
   number        String        @unique // human-readable invoice no
   userId        String
@@ -318,12 +315,11 @@ model Invoice {
   paidAt      DateTime?
   cancelledAt DateTime?
 
-  user                   User                    @relation(fields: [userId], references: [id])
-  payment                Payment?                @relation(fields: [paymentId], references: [id])
-  booking                Booking?                @relation(fields: [bookingId], references: [id])
-  classBooking           ClassBooking?           @relation(fields: [classBookingId], references: [id])
-  membershipUser         MembershipUser?         @relation(fields: [membershipUserId], references: [id])
-  tournamentRegistration TournamentRegistration? @relation(fields: [tournamentRegistrationId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  payment        Payment?        @relation(fields: [paymentId], references: [id])
+  booking        Booking?        @relation(fields: [bookingId], references: [id])
+  classBooking   ClassBooking?   @relation(fields: [classBookingId], references: [id])
+  membershipUser MembershipUser? @relation(fields: [membershipUserId], references: [id])
 
   @@index([status, dueDate])
   @@map("invoices")
@@ -335,7 +331,7 @@ model Invoice {
 model Booking {
   id                 String        @id @default(cuid())
   userId             String
-  status             BookingStatus @default(DRAFT)
+  status             BookingStatus @default(HOLD)
   totalPrice         Int           @default(0) @db.Integer
   processingFee      Int           @default(0) @db.Integer
   createdAt          DateTime      @default(now())
@@ -476,8 +472,8 @@ model Membership {
   description String?
   content     String?
   price       Int      @db.Integer
-  sessions    Int
-  duration    Int // days
+  sessions    Int // how many sessions included (e.g., court bookings) in hours
+  duration    Int // how many days valid after applying membership in days
   sequence    Int      @default(0)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -562,7 +558,7 @@ model ClassBooking {
   id                 String        @id @default(cuid())
   classId            String
   userId             String
-  status             BookingStatus @default(DRAFT)
+  status             BookingStatus @default(HOLD)
   totalPrice         Int           @db.Integer
   processingFee      Int           @default(0) @db.Integer
   createdAt          DateTime      @default(now())
@@ -609,9 +605,8 @@ model Club {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @default(now()) @updatedAt
 
-  leader                 User                     @relation("ClubLeader", fields: [leaderId], references: [id])
-  clubMember             ClubMember[]
-  tournamentRegistration TournamentRegistration[]
+  leader     User         @relation("ClubLeader", fields: [leaderId], references: [id])
+  clubMember ClubMember[]
 
   @@unique([name])
   @@index([visibility, isActive])
@@ -635,61 +630,23 @@ model ClubMember {
 }
 
 model Tournament {
-  id                     String                   @id @default(cuid())
-  name                   String
-  description            String?
-  rules                  String?
-  image                  String?
-  startDate              DateTime                 @db.Date
-  endDate                DateTime                 @db.Date
-  startTime              String
-  endTime                String
-  maxTeams               Int
-  teamSize               Int
-  entryFee               Int                      @db.Integer
-  location               String
-  isActive               Boolean                  @default(true)
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @default(now()) @updatedAt
-  tournamentRegistration TournamentRegistration[]
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  rules       String?
+  image       String?
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  startTime   String
+  endTime     String
+  maxTeams    Int
+  teamSize    Int
+  entryFee    Int      @db.Integer
+  location    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@index([isActive, startDate, endDate])
   @@map("tournaments")
-}
-
-model TournamentRegistration {
-  id                 String        @id @default(cuid())
-  tournamentId       String
-  clubId             String
-  members            Int
-  totalFee           Int           @db.Integer
-  status             BookingStatus @default(DRAFT)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @default(now()) @updatedAt
-  paymentLockedUntil DateTime? // soft hold for payment window
-  cancelledAt        DateTime?
-  cancellationReason String?
-
-  tournament Tournament                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  club       Club                           @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  membersRef TournamentRegistrationMember[]
-  invoice    Invoice?
-
-  @@index([clubId, status, createdAt])
-  @@map("tournament_registrations")
-}
-
-model TournamentRegistrationMember {
-  id                       String   @id @default(cuid())
-  tournamentRegistrationId String
-  userId                   String
-  isHost                   Boolean  @default(false)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @default(now()) @updatedAt
-
-  tournamentRegistration TournamentRegistration @relation(fields: [tournamentRegistrationId], references: [id], onDelete: Cascade)
-  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([tournamentRegistrationId, userId])
-  @@map("tournament_registration_members")
 }

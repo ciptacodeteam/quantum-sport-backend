@@ -9,67 +9,58 @@ import status from 'http-status'
 
 // GET /invoices
 export const getUserInvoicesHandler = factory.createHandlers(
-	zValidator('query', searchQuerySchema, validateHook),
-	async (c) => {
-		try {
-			const user = c.get('user') as { id: string } | null
-			if (!user || !user.id) {
-				return
-			}
+  zValidator('query', searchQuerySchema, validateHook),
+  async (c) => {
+    try {
+      const user = c.get('user') as { id: string } | null
+      if (!user || !user.id) {
+        return
+      }
 
-			const query = c.req.valid('query') as any
-			const queryOptions = buildFindManyOptions(query, {
-				defaultOrderBy: { createdAt: 'desc' },
-				searchableFields: ['status', 'dueDate'],
-			})
+      const query = c.req.valid('query') as any
+      const queryOptions = buildFindManyOptions(query, {
+        defaultOrderBy: { createdAt: 'desc' },
+        searchableFields: ['status', 'dueDate'],
+      })
 
-			const invoices = await db.invoice.findMany({
-				...queryOptions,
-				where: {
-					...queryOptions.where,
-					userId: user.id,
-				},
-				include: {
-					booking: {
-						select: {
-							id: true,
-							status: true,
-							totalPrice: true,
-							createdAt: true,
-						},
-					},
-					classBooking: {
-						select: {
-							id: true,
-							status: true,
-							createdAt: true,
-							class: { select: { id: true, name: true } },
-						},
-					},
-					membershipUser: {
-						select: {
-							id: true,
-							startAt: true,
-							endAt: true,
-							membership: { select: { id: true, name: true } },
-						},
-					},
-					tournamentRegistration: {
-						select: {
-							id: true,
-							createdAt: true,
-							teamName: true,
-						},
-					},
-				},
-			})
+      const invoices = await db.invoice.findMany({
+        ...queryOptions,
+        where: {
+          ...queryOptions.where,
+          userId: user.id,
+        },
+        include: {
+          booking: {
+            select: {
+              id: true,
+              status: true,
+              totalPrice: true,
+              createdAt: true,
+            },
+          },
+          classBooking: {
+            select: {
+              id: true,
+              status: true,
+              createdAt: true,
+              class: { select: { id: true, name: true } },
+            },
+          },
+          membershipUser: {
+            select: {
+              id: true,
+              startDate: true,
+              endDate: true,
+              membership: { select: { id: true, name: true } },
+            },
+          },
+        },
+      })
 
-			return c.json(ok(invoices), status.OK)
-		} catch (error) {
-			c.var.logger.fatal(`Error in getUserInvoicesHandler: ${error}`)
-			throw error
-		}
-	},
+      return c.json(ok(invoices), status.OK)
+    } catch (error) {
+      c.var.logger.fatal(`Error in getUserInvoicesHandler: ${error}`)
+      throw error
+    }
+  },
 )
-
-
