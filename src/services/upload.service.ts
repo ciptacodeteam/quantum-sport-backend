@@ -12,7 +12,7 @@ import { extension as extFromMime } from 'mime-types'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { buildFilename } from '../lib/filename'
-import { ensureDir, safeJoin } from '../lib/fs'
+import { safeJoin } from '../lib/fs'
 
 export type UploadOptions = {
   subdir?: string // e.g. "images", "avatars/2025/10"
@@ -65,7 +65,7 @@ export async function uploadFile(
 
   // Prepare folder
   const dir = safeJoin(subdir)
-  await ensureDir(dir)
+  // await ensureDir(dir)
 
   let outBuf = buf
   let outExt = ''
