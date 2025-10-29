@@ -14,7 +14,7 @@ const adminStaffRoute = createRouter()
   .get('/:id', ...getStaffHandler)
   .put('/:id', ...updateStaffHandler)
   .post('/', ...createStaffHandler)
-  .post('/:id/password', ...changeStaffPasswordHandler)
+  .post('/:id/reset-password', ...changeStaffPasswordHandler)
   .post('/:id/revoke', ...revokeStaffTokenHandler)
 
 export default adminStaffRoute
