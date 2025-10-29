@@ -32,4 +32,5 @@ export const env = {
   fazpassMerchantKey: process.env.FAZPASS_MERCHANT_KEY ?? '',
   fazpassApiUrl: process.env.FAZPASS_API_URL ?? 'https://api.fazpass.com/v1',
   PWD_PEPPER: process.env.PWD_PEPPER ?? undefined,
+  BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN ?? undefined,
 }
