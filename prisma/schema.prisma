@@ -259,13 +259,15 @@ model CourtCostSchedule {
 // Payments & Invoices
 // ------------------------------
 model PaymentMethod {
-  id        String   @id @default(cuid())
-  name      String
-  logo      String?
-  fees      Int      @default(0) @db.Integer // fixed fee (rupiah)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  logo       String?
+  fees       Int      @default(0) @db.Integer // fixed fee (rupiah)
+  percentage Decimal  @default(0) // percentage fee (e.g., 2 for 2%)
+  channel    String? // e.g., "VA", "EWALLET", etc.
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 
   payments Payment[]
 

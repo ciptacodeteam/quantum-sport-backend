@@ -90,20 +90,20 @@ export const createPaymentMethodHandler = factory.createHandlers(
         )
       }
 
-      // let logoUrl: string | undefined = undefined
+      let logoUrl: string | undefined = undefined
 
-      // if (logo) {
-      //   const uploadedUrl = await uploadFile(logo, {
-      //     subdir: PAYMENT_METHOD_LOGO_SUBDIR,
-      //     unoptimized: true,
-      //   })
-      //   logoUrl = uploadedUrl.relativePath
-      // }
+      if (logo) {
+        const uploadedUrl = await uploadFile(logo, {
+          subdir: PAYMENT_METHOD_LOGO_SUBDIR,
+          unoptimized: true,
+        })
+        logoUrl = uploadedUrl.relativePath
+      }
 
       const newPaymentMethod = await db.paymentMethod.create({
         data: {
           name,
-          // logo: logoUrl,
+          logo: logoUrl,
           fees,
           isActive: isActive ?? true,
         },

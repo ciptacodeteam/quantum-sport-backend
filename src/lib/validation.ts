@@ -371,6 +371,13 @@ export const createPaymentMethodSchema = z.object({
   name: z.string().min(3).max(100),
   logo: z.file().optional(),
   fees: z.coerce.number().min(0),
+  percentage: z.string().refine(
+    (val) => {
+      const num = parseFloat(val)
+      return !isNaN(num) && num >= 0
+    },
+    { message: 'Percentage must be a non-negative number' },
+  ),
   isActive: z.coerce.boolean().optional().default(true),
 })
 
