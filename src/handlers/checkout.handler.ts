@@ -10,10 +10,12 @@ import { BookingStatus, PaymentStatus, SlotType } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { env } from '@/env'
+import { requireAuth } from '@/middlewares/auth'
 
 // const PROCESSING_FEE_PERCENT = 0.02 // 2% processing fee
 
 export const checkoutHandler = factory.createHandlers(
+  requireAuth,
   zValidator('json', checkoutSchema, validateHook),
   async (c) => {
     try {

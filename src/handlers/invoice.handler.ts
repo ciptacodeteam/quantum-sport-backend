@@ -4,11 +4,13 @@ import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
 import { ok } from '@/lib/response'
 import { SearchQuerySchema, searchQuerySchema } from '@/lib/validation'
+import { requireAuth } from '@/middlewares/auth'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 
 // GET /invoices
 export const getUserInvoicesHandler = factory.createHandlers(
+  requireAuth,
   zValidator('query', searchQuerySchema, validateHook),
   async (c) => {
     try {

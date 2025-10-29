@@ -1,12 +1,8 @@
-import { createRouter } from '@/lib/create-app'
 import { getUserInvoicesHandler } from '@/handlers/invoice.handler'
-import { requireAuth } from '@/middlewares/auth'
+import { createRouter } from '@/lib/create-app'
 
 const invoiceRoute = createRouter()
-	.basePath('/invoices')
-	.use(requireAuth)
-	.get('/', ...getUserInvoicesHandler)
+  .basePath('/invoices')
+  .get('/', ...getUserInvoicesHandler)
 
 export default invoiceRoute
-
-
