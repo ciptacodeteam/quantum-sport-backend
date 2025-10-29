@@ -111,6 +111,7 @@ export const checkoutHandler = factory.createHandlers(
         }
 
         let totalPrice = 0
+        const xenditItems: Array<{ name: string; quantity: number; price: number }> = []
 
         // Process court slots
         if (courtSlots && courtSlots.length > 0) {
@@ -146,6 +147,11 @@ export const checkoutHandler = factory.createHandlers(
                 price: slot.price,
                 courtId: slot.courtId || undefined,
               },
+            })
+            xenditItems.push({
+              name: `Court booking ${dayjs(slot.startAt).format('YYYY-MM-DD HH:mm')} - ${dayjs(slot.endAt).format('HH:mm')}`,
+              quantity: 1,
+              price: slot.price,
             })
           }
         }
@@ -192,6 +198,11 @@ export const checkoutHandler = factory.createHandlers(
                 price: slot.price,
               },
             })
+            xenditItems.push({
+              name: `Coach session ${dayjs(slot.startAt).format('YYYY-MM-DD HH:mm')} - ${dayjs(slot.endAt).format('HH:mm')}`,
+              quantity: 1,
+              price: slot.price,
+            })
           }
         }
 
@@ -229,6 +240,11 @@ export const checkoutHandler = factory.createHandlers(
                 price: slot.price,
               },
             })
+            xenditItems.push({
+              name: `Ballboy session ${dayjs(slot.startAt).format('YYYY-MM-DD HH:mm')} - ${dayjs(slot.endAt).format('HH:mm')}`,
+              quantity: 1,
+              price: slot.price,
+            })
           }
         }
 
@@ -262,6 +278,11 @@ export const checkoutHandler = factory.createHandlers(
                 price: 0, // You may want to add pricing to inventory
               },
             })
+            xenditItems.push({
+              name: `Inventory - ${inventory.name}`,
+              quantity: inv.quantity,
+              price: 0,
+            })
           }
         }
 
@@ -269,6 +290,9 @@ export const checkoutHandler = factory.createHandlers(
         // const processingFee = Math.round(totalPrice * PROCESSING_FEE_PERCENT)
         const processingFee = paymentMethod.fees
         const finalTotal = totalPrice + processingFee
+        if (processingFee > 0) {
+          xenditItems.push({ name: 'Processing fee', quantity: 1, price: processingFee })
+        }
 
         // Update booking with totals
         await tx.booking.update({
@@ -323,6 +347,7 @@ export const checkoutHandler = factory.createHandlers(
               invoiceDuration: 600, // 10 minutes
               successRedirectUrl: `${env.baseUrl}/payment/success`,
               failureRedirectUrl: `${env.baseUrl}/payment/failed`,
+              items: xenditItems,
               customer: {
                 givenNames: userDetails?.name || 'Customer',
                 email: userDetails?.email || undefined,
