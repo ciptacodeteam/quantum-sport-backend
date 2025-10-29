@@ -3,7 +3,7 @@ import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
 import { ok } from '@/lib/response'
-import { searchQuerySchema } from '@/lib/validation'
+import { SearchQuerySchema, searchQuerySchema } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 
@@ -12,14 +12,14 @@ export const getUserInvoicesHandler = factory.createHandlers(
   zValidator('query', searchQuerySchema, validateHook),
   async (c) => {
     try {
-      const user = c.get('user') as { id: string } | null
+      const user = c.get('user')
       if (!user || !user.id) {
-        return
+        throw new Error('Unauthorized')
       }
 
-      const query = c.req.valid('query') as any
+      const query = c.req.valid('query') as SearchQuerySchema
       const queryOptions = buildFindManyOptions(query, {
-        defaultOrderBy: { createdAt: 'desc' },
+        defaultOrderBy: { issuedAt: 'desc' },
         searchableFields: ['status', 'dueDate'],
       })
 
