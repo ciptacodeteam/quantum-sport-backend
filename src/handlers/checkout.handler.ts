@@ -118,12 +118,10 @@ export const checkoutHandler = factory.createHandlers(
               type: SlotType.COURT,
               isAvailable: true,
             },
-            // include: {
-            //   bookingDetails: { select: { id: true }, take: 1 },
-            // },
+            include: {
+              bookingDetails: { select: { id: true }, take: 1 },
+            },
           })
-          console.log('🚀 ~ courtSlotData:', courtSlotData)
-          console.log('🚀 ~ courtSlots:', courtSlots)
 
           if (courtSlotData.length !== courtSlots.length) {
             throw new BadRequestException(
@@ -132,11 +130,11 @@ export const checkoutHandler = factory.createHandlers(
           }
 
           for (const slot of courtSlotData) {
-            // if (slot.bookingDetails.length > 0) {
-            //   throw new BadRequestException(
-            //     'One or more court slots are already booked',
-            //   )
-            // }
+            if (slot.bookingDetails.length > 0) {
+              throw new BadRequestException(
+                'One or more court slots are already booked',
+              )
+            }
             totalPrice += slot.price
 
             await tx.bookingDetail.create({
@@ -158,9 +156,9 @@ export const checkoutHandler = factory.createHandlers(
               type: SlotType.COACH,
               isAvailable: true,
             },
-            // include: {
-            //   bookingCoaches: { select: { id: true }, take: 1 },
-            // },
+            include: {
+              bookingCoaches: { select: { id: true }, take: 1 },
+            },
           })
 
           if (coachSlotData.length !== coachSlots.length) {
@@ -170,11 +168,11 @@ export const checkoutHandler = factory.createHandlers(
           }
 
           for (const slot of coachSlotData) {
-            // if (slot.bookingCoaches.length > 0) {
-            //   throw new BadRequestException(
-            //     'One or more coach slots are already booked',
-            //   )
-            // }
+            if (slot.bookingCoaches.length > 0) {
+              throw new BadRequestException(
+                'One or more coach slots are already booked',
+              )
+            }
             totalPrice += slot.price
 
             // Get coach type for the staff
@@ -203,9 +201,9 @@ export const checkoutHandler = factory.createHandlers(
               type: SlotType.BALLBOY,
               isAvailable: true,
             },
-            // include: {
-            //   bookingBallboys: { select: { id: true }, take: 1 },
-            // },
+            include: {
+              bookingBallboys: { select: { id: true }, take: 1 },
+            },
           })
 
           if (ballboySlotData.length !== ballboySlots.length) {
@@ -215,11 +213,11 @@ export const checkoutHandler = factory.createHandlers(
           }
 
           for (const slot of ballboySlotData) {
-            // if (slot.bookingBallboys.length > 0) {
-            //   throw new BadRequestException(
-            //     'One or more ballboy slots are already booked',
-            //   )
-            // }
+            if (slot.bookingBallboys.length > 0) {
+              throw new BadRequestException(
+                'One or more ballboy slots are already booked',
+              )
+            }
             totalPrice += slot.price
 
             await tx.bookingBallboy.create({
