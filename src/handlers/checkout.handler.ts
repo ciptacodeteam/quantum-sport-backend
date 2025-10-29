@@ -334,14 +334,6 @@ export const checkoutHandler = factory.createHandlers(
             xenditInvoiceResponse = await xenditService.createInvoice({
               externalId: invoice.id,
               amount: finalTotal,
-              items: [
-                {
-                  name: `Booking ${booking.id}`,
-                  quantity: 1,
-                  price: finalTotal,
-                },
-                { name: `Processing Fee`, quantity: 1, price: processingFee },
-              ],
               payerEmail: userDetails?.email || undefined,
               description: `Payment for booking ${booking.id}`,
               invoiceDuration: 600, // 10 minutes
