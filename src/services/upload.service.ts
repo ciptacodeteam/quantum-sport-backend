@@ -7,7 +7,7 @@ import { env } from '@/env'
 import { sniffImageMime } from '@/helpers/sniff-mime'
 import { toWebp } from '@/lib/image'
 import { log } from '@/lib/logger'
-import { put } from '@vercel/blob'
+import { del, put } from '@vercel/blob'
 import { extension as extFromMime } from 'mime-types'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -141,13 +141,37 @@ export async function uploadFile(
 }
 
 export async function deleteFile(relativePath: string): Promise<boolean> {
+  // If path starts with '/', it's from Vercel Blob
+  if (relativePath.startsWith('/') && env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      // Construct the full Vercel Blob URL for deletion
+      const parts = env.BLOB_READ_WRITE_TOKEN.split('_')
+      if (parts.length >= 4) {
+        const storeId = parts[3]
+        const blobUrl = `https://${storeId}.public.blob.vercel-storage.com${relativePath}`
+        
+        await del(blobUrl, {
+          token: env.BLOB_READ_WRITE_TOKEN,
+        })
+        
+        log.info(`File deleted from Vercel Blob: ${relativePath}`)
+        return true
+      }
+    } catch (err) {
+      log.error(`Failed to delete file from Vercel Blob: ${err}`)
+      return false
+    }
+  }
+
+  // Fallback to local file system deletion
   const fullPath = safeJoin(relativePath)
   try {
     await fs.access(fullPath)
     await fs.unlink(fullPath)
+    log.info(`File deleted from local storage: ${relativePath}`)
     return true
   } catch (err) {
-    log.error(`Failed to delete file: ${err}`)
+    log.error(`Failed to delete file from local storage: ${err}`)
     return false
   }
 }
