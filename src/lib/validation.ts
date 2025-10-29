@@ -378,6 +378,7 @@ export const createPaymentMethodSchema = z.object({
     },
     { message: 'Percentage must be a non-negative number' },
   ),
+  channel: z.string().min(3).max(50).optional(),
   isActive: z.coerce.boolean().optional().default(true),
 })
 

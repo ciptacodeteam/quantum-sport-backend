@@ -76,7 +76,7 @@ export const createPaymentMethodHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('form') as CreatePaymentMethodSchema
-      const { name, logo, fees, isActive } = validated
+      const { name, logo, fees, isActive, percentage, channel } = validated
 
       // Check for duplicate name
       const existingPaymentMethod = await db.paymentMethod.findUnique({
@@ -105,6 +105,8 @@ export const createPaymentMethodHandler = factory.createHandlers(
           name,
           logo: logoUrl,
           fees,
+          percentage: parseFloat(percentage),
+          channel,
           isActive: isActive ?? true,
         },
       })
@@ -124,7 +126,7 @@ export const updatePaymentMethodHandler = factory.createHandlers(
     try {
       const { id } = c.req.valid('param') as IdSchema
       const validated = c.req.valid('form') as UpdatePaymentMethodSchema
-      const { name, logo, fees, isActive } = validated
+      const { name, logo, fees, isActive, channel, percentage } = validated
 
       const existingPaymentMethod = await db.paymentMethod.findUnique({
         where: { id },
@@ -174,6 +176,8 @@ export const updatePaymentMethodHandler = factory.createHandlers(
           name: name ?? undefined,
           logo: logoUrl,
           fees: fees ?? undefined,
+          percentage: percentage ? parseFloat(percentage) : undefined,
+          channel: channel ?? undefined,
           isActive: isPaymentMethodActive,
         },
       })
