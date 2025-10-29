@@ -38,6 +38,15 @@ export const getUserInvoicesHandler = factory.createHandlers(
               status: true,
               totalPrice: true,
               createdAt: true,
+              details: {
+                select: {
+                  id: true,
+                  court: { select: { id: true, name: true } },
+                  price: true,
+                  slot: true,
+                  createdAt: true,
+                },
+              },
             },
           },
           classBooking: {
