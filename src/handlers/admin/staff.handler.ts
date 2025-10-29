@@ -14,6 +14,7 @@ import {
   idSchema,
   SearchQuerySchema,
   searchQuerySchema,
+  UpdateStaffSchema,
   updateStaffSchema,
 } from '@/lib/validation'
 import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
@@ -190,7 +191,7 @@ export const updateStaffHandler = factory.createHandlers(
     try {
       const validatedParam = c.req.valid('param') as IdSchema
       const staffId = validatedParam.id
-      const validatedForm = c.req.valid('form') as Partial<CreateStaffSchema>
+      const validatedForm = c.req.valid('form') as UpdateStaffSchema
 
       const existingStaff = await db.staff.findUnique({
         where: { id: staffId },
@@ -239,6 +240,11 @@ export const updateStaffHandler = factory.createHandlers(
         imageUrl = uploadedUrl.relativePath
       }
 
+      const isActive =
+        validatedForm.isActive !== undefined
+          ? Boolean(validatedForm.isActive)
+          : existingStaff.isActive
+
       const updatedStaff = await db.staff.update({
         where: { id: staffId },
         data: {
@@ -247,7 +253,7 @@ export const updateStaffHandler = factory.createHandlers(
           phone,
           role: validatedForm.role,
           image: imageUrl,
-          isActive: validatedForm.isActive,
+          isActive,
           joinedAt: validatedForm.joinedAt
             ? new Date(validatedForm.joinedAt)
             : new Date(),

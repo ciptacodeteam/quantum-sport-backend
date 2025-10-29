@@ -19,6 +19,7 @@ export type UploadOptions = {
   forceWebpForImages?: boolean // default true
   allowNonImages?: boolean // default true (won't convert)
   replaceExisting?: boolean // default false (wx flag)
+  unoptimized?: boolean // default false (skip image optimization)
 }
 
 export type UploadMeta = {
@@ -63,7 +64,6 @@ export async function uploadFile(
 
   // Prepare folder
   const dir = safeJoin(subdir)
-  log.info(`🚀 ~ uploadFile ~ dir: ${dir}`)
   await ensureDir(dir)
 
   let outBuf = buf
@@ -71,7 +71,7 @@ export async function uploadFile(
   let width: number | undefined
   let height: number | undefined
 
-  if (isImage && forceWebpForImages) {
+  if (isImage && forceWebpForImages && !opts.unoptimized) {
     const webp = await toWebp(buf)
     outBuf = Buffer.from(webp.buffer)
     width = webp.width
@@ -99,7 +99,7 @@ export async function uploadFile(
   return {
     originalName: file.name,
     mime:
-      isImage && forceWebpForImages
+      isImage && forceWebpForImages && !opts.unoptimized
         ? 'image/webp'
         : sniffMime || 'application/octet-stream',
     size: outBuf.length,

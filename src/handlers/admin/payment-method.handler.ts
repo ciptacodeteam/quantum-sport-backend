@@ -14,7 +14,7 @@ import {
   UpdatePaymentMethodSchema,
   updatePaymentMethodSchema,
 } from '@/lib/validation'
-import { uploadFile, deleteFile } from '@/services/upload.service'
+import { uploadFile, deleteFile, getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 
@@ -33,6 +33,13 @@ export const getAllPaymentMethodsHandler = factory.createHandlers(
       const paymentMethods = await db.paymentMethod.findMany({
         ...queryOptions,
       })
+
+      for (const method of paymentMethods) {
+        if (method.logo) {
+          const logoUrl = await getFileUrl(method.logo)
+          method.logo = logoUrl
+        }
+      }
 
       return c.json(ok(paymentMethods), status.OK)
     } catch (error) {
@@ -88,6 +95,7 @@ export const createPaymentMethodHandler = factory.createHandlers(
       if (logo) {
         const uploadedUrl = await uploadFile(logo, {
           subdir: PAYMENT_METHOD_LOGO_SUBDIR,
+          unoptimized: true,
         })
         logoUrl = uploadedUrl.relativePath
       }
@@ -155,15 +163,25 @@ export const updatePaymentMethodHandler = factory.createHandlers(
         logoUrl = uploadedUrl.relativePath
       }
 
+      const isPaymentMethodActive =
+        isActive !== undefined
+          ? Boolean(isActive)
+          : existingPaymentMethod.isActive
+
       const updatedPaymentMethod = await db.paymentMethod.update({
         where: { id },
         data: {
           name: name ?? undefined,
           logo: logoUrl,
           fees: fees ?? undefined,
-          isActive: isActive ?? undefined,
+          isActive: isPaymentMethodActive,
         },
       })
+
+      if (updatedPaymentMethod.logo) {
+        const logoUrl = await getFileUrl(updatedPaymentMethod.logo)
+        updatedPaymentMethod.logo = logoUrl
+      }
 
       return c.json(ok(updatedPaymentMethod), status.OK)
     } catch (error) {
@@ -181,6 +199,9 @@ export const deletePaymentMethodHandler = factory.createHandlers(
 
       const existingPaymentMethod = await db.paymentMethod.findUnique({
         where: { id },
+        include: {
+          payments: true,
+        },
       })
 
       if (!existingPaymentMethod) {
@@ -190,6 +211,18 @@ export const deletePaymentMethodHandler = factory.createHandlers(
       // Delete logo if it exists
       if (existingPaymentMethod.logo) {
         await deleteFile(existingPaymentMethod.logo)
+      }
+
+      if (existingPaymentMethod.payments.length > 0) {
+        await db.paymentMethod.update({
+          where: { id },
+          data: { isActive: false },
+        })
+
+        return c.json(
+          { message: 'Cannot delete payment method with associated payments' },
+          status.BAD_REQUEST,
+        )
       }
 
       await db.paymentMethod.delete({

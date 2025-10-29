@@ -142,7 +142,15 @@ export type CreateStaffSchema = z.infer<typeof createStaffSchema>
 
 export const updateStaffSchema = createStaffSchema
   .partial()
-  .omit({ password: true, confirmPassword: true })
+  .omit({ password: true, confirmPassword: true, isActive: true })
+  .extend({
+    isActive: z.coerce
+      .number()
+      .optional()
+      .refine((val) => val === 0 || val === 1, {
+        message: 'isActive must be 0 or 1',
+      }),
+  })
 
 export type UpdateStaffSchema = z.infer<typeof updateStaffSchema>
 
@@ -370,7 +378,19 @@ export type CreatePaymentMethodSchema = z.infer<
   typeof createPaymentMethodSchema
 >
 
-export const updatePaymentMethodSchema = createPaymentMethodSchema.partial()
+export const updatePaymentMethodSchema = createPaymentMethodSchema
+  .partial()
+  .omit({
+    isActive: true,
+  })
+  .extend({
+    isActive: z.coerce
+      .number()
+      .optional()
+      .refine((val) => val === 0 || val === 1, {
+        message: 'isActive must be 0 or 1',
+      }),
+  })
 
 export type UpdatePaymentMethodSchema = z.infer<
   typeof updatePaymentMethodSchema
@@ -397,16 +417,12 @@ export type CheckoutSchema = z.infer<typeof checkoutSchema>
 
 // Availability queries
 export const availableCoachesQuerySchema = z.object({
-  startAt: z
-    .string()
-    .refine((val) => dayjs(val).isValid(), {
-      message: 'Invalid datetime format for startAt',
-    }),
-  endAt: z
-    .string()
-    .refine((val) => dayjs(val).isValid(), {
-      message: 'Invalid datetime format for endAt',
-    }),
+  startAt: z.string().refine((val) => dayjs(val).isValid(), {
+    message: 'Invalid datetime format for startAt',
+  }),
+  endAt: z.string().refine((val) => dayjs(val).isValid(), {
+    message: 'Invalid datetime format for endAt',
+  }),
 })
 
 export type AvailableCoachesQuerySchema = z.infer<
