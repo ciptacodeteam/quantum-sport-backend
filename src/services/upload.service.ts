@@ -7,6 +7,7 @@ import { env } from '@/env'
 import { sniffImageMime } from '@/helpers/sniff-mime'
 import { toWebp } from '@/lib/image'
 import { log } from '@/lib/logger'
+import { put } from '@vercel/blob'
 import { extension as extFromMime } from 'mime-types'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -91,20 +92,48 @@ export async function uploadFile(
   })
 
   const absolutePath = path.join(dir, filename)
+  const relativePath = path.join(subdir, filename).replaceAll('\\', '/')
+  const finalMime =
+    isImage && forceWebpForImages && !opts.unoptimized
+      ? 'image/webp'
+      : sniffMime || 'application/octet-stream'
 
-  // If replaceExisting is true, use 'w' (overwrite); else use 'wx' (fail if exists)
+  // Upload to Vercel Blob if token is available
+  if (env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const blob = await put(relativePath, outBuf, {
+        access: 'public',
+        token: env.BLOB_READ_WRITE_TOKEN,
+        contentType: finalMime,
+        addRandomSuffix: false,
+      })
+
+      return {
+        originalName: file.name,
+        mime: finalMime,
+        size: outBuf.length,
+        isImage,
+        relativePath: blob.pathname, // Store just the path (e.g., /banners/file.webp)
+        absolutePath: blob.url, // Store full URL for direct access if needed
+        width,
+        height,
+      }
+    } catch (error) {
+      log.error(`Failed to upload to Vercel Blob: ${error}`)
+      // Fall back to local storage if Vercel Blob upload fails
+    }
+  }
+
+  // Fallback to local file storage
   const writeFlag = replaceExisting ? 'w' : 'wx'
   await fs.writeFile(absolutePath, outBuf, { flag: writeFlag })
 
   return {
     originalName: file.name,
-    mime:
-      isImage && forceWebpForImages && !opts.unoptimized
-        ? 'image/webp'
-        : sniffMime || 'application/octet-stream',
+    mime: finalMime,
     size: outBuf.length,
     isImage,
-    relativePath: path.join(subdir, filename).replaceAll('\\', '/'), // example: subdir/filename.webp
+    relativePath, // example: subdir/filename.webp
     absolutePath, // example: /full/path/to/storage/uploads/subdir/filename.webp
     width,
     height,
@@ -128,6 +157,7 @@ export async function getFileUrl(relativePath: string | null): Promise<string> {
     return ''
   }
 
+  // If already a full URL, return as-is
   if (
     relativePath.startsWith('http://') ||
     relativePath.startsWith('https://')
@@ -135,7 +165,17 @@ export async function getFileUrl(relativePath: string | null): Promise<string> {
     return relativePath
   }
 
-  // Ensure relativePath is sanitized and joined safely
+  // If path starts with '/', try to construct Vercel Blob URL first (if token exists)
+  if (relativePath.startsWith('/') && env.BLOB_READ_WRITE_TOKEN) {
+    // The token format is: vercel_blob_rw_<storeId>_<randomString>
+    const parts = env.BLOB_READ_WRITE_TOKEN.split('_')
+    if (parts.length >= 4) {
+      const storeId = parts[3] // Extract store ID from token
+      return `https://${storeId}.public.blob.vercel-storage.com${relativePath}`
+    }
+  }
+
+  // Fallback to local file system check
   const fullPath = safeJoin(relativePath)
   try {
     await fs.access(fullPath)
