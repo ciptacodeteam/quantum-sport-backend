@@ -80,8 +80,8 @@ export const checkoutHandler = factory.createHandlers(
           if (booking.userId !== user.id) {
             throw new BadRequestException('Unauthorized access to booking')
           }
-          if (booking.status !== BookingStatus.DRAFT) {
-            throw new BadRequestException('Booking is not in DRAFT status')
+          if (booking.status !== BookingStatus.HOLD) {
+            throw new BadRequestException('Booking is not in HOLD status')
           }
 
           // Clear existing details
@@ -101,7 +101,7 @@ export const checkoutHandler = factory.createHandlers(
           booking = await tx.booking.create({
             data: {
               userId: user.id,
-              status: BookingStatus.DRAFT,
+              status: BookingStatus.HOLD,
               totalPrice: 0,
               processingFee: 0,
             },
