@@ -12,7 +12,7 @@ import { extension as extFromMime } from 'mime-types'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { buildFilename } from '../lib/filename'
-import { safeJoin } from '../lib/fs'
+import { ensureDir, safeJoin } from '../lib/fs'
 
 export type UploadOptions = {
   subdir?: string // e.g. "images", "avatars/2025/10"
@@ -65,7 +65,10 @@ export async function uploadFile(
 
   // Prepare folder
   const dir = safeJoin(subdir)
-  // await ensureDir(dir)
+
+  if (env.nodeEnv !== 'production') {
+    await ensureDir(dir)
+  }
 
   let outBuf = buf
   let outExt = ''
@@ -99,7 +102,7 @@ export async function uploadFile(
       : sniffMime || 'application/octet-stream'
 
   // Upload to Vercel Blob if token is available
-  if (env.BLOB_READ_WRITE_TOKEN) {
+  if (env.nodeEnv === 'production' && env.BLOB_READ_WRITE_TOKEN) {
     try {
       const blob = await put(relativePath, outBuf, {
         access: 'public',
@@ -166,7 +169,7 @@ export async function getFileUrl(relativePath: string | null): Promise<string> {
   }
 
   // If path starts with '/', try to construct Vercel Blob URL first (if token exists)
-  if (relativePath.startsWith('/') && env.BLOB_READ_WRITE_TOKEN) {
+  if (env.nodeEnv === 'production' && env.BLOB_READ_WRITE_TOKEN) {
     // The token format is: vercel_blob_rw_<storeId>_<randomString>
     const parts = env.BLOB_READ_WRITE_TOKEN.split('_')
     if (parts.length >= 4) {
