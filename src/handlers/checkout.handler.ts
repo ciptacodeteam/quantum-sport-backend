@@ -122,6 +122,8 @@ export const checkoutHandler = factory.createHandlers(
               bookingDetails: { select: { id: true }, take: 1 },
             },
           })
+          console.log('🚀 ~ courtSlotData:', courtSlotData)
+          console.log('🚀 ~ courtSlots:', courtSlots)
 
           if (courtSlotData.length !== courtSlots.length) {
             throw new BadRequestException(
