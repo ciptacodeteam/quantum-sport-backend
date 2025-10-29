@@ -11,7 +11,7 @@ import dayjs from 'dayjs'
 import status from 'http-status'
 import { env } from '@/env'
 
-const PROCESSING_FEE_PERCENT = 0.02 // 2% processing fee
+// const PROCESSING_FEE_PERCENT = 0.02 // 2% processing fee
 
 export const checkoutHandler = factory.createHandlers(
   zValidator('json', checkoutSchema, validateHook),
@@ -264,7 +264,8 @@ export const checkoutHandler = factory.createHandlers(
         }
 
         // Calculate processing fee
-        const processingFee = Math.round(totalPrice * PROCESSING_FEE_PERCENT)
+        // const processingFee = Math.round(totalPrice * PROCESSING_FEE_PERCENT)
+        const processingFee = paymentMethod.fees
         const finalTotal = totalPrice + processingFee
 
         // Update booking with totals
@@ -309,7 +310,7 @@ export const checkoutHandler = factory.createHandlers(
               amount: finalTotal,
               payerEmail: userDetails?.email || undefined,
               description: `Payment for booking ${booking.id}`,
-              invoiceDuration: 86400, // 24 hours
+              invoiceDuration: 600, // 10 minutes
               successRedirectUrl: `${env.baseUrl}/payment/success`,
               failureRedirectUrl: `${env.baseUrl}/payment/failed`,
               customer: {
@@ -331,7 +332,7 @@ export const checkoutHandler = factory.createHandlers(
             amount: finalTotal,
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
-            dueDate: dayjs().add(1, 'day').toDate(),
+            dueDate: dayjs().add(10, 'minutes').toDate(),
             externalRef: xenditInvoiceResponse?.id || null,
             meta: xenditInvoiceResponse
               ? JSON.stringify({
