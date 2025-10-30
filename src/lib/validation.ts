@@ -1,6 +1,6 @@
 import { DEFAULT_DATE_FORMAT } from '@/config'
 import dayjs from 'dayjs'
-import { Role } from '@prisma/client'
+import { Gender, Role } from '@prisma/client'
 import z from 'zod'
 
 export const idSchema = z.object({
@@ -320,7 +320,7 @@ export const createClassSchema = z.object({
   capacity: z.number().min(1),
   remaining: z.number().min(0),
   maxBookingPax: z.number().min(1),
-  gender: z.enum(['ALL', 'MALE', 'FEMALE']),
+  gender: z.enum(Gender).optional(),
   ageMin: z.number().min(0),
   isActive: z.coerce.boolean(),
 })
