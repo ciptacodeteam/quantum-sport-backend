@@ -351,13 +351,14 @@ export type UpdateClubSchema = z.infer<typeof updateClubSchema>
 // Membership schema
 export const createMembershipSchema = z.object({
   name: z.string().min(3).max(100),
-  description: z.string().min(3).max(500).optional(),
-  content: z.string().min(3).max(2000).optional(),
+  description: z.string().max(500).optional(),
+  content: z.string().optional(),
   price: z.number().min(0),
   sessions: z.number().min(1),
   duration: z.number().min(1),
   sequence: z.number().min(0).optional(),
   isActive: z.coerce.boolean().optional(),
+  benefits: z.array(z.string().max(200)).optional(),
 })
 
 export type CreateMembershipSchema = z.infer<typeof createMembershipSchema>

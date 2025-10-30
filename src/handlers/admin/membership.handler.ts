@@ -45,6 +45,9 @@ export const getMembershipHandler = factory.createHandlers(
 
       const item = await db.membership.findUnique({
         where: { id },
+        include: {
+          benefits: true,
+        },
       })
 
       if (!item) {
@@ -63,21 +66,29 @@ export const createMembershipHandler = factory.createHandlers(
   zValidator('json', createMembershipSchema, validateHook),
   async (c) => {
     try {
-      const membershipData = c.req.valid(
-        'json',
-      ) as CreateMembershipSchema
+      const membershipData = c.req.valid('json') as CreateMembershipSchema
 
       const newMembership = await db.membership.create({
         data: {
           name: membershipData.name,
           description: membershipData.description,
           price: membershipData.price,
+          content: membershipData.content,
           sessions: membershipData.sessions,
           duration: membershipData.duration,
           sequence: membershipData.sequence,
-        },  
+          isActive: membershipData.isActive,
+          benefits: {
+            createMany: {
+              data: (membershipData.benefits || []).map((benefit) => ({
+                benefit: benefit,
+              })),
+              skipDuplicates: true,
+            },
+          },
+        },
       })
-     
+
       return c.json(ok(newMembership), status.CREATED)
     } catch (error) {
       c.var.logger.fatal(`Error in createMembership: ${error}`)
@@ -104,12 +115,31 @@ export const updateMembershipHandler = factory.createHandlers(
         throw new NotFoundException('Membership item not found')
       }
 
+      if (Array.isArray(membershipData.benefits)) {
+        // If benefits is provided (even an empty array) treat it as an explicit replacement:
+        // delete all existing and recreate only if the provided array has elements.
+        await db.membershipBenefit.deleteMany({
+          where: { membershipId: id },
+        })
+
+        if (membershipData.benefits.length > 0) {
+          await db.membershipBenefit.createMany({
+            data: membershipData.benefits.map((benefit) => ({
+              membershipId: id,
+              benefit: benefit,
+            })),
+            skipDuplicates: true,
+          })
+        }
+      }
+
       const updatedMembership = await db.membership.update({
         where: { id },
         data: {
           name: membershipData.name,
           description: membershipData.description,
           price: membershipData.price,
+          content: membershipData.content,
           sessions: membershipData.sessions,
           duration: membershipData.duration,
           sequence: membershipData.sequence,
