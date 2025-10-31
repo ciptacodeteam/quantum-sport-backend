@@ -327,7 +327,8 @@ export const checkoutHandler = factory.createHandlers(
           },
         })
 
-        // Create Xendit invoice if API key is configured
+        // --- OLD v2 Invoice (disabled, see below to re-enable) ---
+        /*
         let xenditInvoiceResponse: any = null
         if (env.xendit.apiKey) {
           try {
@@ -345,9 +346,99 @@ export const checkoutHandler = factory.createHandlers(
                 email: userDetails?.email || undefined,
                 mobileNumber: userDetails?.phone || undefined,
               },
+              // payment_methods: paymentMethod.channel ? [paymentMethod.channel] : undefined, // Only needed if supporting v2 and you've implemented preference filtering
             })
           } catch (error) {
             c.var.logger.error(`Failed to create Xendit invoice: ${error}`)
+            // Continue without Xendit integration
+          }
+        }
+        */
+
+        // --- NEW v3 /payment_requests (enabled) ---
+        let xenditInvoiceResponse: any = null;
+        if (env.xendit.apiKey) {
+          try {
+            // Build channel_properties based on the payment method/channel
+            const channelCode = (paymentMethod as any).channel || '';
+            let channelProperties: Record<string, any> = {};
+
+            if (channelCode === 'CARDS') {
+              channelProperties = {
+                mid_label: 'mid_label_acquirer_1',
+                card_details: {
+                  cvn: '246',
+                  card_number: '2222444466668888',
+                  expiry_year: '2027',
+                  expiry_month: '12',
+                  cardholder_first_name: userDetails?.name?.split(' ')[0] || 'John',
+                  cardholder_last_name: userDetails?.name?.split(' ').slice(1).join(' ') || 'Doe',
+                  cardholder_email: userDetails?.email || 'payments@xendit.co',
+                  cardholder_phone_number: userDetails?.phone || '+6571234567',
+                },
+                skip_three_ds: false,
+                card_on_file_type: 'MERCHANT_UNSCHEDULED',
+                failure_return_url: `${env.baseUrl}/payment/failed`,
+                success_return_url: `${env.baseUrl}/payment/success`,
+                billing_information: {
+                  city: 'Singapore',
+                  country: 'SG',
+                  postal_code: '644228',
+                  street_line1: 'Merlion Bay Sands Suites',
+                  street_line2: '21-37',
+                  province_state: 'Singapore',
+                },
+                statement_descriptor: 'Goods & Services',
+                transaction_sequence: 'SUBSEQUENT',
+                network_transaction_id: 'MPL67M01P0628',
+                recurring_configuration: {
+                  recurring_expiry: '2025-12-01',
+                  recurring_frequency: 30,
+                },
+              };
+            } else if (channelCode === 'QR') {
+              channelProperties = {
+                // Aligning with example; set reasonable expiry (10 minutes)
+                expires_at: dayjs().add(10, 'minutes').toISOString(),
+              };
+            } else if (channelCode === 'MANDIRI_VIRTUAL_ACCOUNT') {
+              channelProperties = {
+                expires_at: dayjs().add(10, 'minutes').toISOString(),
+                display_name: userDetails?.name || 'John Doe',
+                // virtual_account_number: '88696969696988', // Optional: set if you manage VA numbers yourself
+                verification_data: {
+                  customer_name: userDetails?.name || 'John Doe',
+                  accepted_name_variations: [
+                    userDetails?.name?.split(' ')[0] || 'John',
+                    userDetails?.name || 'John Doe',
+                  ],
+                  allowed_bank_accounts: [
+                    {
+                      bank_name: 'BRI',
+                      account_number: '2876783233',
+                      account_name: userDetails?.name || 'John Doe',
+                    },
+                  ],
+                },
+              };
+            }
+
+            xenditInvoiceResponse = await xenditService.createPaymentRequestV3({
+              referenceId: invoice.id,
+              requestAmount: finalTotal,
+              country: 'ID',
+              currency: 'IDR',
+              captureMethod: 'AUTOMATIC',
+              channelCode,
+              channelProperties,
+              description: `Payment for booking ${booking.id}`,
+              metadata: {
+                bookingId: booking.id,
+                userId: user.id,
+              }
+            });
+          } catch (error) {
+            c.var.logger.error(`Failed to create Xendit v3 payment request: ${error}`);
             // Continue without Xendit integration
           }
         }
@@ -396,7 +487,7 @@ export const checkoutHandler = factory.createHandlers(
           booking,
           invoice,
           payment,
-          xenditInvoiceUrl: xenditInvoiceResponse?.invoice_url || null,
+          xenditInvoiceUrl: xenditInvoiceResponse?.actions?.mobile_web_checkout_url || xenditInvoiceResponse?.invoice_url || null,
         }
       })
 

@@ -59,6 +59,31 @@ interface XenditVirtualAccountResponse {
   currency: string
 }
 
+export interface CreatePaymentRequestV3 {
+  referenceId: string;
+  requestAmount: number;
+  country?: string; // e.g., "ID"
+  currency?: string; // e.g., "IDR"
+  captureMethod?: string; // e.g., "AUTOMATIC"
+  channelCode: string;
+  channelProperties: Record<string, any>;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface XenditPaymentRequestV3Response {
+  id: string;
+  reference_id: string;
+  status: string;
+  currency: string;
+  request_amount: number;
+  channel_code: string;
+  channel_properties: any;
+  actions?: any;
+  description?: string;
+  metadata?: any;
+}
+
 class XenditService {
   private apiKey: string
   private baseUrl = 'https://api.xendit.co'
@@ -189,6 +214,41 @@ class XenditService {
     } catch (error) {
       log.fatal(`Error getting Xendit Virtual Account: ${error}`)
       throw error
+    }
+  }
+
+  async createPaymentRequestV3(
+    data: CreatePaymentRequestV3
+  ): Promise<XenditPaymentRequestV3Response> {
+    try {
+      log.info(`Creating Xendit v3 payment request for referenceId: ${data.referenceId}`);
+      const response = await fetch(`${this.baseUrl}/v3/payment_requests`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          reference_id: data.referenceId,
+          type: 'PAY',
+          country: data.country || 'ID',
+          currency: data.currency || 'IDR',
+          request_amount: data.requestAmount,
+          capture_method: data.captureMethod || 'AUTOMATIC',
+          channel_code: data.channelCode,
+          channel_properties: data.channelProperties,
+          description: data.description,
+          metadata: data.metadata,
+        }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error(`Xendit v3 API error: ${response.status} - ${errorText}`);
+        throw new Error(`Xendit v3 API error: ${response.status}`);
+      }
+      const result = (await response.json()) as any;
+      log.info(`Xendit v3 payment request created: ${result.id}`);
+      return result;
+    } catch (error) {
+      log.fatal(`Error creating Xendit v3 payment request: ${error}`);
+      throw error;
     }
   }
 
