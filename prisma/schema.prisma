@@ -705,8 +705,8 @@ model Club {
   id          String         @id @default(cuid())
   name        String
   logo        String?
-  description String?
-  rules       String?
+  description String?        @db.Text
+  rules       String?        @db.Text
   leaderId    String
   visibility  ClubVisibility @default(PUBLIC)
   isActive    Boolean        @default(true)

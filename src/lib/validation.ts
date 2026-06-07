@@ -413,8 +413,8 @@ export type UpdateClassSchema = z.infer<typeof updateClassSchema>
 export const createClubSchema = z.object({
   name: z.string().min(3).max(100),
   logo: z.file().optional(),
-  description: z.string().min(3).max(500).optional(),
-  rules: z.string().min(3).max(2000).optional(),
+  description: z.string().min(3).optional(),
+  rules: z.string().min(3).optional(),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
   // For admin flows: explicitly choose a leader
   // For user flows: this will typically be omitted and set from the authenticated user
