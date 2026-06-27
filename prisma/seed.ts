@@ -121,6 +121,11 @@ async function seedStaff() {
       password: hashedPassword,
       role: 'COACH' as const,
       coachType: 'GUIDED_MATCH' as const,
+      coachProfile: [
+        'Former national-level tennis competitor',
+        'Specialist in match strategy and doubles positioning',
+        '10+ years coaching junior and adult players',
+      ].join('\n'),
       isActive: true,
       joinedAt: dayjs().subtract(1, 'year').toDate(),
     },
@@ -131,6 +136,11 @@ async function seedStaff() {
       password: hashedPassword,
       role: 'COACH' as const,
       coachType: 'COACH' as const,
+      coachProfile: [
+        'Certified performance coach for beginner to advanced players',
+        'Focus on footwork, serve technique, and rally consistency',
+        'Experienced in private sessions and group training programs',
+      ].join('\n'),
       isActive: true,
       joinedAt: dayjs().subtract(6, 'months').toDate(),
     },

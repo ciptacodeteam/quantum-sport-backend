@@ -1,10 +1,12 @@
 import { createRouter } from '@/lib/create-app'
-import { getAvailableCoachesHandler } from '@/handlers/coach.handler'
+import {
+  getAvailableCoachesHandler,
+  getCoachesHandler,
+} from '@/handlers/coach.handler'
 
 const coachRoute = createRouter()
-	.basePath('/coaches')
-	.get('/availability', ...getAvailableCoachesHandler)
+  .basePath('/coaches')
+  .get('/', ...getCoachesHandler)
+  .get('/availability', ...getAvailableCoachesHandler)
 
 export default coachRoute
-
-

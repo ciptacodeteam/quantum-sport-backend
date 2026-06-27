@@ -161,18 +161,19 @@ model EmailVerification {
 }
 
 model Staff {
-  id        String     @id @default(cuid())
-  image     String?
-  name      String
-  email     String     @unique
-  phone     String?    @unique
-  password  String
-  isActive  Boolean    @default(true)
-  joinedAt  DateTime   @default(now()) @db.Date
-  role      Role       @default(ADMIN)
-  coachType CoachType?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
+  id           String     @id @default(cuid())
+  image        String?
+  name         String
+  email        String     @unique
+  phone        String?    @unique
+  password     String
+  isActive     Boolean    @default(true)
+  joinedAt     DateTime   @default(now()) @db.Date
+  role         Role       @default(ADMIN)
+  coachType    CoachType?
+  coachProfile String?    @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
 
   authTokens          AuthToken[]
   // Derived schedules now use Slot (see below) instead of separate tables

@@ -134,6 +134,7 @@ const staffBaseSchema = z.object({
     .enum(['ADMIN', 'ADMIN_VIEWER', 'BALLBOY', 'COACH', 'CASHIER'] as const)
     .default('ADMIN'),
   coachType: z.enum(['GUIDED_MATCH', 'COACH'] as const).optional(),
+  coachProfile: z.string().trim().max(2000).optional(),
   isActive: z.coerce.boolean().optional(),
   image: z.file().optional(),
 })

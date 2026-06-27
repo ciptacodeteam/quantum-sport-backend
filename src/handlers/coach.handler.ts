@@ -7,6 +7,44 @@ import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
 import dayjs from 'dayjs'
 import { BookingStatus, SlotType } from '@prisma/client'
+import { getFileUrl } from '@/services/upload.service'
+
+// GET /coaches
+export const getCoachesHandler = factory.createHandlers(async (c) => {
+  try {
+    const coaches = await db.staff.findMany({
+      where: {
+        role: 'COACH',
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        coachType: true,
+        coachProfile: true,
+      },
+      orderBy: [{ joinedAt: 'asc' }, { name: 'asc' }],
+    })
+
+    const formattedCoaches = await Promise.all(
+      coaches.map(async (coach) => ({
+        ...coach,
+        image: coach.image ? await getFileUrl(coach.image) : null,
+        achievements:
+          coach.coachProfile
+            ?.split('\n')
+            .map((item) => item.trim())
+            .filter(Boolean) ?? [],
+      })),
+    )
+
+    return c.json(ok(formattedCoaches), status.OK)
+  } catch (error) {
+    c.var.logger.fatal(`Error in getCoachesHandler: ${error}`)
+    throw error
+  }
+})
 
 // GET /coaches/availability?startAt=YYYY-MM-DDTHH:mm&endAt=YYYY-MM-DDTHH:mm
 export const getAvailableCoachesHandler = factory.createHandlers(

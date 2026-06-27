@@ -48,6 +48,7 @@ export const getAllStaffHandler = factory.createHandlers(
           createdAt: true,
           role: true,
           coachType: true,
+          coachProfile: true,
           isActive: true,
           joinedAt: true,
         },
@@ -86,6 +87,7 @@ export const getStaffHandler = factory.createHandlers(
           createdAt: true,
           role: true,
           coachType: true,
+          coachProfile: true,
           isActive: true,
           joinedAt: true,
           slot: {
@@ -123,7 +125,8 @@ export const createStaffHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('form') as CreateStaffSchema
-      const { name, email, phone, role, coachType, image, isActive, joinedAt } = validated
+      const { name, email, phone, role, coachType, coachProfile, image, isActive, joinedAt } =
+        validated
 
       const existingStaff = await db.staff.findFirst({
         where: {
@@ -157,6 +160,7 @@ export const createStaffHandler = factory.createHandlers(
           password: hashedPassword,
           role,
           coachType,
+          coachProfile: role === 'COACH' ? coachProfile : null,
           image: imageUrl,
           isActive,
           joinedAt: joinedAt ? new Date(joinedAt) : new Date(),
@@ -170,6 +174,7 @@ export const createStaffHandler = factory.createHandlers(
           createdAt: true,
           role: true,
           coachType: true,
+          coachProfile: true,
           isActive: true,
           joinedAt: true,
         },
@@ -257,6 +262,12 @@ export const updateStaffHandler = factory.createHandlers(
           phone,
           role: validatedForm.role,
           coachType: validatedForm.coachType,
+          coachProfile:
+            validatedForm.role === 'COACH'
+              ? validatedForm.coachProfile
+              : validatedForm.role
+                ? null
+                : validatedForm.coachProfile,
           image: imageUrl,
           isActive,
           joinedAt: validatedForm.joinedAt
@@ -272,6 +283,7 @@ export const updateStaffHandler = factory.createHandlers(
           createdAt: true,
           role: true,
           coachType: true,
+          coachProfile: true,
           isActive: true,
           joinedAt: true,
         },
