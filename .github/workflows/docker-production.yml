@@ -148,7 +148,8 @@ jobs:
           PORT="${PORT:-8000}"
           echo "Probing http://127.0.0.1:${PORT}/health ..."
           for i in $(seq 1 12); do
-            if curl -fsS --max-time 5 "http://127.0.0.1:${PORT}/health" >/dev/null; then
+            if curl -fsS --max-time 5 "http://127.0.0.1:${PORT}/health" 2>/dev/null \
+              | grep -qE '"success"[[:space:]]*:[[:space:]]*true|"up"[[:space:]]*:[[:space:]]*true'; then
               echo "✅ Health check passed on attempt ${i}"
               exit 0
             fi
@@ -156,6 +157,11 @@ jobs:
             sleep 5
           done
           echo "❌ Health check failed after retries"
+          LAST_GOOD="$(cat .deploy-last-good-image 2>/dev/null || true)"
+          if [ -n "$LAST_GOOD" ]; then
+            echo "Last known-good image: $LAST_GOOD"
+            echo "Manual rollback: APP_IMAGE=$LAST_GOOD bash scripts/deploy-registry.sh"
+          fi
           exit 1
           EOF
 

@@ -1,6 +1,6 @@
 # Docker Makefile for common operations
 
-.PHONY: help build up down restart logs shell db-migrate db-backup clean
+.PHONY: help build up down restart logs shell db-migrate db-backup db-backup-setup clean
 
 # Default target
 help:
@@ -16,8 +16,9 @@ help:
 	@echo "  make dev-down      - Stop development services"
 	@echo "  make logs          - View development logs"
 	@echo "  make shell         - Access app container shell"
-	@echo "  make db-migrate    - Run database migrations"
-	@echo "  make db-backup     - Backup database"
+	@echo "  make db-migrate       Run database migrations"
+	@echo "  make db-backup        Backup DB to Vercel Blob"
+	@echo "  make db-backup-setup  Install daily backup cron (VPS)"
 	@echo "  make clean         - Clean up containers and volumes"
 	@echo "  make clean-all     - Clean up all containers, images, and volumes"
 
@@ -67,11 +68,13 @@ db-migrate:
 	docker-compose -f docker-compose.prod.yml exec app bunx prisma migrate deploy
 
 db-backup:
-	docker-compose -f docker-compose.prod.yml exec db pg_dump -U postgres quantum_sport > backup_$$(date +%Y%m%d_%H%M%S).sql
+	./scripts/backup-db.sh
+
+db-backup-setup:
+	./scripts/setup-backup-cron.sh
 
 db-restore:
-	@echo "Usage: make db-restore FILE=backup.sql"
-	docker-compose -f docker-compose.prod.yml exec -T db psql -U postgres quantum_sport < $(FILE)
+	./scripts/restore-db.sh $(FILE)
 
 # Cleanup commands
 clean:
