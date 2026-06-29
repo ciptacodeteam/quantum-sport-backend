@@ -193,8 +193,9 @@ export async function getFileUrl(relativePath: string | null): Promise<string> {
     }
   }
 
-  // Fallback: return the path as-is
-  // This will happen on the first request before any upload
-  log.warn(`No blob base URL available yet for path: ${relativePath}`)
-  return `${env.baseUrl}/storage${cleanPath}`
+  // Fallback to local static serving (matches the /storage/* route in app.ts,
+  // which serves files from src/storage/uploads). Used only when no blob token
+  // is configured.
+  log.warn(`No blob base URL available for path: ${relativePath}`)
+  return `${env.baseUrl}/storage/uploads${cleanPath}`
 }
