@@ -176,12 +176,21 @@ export async function getFileUrl(relativePath: string | null): Promise<string> {
     ? relativePath
     : `/${relativePath}`
 
-  // If no cached URL yet, try to get it from env variable
-  const envBlobUrl = env.blobToken
-  if (envBlobUrl) {
-    const token = envBlobUrl.split('_')[3]
-    const baseUrl = `${token}.public.blob.vercel-storage.com⁠`
-    return `https://${baseUrl.toLowerCase()}${cleanPath}`
+  // Prefer the base URL learned from a real upload in this process — it's the
+  // authoritative host returned by Vercel Blob.
+  if (blobBaseUrl) {
+    return `${blobBaseUrl}${cleanPath}`
+  }
+
+  // Otherwise derive the public host from the blob token.
+  // Token format: vercel_blob_rw_<STORE_ID>_<SECRET>
+  // Public host:  https://<STORE_ID>.public.blob.vercel-storage.com
+  if (env.blobToken) {
+    const storeId = env.blobToken.split('_')[3]
+    if (storeId) {
+      const host = `${storeId.toLowerCase()}.public.blob.vercel-storage.com`
+      return `https://${host}${cleanPath}`
+    }
   }
 
   // Fallback: return the path as-is
