@@ -335,7 +335,28 @@ load_backup_env() {
 }
 
 blob_cli() {
-  compose -f docker-compose.prod.yml exec -T app bun scripts/blob-backup.ts "$@"
+  local script_host script_container
+  script_host="$(pwd)/scripts/blob-backup.ts"
+  script_container="/app/scripts/blob-backup.ts"
+
+  if [ ! -f "$script_host" ]; then
+    print_error "Missing ${script_host} — git pull the latest backup scripts"
+    exit 1
+  fi
+
+  # Prefer the running app container when the image already includes the script.
+  if compose -f docker-compose.prod.yml exec -T app test -f "$script_container" 2>/dev/null; then
+    compose -f docker-compose.prod.yml exec -T app bun "$script_container" "$@"
+    return
+  fi
+
+  # Fallback: mount script from the host (works before the next image deploy).
+  compose -f docker-compose.prod.yml run --rm -T --no-deps \
+    -v "${script_host}:${script_container}:ro" \
+    -e "BLOB_READ_WRITE_TOKEN=${BLOB_READ_WRITE_TOKEN}" \
+    -e "BLOB_BACKUP_PREFIX=${BLOB_BACKUP_PREFIX:-quantum-sport/db}" \
+    -e "BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}" \
+    app bun "$script_container" "$@"
 }
 
 blob_assert_safe_prefix() {

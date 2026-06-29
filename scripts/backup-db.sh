@@ -52,10 +52,6 @@ if ! compose -f docker-compose.prod.yml ps db 2>/dev/null | grep -q "Up"; then
   fail_backup "Database container is not running"
 fi
 
-if ! compose -f docker-compose.prod.yml ps app 2>/dev/null | grep -q "Up"; then
-  fail_backup "App container is not running (required for Vercel Blob upload)"
-fi
-
 if [ "$DRY_RUN" = true ]; then
   print_warning "Dry run — no dump or upload will be performed"
   print_info "Would dump ${DB_NAME} → ${local_path}"

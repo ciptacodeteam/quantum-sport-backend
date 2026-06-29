@@ -44,11 +44,6 @@ if ! compose -f docker-compose.prod.yml ps db 2>/dev/null | grep -q "Up"; then
   exit 1
 fi
 
-if ! compose -f docker-compose.prod.yml ps app 2>/dev/null | grep -q "Up"; then
-  print_error "App container is not running (required to download from Vercel Blob)"
-  exit 1
-fi
-
 LOCAL_PATH="${LOCAL_BACKUP_DIR}/${BACKUP_NAME}"
 
 print_warning "This will REPLACE all data in database '${DB_NAME}'"
