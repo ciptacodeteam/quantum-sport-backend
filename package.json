@@ -18,6 +18,7 @@
     "db:truncate": "bun prisma/truncate.ts",
     "db:seed": "bun prisma/seed.ts",
     "db:studio": "prisma studio",
+    "db:fix-coach-type-enum": "bun prisma/fix-coach-type-enum.ts",
     "db:fix-slots": "bun run scripts/fix-slots.ts",
     "db:check-expired": "bun run scripts/check-expired-data.ts",
     "db:resolve-failed": "bun prisma/resolve-failed-migration.ts",

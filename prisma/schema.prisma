@@ -57,8 +57,9 @@ enum SlotType {
 }
 
 enum CoachType {
-  GUIDED_MATCH
-  COACH
+  PADEL
+  PADEL_TENNIS
+  TENNIS
 }
 
 enum Gender {

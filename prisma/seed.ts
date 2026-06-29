@@ -120,7 +120,7 @@ async function seedStaff() {
       phone: '+6281100000004',
       password: hashedPassword,
       role: 'COACH' as const,
-      coachType: 'GUIDED_MATCH' as const,
+      coachType: 'PADEL_TENNIS' as const,
       coachProfile: [
         'Former national-level tennis competitor',
         'Specialist in match strategy and doubles positioning',
@@ -135,7 +135,7 @@ async function seedStaff() {
       phone: '+6281100000005',
       password: hashedPassword,
       role: 'COACH' as const,
-      coachType: 'COACH' as const,
+      coachType: 'PADEL' as const,
       coachProfile: [
         'Certified performance coach for beginner to advanced players',
         'Focus on footwork, serve technique, and rally consistency',
