@@ -33,12 +33,7 @@ export ENV_FILE="${ENV_FILE:-.env}"
 export APP_IMAGE
 
 if [ "${SKIP_PULL_CODE:-}" != "true" ]; then
-  print_info "Pulling latest code..."
-  if git pull origin main; then
-    print_success "Code updated"
-  else
-    print_warning "Git pull failed or no changes; continuing"
-  fi
+  sync_repo_for_deploy
 fi
 
 print_header "Pulling container images"

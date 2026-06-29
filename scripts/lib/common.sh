@@ -89,6 +89,26 @@ validate_env_production() {
   validate_env_file
 }
 
+# Pull latest code. If this fails on the VPS (usually CRLF/chmod drift on
+# tracked files), recover with: git fetch origin main && git reset --hard origin/main
+sync_repo_for_deploy() {
+  local branch="${DEPLOY_BRANCH:-main}"
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    print_warning "Not a git repository; skipping code sync"
+    return 0
+  fi
+
+  print_info "Pulling latest code from origin/${branch}..."
+  if git pull origin "$branch"; then
+    print_success "Code updated"
+  else
+    print_warning "git pull failed (often CRLF or local edits on tracked files)"
+    print_info "Recover with: git fetch origin ${branch} && git reset --hard origin/${branch}"
+    print_info "Continuing with current checkout..."
+  fi
+}
+
 # Read a single KEY=value from the env file without shell expansion ($, !, etc.).
 read_env_value() {
   local key="$1"
