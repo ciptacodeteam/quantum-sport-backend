@@ -158,15 +158,21 @@ export_compose_env() {
   db_name="${db_name:-quantum_sport}"
   db_host="$(read_env_value DB_HOST 2>/dev/null || true)"
   db_host="${db_host:-db}"
-  db_port="$(read_env_value DB_PORT 2>/dev/null || true)"
-  db_port="${db_port:-5432}"
+
+  # Host-published port (for pgAdmin/SSH tunnel only). Decoupled from the
+  # internal connection: Postgres always listens on 5432 inside the container,
+  # and the app reaches it over the compose network as ${db_host}:5432.
+  # Bound to 127.0.0.1 in docker-compose.prod.yml so it never conflicts with a
+  # native Postgres on 5432 and is never exposed publicly.
+  db_host_port="$(read_env_value DB_HOST_PORT 2>/dev/null || true)"
+  db_host_port="${db_host_port:-5433}"
 
   export DB_PASSWORD="$db_password"
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$db_password}"
   export DB_USER="$db_user"
   export DB_NAME="$db_name"
   export DB_HOST="$db_host"
-  export DB_PORT="$db_port"
+  export DB_HOST_PORT="$db_host_port"
 
   existing_url="$(read_env_value DATABASE_URL 2>/dev/null || true)"
   if [ -n "$existing_url" ]; then
@@ -174,8 +180,8 @@ export_compose_env() {
     export DATABASE_URL_WORKER="$existing_url"
   else
     encoded_pass="$(urlencode_component "$db_password")"
-    export DATABASE_URL="postgresql://${db_user}:${encoded_pass}@${db_host}:${db_port}/${db_name}?schema=public&connection_limit=10&pool_timeout=20"
-    export DATABASE_URL_WORKER="postgresql://${db_user}:${encoded_pass}@${db_host}:${db_port}/${db_name}?schema=public&connection_limit=5&pool_timeout=20"
+    export DATABASE_URL="postgresql://${db_user}:${encoded_pass}@${db_host}:5432/${db_name}?schema=public&connection_limit=10&pool_timeout=20"
+    export DATABASE_URL_WORKER="postgresql://${db_user}:${encoded_pass}@${db_host}:5432/${db_name}?schema=public&connection_limit=5&pool_timeout=20"
   fi
 
   if port="$(read_env_value PORT 2>/dev/null || true)" && [ -n "$port" ]; then
