@@ -119,30 +119,14 @@ fetch('/admin/analytics/export/bulk-data?type=coach-bookings', {
 
 ## 🧪 Testing
 
-### Quick Test
-
-```bash
-# Test all endpoints
-node docs/analytics.test.ts
-
-# Edit test file to add your auth token first
-```
-
-### Postman
-
-1. Create new request
-2. Set authorization header
-3. Add query parameters
-4. Send request
+Use Postman or cURL with the examples in `ANALYTICS_SETUP_GUIDE.md`.
 
 ## 📚 Documentation Files
 
-| File                          | Purpose                |
-| ----------------------------- | ---------------------- |
-| `ANALYTICS_APIS.md`           | Complete API reference |
-| `ANALYTICS_SETUP_GUIDE.md`    | Setup & testing guide  |
-| `ANALYTICS_IMPLEMENTATION.md` | Implementation summary |
-| `analytics.test.ts`           | Integration tests      |
+| File                       | Purpose                |
+| -------------------------- | ---------------------- |
+| `ANALYTICS_APIS.md`        | Complete API reference |
+| `ANALYTICS_SETUP_GUIDE.md` | Setup & testing guide  |
 
 ## 🔧 File Structure
 

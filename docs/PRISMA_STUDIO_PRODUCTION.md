@@ -63,7 +63,7 @@ docker-compose -f docker-compose.prod.yml down prisma-studio
 
 ### Port Configuration
 
-You can change the port by setting `PRISMA_STUDIO_PORT` in `.env.production`:
+You can change the port by setting `PRISMA_STUDIO_PORT` in `.env`:
 
 ```bash
 PRISMA_STUDIO_PORT=5555
@@ -71,7 +71,7 @@ PRISMA_STUDIO_PORT=5555
 
 ### Environment Variables
 
-Prisma Studio uses the same `.env.production` file and connects to the production database automatically.
+Prisma Studio uses the same `.env` file and connects to the production database automatically.
 
 ## Troubleshooting
 
@@ -116,7 +116,7 @@ Prisma Studio uses the same `.env.production` file and connects to the productio
 
 - Ensure the database service is healthy
 - Check that Prisma Studio container is on the same network
-- Verify DATABASE_URL format in `.env.production`
+- Verify DATABASE_URL format in `.env`
 
 ## Alternative: Run Locally
 

@@ -65,7 +65,7 @@ print_header "Quantum Sport Backend - Production Deployment"
 
 # Verify we're in the right directory
 if [ ! -f "package.json" ] || [ ! -f "Dockerfile" ]; then
-    print_error "Error: Must run deploy.sh from the project root directory"
+    print_error "Error: Must run scripts/deploy.sh from the project root directory"
     print_info "Current directory: $(pwd)"
     exit 1
 fi
@@ -94,18 +94,20 @@ if [ "$EUID" -eq 0 ]; then
     fi
 fi
 
-# Check if .env.production exists
-if [ ! -f .env.production ]; then
-    print_error ".env.production file not found!"
+ENV_FILE="${ENV_FILE:-.env}"
+
+# Check if env file exists
+if [ ! -f "$ENV_FILE" ]; then
+    print_error "${ENV_FILE} file not found!"
     echo ""
     print_info "Creating from template..."
     
     if [ -f "docker/env.production.template" ]; then
-        cp docker/env.production.template .env.production
-        print_warning "Please edit .env.production and set your configuration"
+        cp docker/env.production.template "$ENV_FILE"
+        print_warning "Please edit ${ENV_FILE} and set your configuration"
         print_info "Required variables: DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET"
         echo ""
-        read -p "Press Enter after editing .env.production to continue..."
+        read -p "Press Enter after editing ${ENV_FILE} to continue..."
     else
         print_error "Template file not found: docker/env.production.template"
         exit 1
@@ -118,23 +120,29 @@ REQUIRED_VARS=("DB_PASSWORD" "JWT_SECRET" "JWT_REFRESH_SECRET")
 MISSING_VARS=()
 
 for var in "${REQUIRED_VARS[@]}"; do
-    if ! grep -q "^${var}=" .env.production || grep -q "^${var}=your_" .env.production || grep -q "^${var}=$" .env.production; then
+    if ! grep -q "^${var}=" "$ENV_FILE" || grep -q "^${var}=your_" "$ENV_FILE" || grep -q "^${var}=$" "$ENV_FILE"; then
         MISSING_VARS+=("$var")
     fi
 done
 
 if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-    print_error "Missing or invalid required variables in .env.production:"
+    print_error "Missing or invalid required variables in ${ENV_FILE}:"
     for var in "${MISSING_VARS[@]}"; do
         echo "  - $var"
     done
     echo ""
-    print_info "Please edit .env.production and set these variables"
+    print_info "Please edit ${ENV_FILE} and set these variables"
     print_info "See docker/env.production.template for reference"
     exit 1
 fi
 
 print_success "Environment configuration validated"
+
+# Load DB credentials safely for docker compose ($ in passwords breaks compose .env parsing)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+export_compose_env
 
 # Confirm deployment (skip if AUTO_DEPLOY is set)
 if [ "${AUTO_DEPLOY:-}" != "true" ]; then
@@ -149,10 +157,7 @@ else
     print_info "AUTO_DEPLOY=true, skipping confirmation prompt"
 fi
 
-# Load environment variables for display purposes
-set +e
-source .env.production 2>/dev/null
-set -e
+BASE_URL="$(read_env_value BASE_URL 2>/dev/null || true)"
 
 print_header "Pulling Latest Code"
 print_info "Fetching latest changes from repository..."

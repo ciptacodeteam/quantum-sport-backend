@@ -38,8 +38,8 @@ fi
 echo -e "${GREEN}✅ .env file configured${NC}"
 
 # Make scripts executable
-chmod +x docker/ngrok-entrypoint.sh 2>/dev/null || true
-chmod +x docker/get-ngrok-url.sh 2>/dev/null || true
+chmod +x scripts/ngrok-entrypoint.sh 2>/dev/null || true
+chmod +x scripts/get-ngrok-url.sh 2>/dev/null || true
 
 echo -e "${BLUE}🚀 Starting development environment with ngrok...${NC}"
 

@@ -528,7 +528,7 @@ const expired = await db.passwordResetToken.deleteMany({
 - [EMAIL_QUEUE.md](./EMAIL_QUEUE.md) - Detailed email queue implementation
 - [PASSWORD_RESET.md](./PASSWORD_RESET.md) - Password reset flow and token lifecycle
 - [DOCKER_EMAIL_WORKER.md](./DOCKER_EMAIL_WORKER.md) - Docker worker operations
-- [XENDIT_INTEGRATION.md](../XENDIT_INTEGRATION.md) - Payment integration (similar async pattern)
+- [XENDIT_PAYMENT_INTEGRATION.md](./payments/XENDIT_PAYMENT_INTEGRATION.md) - Payment integration (similar async pattern)
 
 ## Next Steps
 

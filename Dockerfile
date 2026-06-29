@@ -8,6 +8,9 @@ FROM oven/bun:1.3-alpine AS deps
 
 WORKDIR /app
 
+# prisma generate (postinstall) reads prisma.config.ts and needs DATABASE_URL
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
+
 # Install system dependencies needed for native modules
 RUN apk add --no-cache python3 make g++
 
@@ -16,6 +19,7 @@ COPY package.json bun.lock* ./
 
 # Copy Prisma schema (needed for postinstall)
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 # Install production dependencies with optimized flags
 # Use --no-optional to skip optional dependencies and speed up install
@@ -31,6 +35,8 @@ FROM oven/bun:1.3-alpine AS builder
 
 WORKDIR /app
 
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
+
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
@@ -39,6 +45,7 @@ COPY package.json bun.lock* ./
 
 # Copy Prisma schema
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 # Install all dependencies (including devDependencies)
 # Retry logic for memory-constrained environments
@@ -81,7 +88,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
 
 # Copy entrypoint script and make it executable (must be done as root)
-COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh && \
     chown nodejs:nodejs /app/docker-entrypoint.sh
 

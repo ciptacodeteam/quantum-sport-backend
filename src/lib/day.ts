@@ -6,21 +6,32 @@ dayjs.extend(isSameOrBefore)
 
 const DAY_MAP: Record<string, number> = {
   // EN long
-  sunday: 1,
-  monday: 2,
-  tuesday: 3,
-  wednesday: 4,
-  thursday: 5,
-  friday: 6,
-  saturday: 7,
-  // ID long
-  minggu: 1,
-  senin: 2,
-  selasa: 3,
-  rabu: 4,
-  kamis: 5,
-  jumat: 6,
-  sabtu: 7,
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  // EN short
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  tues: 2,
+  wed: 3,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  fri: 5,
+  sat: 6,
+  // ID long (dayjs: 0=Sun … 6=Sat)
+  minggu: 0,
+  senin: 1,
+  selasa: 2,
+  rabu: 3,
+  kamis: 4,
+  jumat: 5,
+  sabtu: 6,
 }
 
 // Convert DayToken[] to Set of day numbers (0=Sun, 1=Mon, ..., 6=Sat)

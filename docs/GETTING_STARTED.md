@@ -6,12 +6,12 @@
 
 ```bash
 # Copy the template
-cp docker/env.production.template .env.production
+cp docker/env.production.template .env
 ```
 
 ### Step 2: Edit Your Secrets
 
-Open `.env.production` and set these **required** values:
+Open `.env` and set these **required** values:
 
 ```bash
 # Database Password (use a strong password!)
@@ -52,10 +52,10 @@ openssl rand -base64 32
 **Option A: Automated Deployment (Recommended)**
 ```bash
 # Make script executable (first time only)
-chmod +x deploy.sh
+chmod +x scripts/deploy.sh
 
 # Run deployment
-./deploy.sh
+./scripts/deploy.sh
 ```
 
 The script will automatically:
@@ -102,10 +102,12 @@ You should see:
 ## ❌ Common Issues
 
 ### "DB_PASSWORD is required"
-**Solution:** Make sure `.env.production` exists and has `DB_PASSWORD=your_password` set.
+**Cause:** Password contains `$` or other characters Docker Compose misreads from `.env`.
+
+**Solution:** Quote it — `DB_PASSWORD='a1ndi$'` — or use `scripts/deploy.sh` / `scripts/deploy-registry.sh`, which handle this automatically.
 
 ### "port 80 is already allocated"
-**Solution:** Either stop system nginx (`sudo systemctl stop nginx`) or change the port in `.env.production` (`PORT=3001`).
+**Solution:** Either stop system nginx (`sudo systemctl stop nginx`) or change the port in `.env` (`PORT=3001`).
 
 ### Migration fails
 **Solution:** The migrations are now idempotent. If you see errors, try:
@@ -115,9 +117,9 @@ docker-compose -f docker-compose.prod.yml restart app
 
 ## 📚 Documentation
 
-- **[DOCKER_DEPLOYMENT_GUIDE.md](../DOCKER_DEPLOYMENT_GUIDE.md)** - Complete guide
-- **[DOCKER_QUICK_REFERENCE.md](../DOCKER_QUICK_REFERENCE.md)** - Quick commands
-- **[DOCKER_CHANGES_SUMMARY.md](../DOCKER_CHANGES_SUMMARY.md)** - What was changed
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete guide
+- **[DOCKER_QUICK_REFERENCE.md](./DOCKER_QUICK_REFERENCE.md)** - Quick commands
+- **[DEPLOY_SCRIPT_GUIDE.md](./DEPLOY_SCRIPT_GUIDE.md)** - Production deploy script
 
 ## 🎯 Next Steps
 

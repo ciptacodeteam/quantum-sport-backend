@@ -5,8 +5,8 @@
 ```bash
 cd ~/quantum-sport-backend
 git pull origin main
-chmod +x docker/setup-ssl.sh
-./docker/setup-ssl.sh
+chmod +x scripts/setup-ssl.sh
+./scripts/setup-ssl.sh
 ```
 
 **Done!** Your API will be available at `https://api.quantumsocialclub.id`
@@ -100,7 +100,7 @@ sudo netstat -tlnp | grep :80         # Check port 80
 sudo ufw status                        # Check firewall
 
 # Try again
-./docker/setup-ssl.sh
+./scripts/setup-ssl.sh
 ```
 
 ## 📚 Full Guide
@@ -109,5 +109,5 @@ See [DOMAIN_AND_SSL_SETUP.md](./DOMAIN_AND_SSL_SETUP.md) for complete documentat
 
 ---
 
-**Ready?** Run `./docker/setup-ssl.sh` now! 🚀
+**Ready?** Run `./scripts/setup-ssl.sh` now! 🚀
 

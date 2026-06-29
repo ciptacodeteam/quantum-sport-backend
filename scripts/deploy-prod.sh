@@ -75,15 +75,17 @@ print_success "Docker and Docker Compose are installed"
 # Step 2: Check environment file
 print_info "Checking environment configuration..."
 
-if [ ! -f ".env.production" ]; then
-    print_warning ".env.production file not found"
+ENV_FILE="${ENV_FILE:-.env}"
+
+if [ ! -f "$ENV_FILE" ]; then
+    print_warning "${ENV_FILE} file not found"
     print_info "Creating from template..."
     
     if [ -f "docker/env.production.template" ]; then
-        cp docker/env.production.template .env.production
-        print_warning "Please edit .env.production and set your configuration"
+        cp docker/env.production.template "$ENV_FILE"
+        print_warning "Please edit ${ENV_FILE} and set your configuration"
         print_info "Required variables: DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET"
-        read -p "Press Enter after editing .env.production to continue..."
+        read -p "Press Enter after editing ${ENV_FILE} to continue..."
     else
         print_error "Template file not found: docker/env.production.template"
         exit 1
@@ -95,17 +97,17 @@ REQUIRED_VARS=("DB_PASSWORD" "JWT_SECRET" "JWT_REFRESH_SECRET")
 MISSING_VARS=()
 
 for var in "${REQUIRED_VARS[@]}"; do
-    if ! grep -q "^${var}=" .env.production || grep -q "^${var}=your_" .env.production; then
+    if ! grep -q "^${var}=" "$ENV_FILE" || grep -q "^${var}=your_" "$ENV_FILE"; then
         MISSING_VARS+=("$var")
     fi
 done
 
 if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-    print_error "Missing or invalid required variables in .env.production:"
+    print_error "Missing or invalid required variables in ${ENV_FILE}:"
     for var in "${MISSING_VARS[@]}"; do
         echo "  - $var"
     done
-    print_info "Please edit .env.production and set these variables"
+    print_info "Please edit ${ENV_FILE} and set these variables"
     exit 1
 fi
 

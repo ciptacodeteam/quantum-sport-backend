@@ -16,7 +16,7 @@ Ngrok is a secure tunneling service that creates a secure tunnel from a public U
 
 ```
 project/
-├── docker/
+├── scripts/
 │   ├── ngrok-entrypoint.sh      ← Ngrok initialization script
 │   └── get-ngrok-url.sh         ← URL monitoring helper
 ├── docker-compose.ngrok.yml     ← Ngrok-specific Docker setup

@@ -12,7 +12,7 @@ echo "   PORT: ${PORT:-not set}"
 echo "⏳ Waiting for database to be ready..."
 if [ -z "$DATABASE_URL" ]; then
   echo "❌ ERROR: DATABASE_URL environment variable is not set!"
-  echo "   Please ensure .env.production file exists with DB_PASSWORD set"
+  echo "   Please ensure .env file exists with DB_PASSWORD set"
   exit 1
 fi
 

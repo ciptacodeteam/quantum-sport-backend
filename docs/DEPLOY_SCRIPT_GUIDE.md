@@ -1,6 +1,6 @@
 # Deploy Script Guide
 
-Complete guide for using the `./deploy.sh` script for production deployment.
+Complete guide for using the `./scripts/deploy.sh` script for production deployment.
 
 ## 🎯 Overview
 
@@ -10,26 +10,26 @@ The `deploy.sh` script is your one-command solution for deploying the Quantum Sp
 
 ```bash
 # 1. First time: Set up environment
-cp docker/env.production.template .env.production
-nano .env.production  # Edit and set your secrets
+cp docker/env.production.template .env
+nano .env  # Edit and set your secrets
 
 # 2. Make script executable (first time only)
-chmod +x deploy.sh
+chmod +x scripts/deploy.sh
 
 # 3. Deploy!
-./deploy.sh
+./scripts/deploy.sh
 ```
 
 That's it! The script handles everything else automatically.
 
 ## ✨ What the Script Does
 
-When you run `./deploy.sh`, it automatically:
+When you run `./scripts/deploy.sh`, it automatically:
 
 ### 1. **Pre-flight Checks** ✈️
 - ✅ Verifies Docker and Docker Compose are installed
 - ✅ Checks if running as root (warns if so)
-- ✅ Validates `.env.production` exists
+- ✅ Validates `.env` exists
 - ✅ Checks for required environment variables:
   - `DB_PASSWORD`
   - `JWT_SECRET`
@@ -68,7 +68,7 @@ When you run `./deploy.sh`, it automatically:
 
 ### Required Variables
 
-These **must** be set in `.env.production`:
+These **must** be set in `.env`:
 
 ```bash
 # Database Password (use a strong password!)
@@ -104,7 +104,7 @@ See `docker/env.production.template` for complete list:
 Force a clean build without cache:
 
 ```bash
-CLEAN_BUILD=true ./deploy.sh
+CLEAN_BUILD=true ./scripts/deploy.sh
 ```
 
 ### Skip Git Pull
@@ -114,7 +114,7 @@ If you don't want to pull latest code:
 ```bash
 # Temporarily rename .git directory
 mv .git .git.bak
-./deploy.sh
+./scripts/deploy.sh
 mv .git.bak .git
 ```
 
@@ -191,15 +191,15 @@ quantum-sport-email-worker-prod   Up
 
 ## ❌ Common Errors
 
-### Error: .env.production not found
+### Error: .env not found
 
 **Problem:** Environment file doesn't exist
 
 **Solution:**
 ```bash
-cp docker/env.production.template .env.production
-nano .env.production  # Edit and set your secrets
-./deploy.sh
+cp docker/env.production.template .env
+nano .env  # Edit and set your secrets
+./scripts/deploy.sh
 ```
 
 ### Error: Missing required variables
@@ -208,16 +208,16 @@ nano .env.production  # Edit and set your secrets
 
 **Output:**
 ```
-❌ Missing or invalid required variables in .env.production:
+❌ Missing or invalid required variables in .env:
   - DB_PASSWORD
   - JWT_SECRET
 ```
 
 **Solution:**
 ```bash
-nano .env.production
+nano .env
 # Set actual values for DB_PASSWORD and JWT_SECRET
-./deploy.sh
+./scripts/deploy.sh
 ```
 
 ### Error: Build failed
@@ -227,7 +227,7 @@ nano .env.production
 **Solution:**
 ```bash
 # Try clean build
-CLEAN_BUILD=true ./deploy.sh
+CLEAN_BUILD=true ./scripts/deploy.sh
 
 # Or check Docker is running
 docker ps
@@ -248,7 +248,7 @@ docker compose -f docker-compose.prod.yml logs -f app
 # Common causes:
 # - Database connection failed (check DB_PASSWORD)
 # - Migration failed (check logs for SQL errors)
-# - Port already in use (check PORT in .env.production)
+# - Port already in use (check PORT in .env)
 ```
 
 ## 🔧 Troubleshooting Commands
@@ -294,10 +294,9 @@ docker compose -f docker-compose.prod.yml restart
 
 ## 📚 Related Documentation
 
-- **[DOCKER_DEPLOYMENT_GUIDE.md](./DOCKER_DEPLOYMENT_GUIDE.md)** - Complete deployment guide
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
 - **[DOCKER_QUICK_REFERENCE.md](./DOCKER_QUICK_REFERENCE.md)** - Quick command reference
-- **[docker/GETTING_STARTED.md](./docker/GETTING_STARTED.md)** - 5-minute quick start
-- **[DOCKER_CHANGES_SUMMARY.md](./DOCKER_CHANGES_SUMMARY.md)** - What changed
+- **[GETTING_STARTED.md](./GETTING_STARTED.md)** - 5-minute quick start
 - **[docker/env.production.template](./docker/env.production.template)** - Environment template
 
 ## 🎓 Tips & Best Practices
@@ -324,7 +323,7 @@ docker compose -f docker-compose.prod.yml restart
 6. **Regular Updates**: Keep Docker images updated
    ```bash
    docker compose -f docker-compose.prod.yml pull
-   ./deploy.sh
+   ./scripts/deploy.sh
    ```
 
 ## 🆘 Getting Help
@@ -336,11 +335,11 @@ If the deployment fails:
 3. Verify environment variables are set correctly
 4. Check database connectivity
 5. Review migration status
-6. Consult the [DOCKER_DEPLOYMENT_GUIDE.md](./DOCKER_DEPLOYMENT_GUIDE.md)
+6. Consult the [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ## ✅ Success Checklist
 
-After running `./deploy.sh`, verify:
+After running `./scripts/deploy.sh`, verify:
 
 - [ ] All containers show "Up (healthy)" status
 - [ ] Application logs show no errors
@@ -351,5 +350,5 @@ After running `./deploy.sh`, verify:
 
 ---
 
-**Ready to deploy?** Run `./deploy.sh` and watch the magic happen! 🚀
+**Ready to deploy?** Run `./scripts/deploy.sh` and watch the magic happen! 🚀
 

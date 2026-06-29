@@ -682,7 +682,7 @@ class XenditService {
    * 3. Frontend: Redirect to 3DS → Bank redirects to success/failure URL
    * 4. Backend: Receive webhook (payment.capture)
    *
-   * See CARDS_PAYMENT_CORRECT_FLOW.md for complete implementation guide.
+   * See docs/payments/CARDS_PAYMENT_CORRECT_FLOW.md for complete implementation guide.
    */
   async tokenizeCreditCard(
     data: TokenizeCreditCardRequest,
@@ -690,7 +690,7 @@ class XenditService {
     log.warn(
       '⚠️  tokenizeCreditCard() is deprecated! Use Payment Sessions flow instead.',
     )
-    log.warn('See CARDS_PAYMENT_CORRECT_FLOW.md for correct implementation.')
+    log.warn('See docs/payments/CARDS_PAYMENT_CORRECT_FLOW.md for correct implementation.')
 
     try {
       log.info(
@@ -846,14 +846,14 @@ class XenditService {
    * 3. Frontend: Redirect to 3DS → Bank redirects to success/failure URL
    * 4. Backend: Receive webhook (payment.capture)
    *
-   * See CARDS_PAYMENT_CORRECT_FLOW.md for complete implementation guide.
+   * See docs/payments/CARDS_PAYMENT_CORRECT_FLOW.md for complete implementation guide.
    */
   async createPaymentRequestWithCard(
     _data: any,
   ): Promise<XenditPaymentRequestV3Response | null> {
     throw new Error(
       '⚠️  createPaymentRequestWithCard() is DEPRECATED and uses INCORRECT flow! ' +
-        'Use createPaymentSession() instead. See CARDS_PAYMENT_CORRECT_FLOW.md for details.',
+        'Use createPaymentSession() instead. See docs/payments/CARDS_PAYMENT_CORRECT_FLOW.md for details.',
     )
   }
 

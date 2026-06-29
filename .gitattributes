@@ -1,0 +1,20 @@
+# Normalize line endings. Without this, committing from Windows can rewrite
+# shell scripts with CRLF, which breaks them on the Linux VPS and shows up as
+# spurious "modified" files after deploys.
+
+# Default: let git decide text vs binary, normalize to LF in the repo.
+* text=auto eol=lf
+
+# Shell scripts MUST be LF (they run on the Linux VPS / in containers).
+*.sh text eol=lf
+
+# Common binary types — never normalize these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.lock binary
+bun.lock binary

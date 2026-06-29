@@ -39,6 +39,6 @@ else
     echo "   - $var"
   done
   echo ""
-  echo "Please check your .env.production file"
+  echo "Please check your .env file"
 fi
 

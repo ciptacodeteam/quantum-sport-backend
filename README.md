@@ -9,8 +9,8 @@ This project is a backend API built with [Hono](https://hono.dev/) for Quantum S
   - [Local Development](#local-development)
   - [Docker Development](#docker-development)
 - [Production Deployment](#production-deployment)
-- [Development Guide](./develop-guide.md)
-- [Docker Production Guide](./DOCKER_PRODUCTION.md)
+- [Development Guide](./docs/develop-guide.md)
+- [Production Deployment](./docs/DEPLOYMENT.md)
 - [Scripts](#scripts)
 - [Learn More](#learn-more)
 
@@ -130,30 +130,32 @@ make dev-down
 ### 🌐 Domain & SSL Setup
 Your API domain: **api.quantumsocialclub.id**
 
-- **[SSL_QUICK_SETUP.md](./SSL_QUICK_SETUP.md)** - ⚡ **Quick SSL setup** (2 minutes!)
-- **[DOMAIN_AND_SSL_SETUP.md](./DOMAIN_AND_SSL_SETUP.md)** - 🔐 Complete domain & SSL guide
+- **[SSL_QUICK_SETUP.md](./docs/SSL_QUICK_SETUP.md)** - ⚡ **Quick SSL setup** (2 minutes!)
+- **[DOMAIN_AND_SSL_SETUP.md](./docs/DOMAIN_AND_SSL_SETUP.md)** - 🔐 Complete domain & SSL guide
 
 ### 📚 Deployment Guides
-- **[DEPLOY_4GB_SERVER.md](./DEPLOY_4GB_SERVER.md)** - 🌟 **Recommended: 4GB RAM** (Optimal for production!)
-- **[UPGRADE_TO_4GB_CHECKLIST.md](./UPGRADE_TO_4GB_CHECKLIST.md)** - Upgrading from 2GB? Follow this!
-- **[QUICK_START_2GB.md](./QUICK_START_2GB.md)** - ⚠️ 2GB RAM minimum (add swap required)
-- **[DOCKER_DEPLOYMENT_GUIDE.md](./DOCKER_DEPLOYMENT_GUIDE.md)** - Complete deployment guide
-- **[DOCKER_QUICK_REFERENCE.md](./DOCKER_QUICK_REFERENCE.md)** - Quick commands
-- **[docker/GETTING_STARTED.md](./docker/GETTING_STARTED.md)** - 5-minute quick start
+- **[DEPLOYMENT.md](./docs/DEPLOYMENT.md)** - Complete production deployment guide (4GB recommended)
+- **[DOCKER_QUICK_REFERENCE.md](./docs/DOCKER_QUICK_REFERENCE.md)** - Quick commands
+- **[DEPLOY_SCRIPT_GUIDE.md](./docs/DEPLOY_SCRIPT_GUIDE.md)** - Using `./scripts/deploy.sh`
+- **[DEPLOYMENT_CHECKLIST.md](./docs/DEPLOYMENT_CHECKLIST.md)** - Pre-deploy checklist
+- **[GETTING_STARTED.md](./docs/GETTING_STARTED.md)** - 5-minute quick start
+
+### 📖 API & Feature Reference
+See the [`docs/`](./docs/) directory for API references (analytics, dashboard, payments, email queue, CI/CD, etc.).
 
 ### Quick Production Setup
 
 1. **Configure Environment**
    ```bash
-   cp docker/env.production.template .env.production
-   # Edit .env.production with your production values
+   cp docker/env.production.template .env
+   # Edit .env with your production values
    # REQUIRED: DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET
    ```
 
 2. **Deploy (Automated - Recommended)**
    ```bash
-   chmod +x deploy.sh
-   ./deploy.sh
+   chmod +x scripts/deploy.sh
+   ./scripts/deploy.sh
    ```
    
    The script automatically:
@@ -166,8 +168,8 @@ Your API domain: **api.quantumsocialclub.id**
 
 3. **Setup SSL (For api.quantumsocialclub.id)**
    ```bash
-   chmod +x docker/setup-ssl.sh
-   ./docker/setup-ssl.sh
+   chmod +x scripts/setup-ssl.sh
+   ./scripts/setup-ssl.sh
    ```
    
    Configures HTTPS with Let's Encrypt:
@@ -257,15 +259,15 @@ quantum-sport-backend/
 │   ├── schema.prisma       # Database schema
 │   ├── migrations/         # Database migrations
 │   └── seed.ts             # Database seeding
+├── docs/                   # Documentation
+├── scripts/                # Shell scripts (deploy, SSL, ngrok, etc.)
 ├── docker/
 │   ├── nginx/              # Nginx configuration
-│   ├── init-db.sh          # Database initialization
 │   └── redis.conf          # Redis configuration
 ├── Dockerfile              # Production Dockerfile
 ├── Dockerfile.dev          # Development Dockerfile
 ├── docker-compose.yml      # Development compose
 ├── docker-compose.prod.yml # Production compose
-├── deploy.sh               # Production deployment script
 └── Makefile                # Common Docker operations
 ```
 
@@ -273,7 +275,7 @@ quantum-sport-backend/
 
 ## Environment Variables
 
-See `.env.example` for development and `.env.production.example` for production.
+See `.env.example` for local development. Production uses `.env` on the server (copy from `docker/env.production.template`).
 
 Key variables:
 - `NODE_ENV`: Environment (development/production)
@@ -324,8 +326,8 @@ This project is proprietary software. All rights reserved.
 For issues or questions:
 - Open an issue on GitHub
 - Contact the development team
-- Check the [Development Guide](./develop-guide.md)
-- Review [Docker Production Guide](./DOCKER_PRODUCTION.md)
+- Check the [Development Guide](./docs/develop-guide.md)
+- Review [Production Deployment Guide](./docs/DEPLOYMENT.md)
 
 ---
 

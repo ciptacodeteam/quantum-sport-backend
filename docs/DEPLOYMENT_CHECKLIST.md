@@ -4,7 +4,7 @@
 
 ### 1. Environment Configuration
 
-- [ ] Copy `.env.production.example` to `.env.production`
+- [ ] Copy `docker/env.production.template` to `.env` (or keep your existing production `.env`)
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure `BASE_URL` and `FRONT_END_URL` with production domains
 - [ ] Set strong `DB_PASSWORD` (min 20 characters, alphanumeric + symbols)
@@ -70,8 +70,8 @@
   git clone <repo-url> /opt/quantum-sport-backend
   cd /opt/quantum-sport-backend
   ```
-- [ ] Copy `.env.production` to server
-- [ ] Make deploy script executable: `chmod +x deploy.sh`
+- [ ] Copy `.env` to server
+- [ ] Make deploy script executable: `chmod +x scripts/deploy.sh`
 - [ ] Review `docker-compose.prod.yml` settings
 - [ ] Build images: `make prod-build`
 - [ ] Start database and redis: `docker-compose -f docker-compose.prod.yml up -d db redis`
@@ -231,7 +231,7 @@
 ### Start Services
 
 ```bash
-./deploy.sh
+./scripts/deploy.sh
 # or
 make prod-up
 ```

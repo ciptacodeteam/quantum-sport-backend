@@ -47,10 +47,10 @@ cd ~/quantum-sport-backend
 git pull origin main
 
 # Make script executable
-chmod +x docker/setup-ssl.sh
+chmod +x scripts/setup-ssl.sh
 
 # Run SSL setup
-./docker/setup-ssl.sh
+./scripts/setup-ssl.sh
 ```
 
 The script will:
@@ -162,7 +162,7 @@ The following files are configured for your domain:
 - Rate limiting configured
 
 ### 2. Environment Variables
-**File:** `.env.production`
+**File:** `.env`
 ```bash
 APP_URL=https://api.quantumsocialclub.id
 BASE_URL=https://api.quantumsocialclub.id
@@ -225,7 +225,7 @@ docker-compose -f docker-compose.prod.yml logs nginx
 docker-compose -f docker-compose.prod.yml logs certbot
 
 # 5. Try again
-./docker/setup-ssl.sh
+./scripts/setup-ssl.sh
 ```
 
 ### Issue: "certificate not found" error
@@ -286,7 +286,7 @@ After SSL setup, verify everything:
 Update your frontend configuration to use HTTPS:
 
 ```javascript
-// frontend/.env.production
+// frontend/.env
 VITE_API_URL=https://api.quantumsocialclub.id
 NEXT_PUBLIC_API_URL=https://api.quantumsocialclub.id
 ```
@@ -297,7 +297,7 @@ Future deployments will maintain SSL:
 
 ```bash
 # Regular deployment
-./deploy.sh
+./scripts/deploy.sh
 
 # SSL certificates are persisted in Docker volumes
 # No need to reconfigure SSL on each deployment
@@ -332,5 +332,5 @@ docker-compose -f docker-compose.prod.yml exec nginx nginx -t
 
 ---
 
-**Ready?** Run `./docker/setup-ssl.sh` to get SSL certificates! 🔐
+**Ready?** Run `./scripts/setup-ssl.sh` to get SSL certificates! 🔐
 

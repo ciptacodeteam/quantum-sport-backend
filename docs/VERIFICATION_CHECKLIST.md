@@ -222,7 +222,6 @@ For detailed information, refer to:
 | [EMAIL_QUEUE.md](./EMAIL_QUEUE.md)                         | Email queue specifics      | Understanding retry logic   |
 | [PASSWORD_RESET.md](./PASSWORD_RESET.md)                   | Password reset flow        | Token lifecycle details     |
 | [DOCKER_EMAIL_WORKER.md](./DOCKER_EMAIL_WORKER.md)         | Worker operations          | Deployment and monitoring   |
-| [IMPLEMENTATION_COMPLETE.md](./IMPLEMENTATION_COMPLETE.md) | Feature summary            | Overview of all changes     |
 
 ## Success Criteria
 

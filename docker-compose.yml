@@ -165,7 +165,7 @@ services:
     ports:
       - '4040:4040' # ngrok web interface
     volumes:
-      - ./docker/ngrok-entrypoint.sh:/docker-entrypoint.sh
+      - ./scripts/ngrok-entrypoint.sh:/docker-entrypoint.sh
     depends_on:
       app:
         condition: service_started

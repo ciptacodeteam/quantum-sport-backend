@@ -156,7 +156,7 @@ else
     echo "  1. Check memory: free -h"
     echo "  2. Check swap: swapon --show"
     echo "  3. Add more swap if needed"
-    echo "  4. Try building without cache: CLEAN_BUILD=true ./deploy.sh"
+    echo "  4. Try building without cache: CLEAN_BUILD=true ./scripts/deploy.sh"
     echo "  5. Check logs: docker-compose -f docker-compose.prod.yml logs"
     exit 1
 fi
@@ -165,7 +165,7 @@ print_header "Build Complete"
 print_success "Docker images built successfully"
 echo ""
 print_info "Next steps:"
-echo "  1. Deploy: ./deploy.sh"
+echo "  1. Deploy: ./scripts/deploy.sh"
 echo "  2. Check status: docker-compose -f docker-compose.prod.yml ps"
 echo "  3. View logs: docker-compose -f docker-compose.prod.yml logs -f"
 echo ""

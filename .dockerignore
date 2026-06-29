@@ -18,7 +18,7 @@ build/
 # Environment files (will be mounted or set via env_file)
 .env
 .env.*
-!.env.production  # Keep production template for reference
+!.env.example
 
 # Git (not needed in container)
 .git/
@@ -79,7 +79,7 @@ temp/
 *.cache
 
 # Deployment files
-deploy.sh
+scripts/deploy.sh
 vercel.json
 .vercel/
 netlify.toml

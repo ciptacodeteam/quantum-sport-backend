@@ -6,14 +6,14 @@ Quick commands and troubleshooting for Quantum Sport Backend.
 
 ```bash
 # 1. Copy environment template
-cp docker/env.production.template .env.production
+cp docker/env.production.template .env
 
 # 2. Edit and set DB_PASSWORD, JWT_SECRET, etc.
-nano .env.production
+nano .env
 
 # 3. Deploy with automated script (recommended)
-chmod +x deploy.sh
-./deploy.sh
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 
 # OR deploy manually
 DOCKER_BUILDKIT=1 docker-compose -f docker-compose.prod.yml build
@@ -85,11 +85,11 @@ docker-compose -f docker-compose.prod.yml exec app bunx prisma studio
 ### Issue: DB_PASSWORD not found
 
 ```bash
-# Check .env.production exists
-ls -la .env.production
+# Check .env exists
+ls -la .env
 
 # Verify DB_PASSWORD is set
-grep DB_PASSWORD .env.production
+grep DB_PASSWORD .env
 
 # Restart services
 docker-compose -f docker-compose.prod.yml down
@@ -119,8 +119,8 @@ sudo lsof -i :3000
 # Stop system nginx if needed
 sudo systemctl stop nginx
 
-# OR change port in .env.production
-echo "PORT=3001" >> .env.production
+# OR change port in .env
+echo "PORT=3001" >> .env
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
@@ -247,9 +247,7 @@ docker-compose up
 
 ```bash
 # Full backup
-./docker/backup.sh  # If script exists
-
-# Manual database backup
+# Manual database backup (see DEPLOYMENT.md for full backup/restore guide)
 docker-compose -f docker-compose.prod.yml exec db pg_dump \
   -U postgres -Fc quantum_sport > backup_$(date +%Y%m%d).dump
 
@@ -273,5 +271,5 @@ docker-compose -f docker-compose.prod.yml logs -f nginx
 
 ---
 
-**For detailed documentation, see:** [DOCKER_DEPLOYMENT_GUIDE.md](./DOCKER_DEPLOYMENT_GUIDE.md)
+**For detailed documentation, see:** [DEPLOYMENT.md](./DEPLOYMENT.md)
 
