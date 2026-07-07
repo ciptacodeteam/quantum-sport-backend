@@ -1,16 +1,19 @@
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
+import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { generateInvoiceNumber, formatPhone } from '@/lib/utils'
 import { zValidator } from '@hono/zod-validator'
 import {
   BookingStatus,
-  MembershipUser,
+  CoachType,
+  CourtSport,
   PaymentStatus,
   SlotType,
 } from '@prisma/client'
+import type { Membership, MembershipUser } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
@@ -26,6 +29,7 @@ const adminCheckoutSchema = z
     coachSlots: z.array(z.string()).optional(),
     // Optional description for coach booking – e.g. names of up to 4 members
     coachDescription: z.string().max(500).optional(),
+    useMembership: z.boolean().optional().default(true),
     ballboySlots: z.array(z.string()).optional(),
     inventories: z
       .array(
@@ -61,6 +65,7 @@ export const adminCheckoutHandler = factory.createHandlers(
       courtSlots,
       coachSlots,
       coachDescription,
+      useMembership,
       ballboySlots,
       inventories,
     } = c.req.valid('json') as AdminCheckoutSchema
@@ -123,12 +128,43 @@ export const adminCheckoutHandler = factory.createHandlers(
           }
         }
 
+        let courtSportForMembership: CourtSport | null = null
+        if (courtSlots && courtSlots.length > 0) {
+          const courtSlotSports = await tx.slot.findMany({
+            where: {
+              id: { in: courtSlots },
+              type: SlotType.COURT,
+            },
+            select: {
+              court: {
+                select: {
+                  sport: true,
+                },
+              },
+            },
+          })
+          const sports = Array.from(
+            new Set(courtSlotSports.map((slot) => slot.court?.sport).filter(Boolean)),
+          ) as CourtSport[]
+
+          if (sports.length > 1) {
+            throw new BadRequestException(
+              'Cannot use one membership for mixed padel and tennis court slots',
+            )
+          }
+
+          courtSportForMembership = sports[0] ?? null
+        }
+
         // Check for active membership BEFORE calculating prices
         // This determines if court costs should be excluded from totalPrice
-        let activeMembership: MembershipUser | null = null
-        if (totalHours > 0) {
+        let activeMembership: (MembershipUser & { membership: Membership }) | null = null
+        let activeMembershipCandidates: Array<
+          MembershipUser & { membership: Membership }
+        > = []
+        if (useMembership && totalHours > 0 && courtSportForMembership) {
           const now = new Date()
-          activeMembership = await tx.membershipUser.findFirst({
+          activeMembershipCandidates = await tx.membershipUser.findMany({
             where: {
               userId: resolvedUserId!,
               isExpired: false,
@@ -136,6 +172,12 @@ export const adminCheckoutHandler = factory.createHandlers(
               startDate: { lte: now }, // Membership must have started
               endDate: { gt: now }, // Membership must not have expired
               remainingSessions: { gte: totalHours }, // Must have enough sessions
+              membership: {
+                sport: courtSportForMembership,
+              },
+            },
+            include: {
+              membership: true,
             },
             orderBy: {
               endDate: 'asc', // Use membership that expires first
@@ -193,6 +235,14 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          activeMembership =
+            activeMembershipCandidates.find((candidate) =>
+              slotData.every((slot) =>
+                isSlotAllowedForMembershipType(candidate.membership.type, slot.startAt),
+              ),
+            ) ?? null
+
+          // If the user's package does not match these slot hours, continue as a normal paid booking.
           for (const slot of slotData) {
             if (slot.bookingDetails.length > 0) {
               throw new BadRequestException(
@@ -251,6 +301,11 @@ export const adminCheckoutHandler = factory.createHandlers(
               isAvailable: true,
             },
             include: {
+              staff: {
+                select: {
+                  coachType: true,
+                },
+              },
               bookingCoaches: {
                 where: {
                   booking: {
@@ -273,6 +328,23 @@ export const adminCheckoutHandler = factory.createHandlers(
             throw new BadRequestException(
               'One or more coach slots not found or unavailable',
             )
+          }
+          if (courtSportForMembership) {
+            const allowedCoachTypes =
+              courtSportForMembership === CourtSport.PADEL
+                ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
+                : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
+            if (
+              slotData.some(
+                (slot) =>
+                  slot.staff?.coachType &&
+                  !allowedCoachTypes.includes(slot.staff.coachType),
+              )
+            ) {
+              throw new BadRequestException(
+                'One or more coach slots do not match the selected court sport',
+              )
+            }
           }
           // Use a generic coach type; if none exists, create a default one.
           let defaultCoachType = await tx.bookingCoachType.findFirst()
@@ -389,6 +461,11 @@ export const adminCheckoutHandler = factory.createHandlers(
             if (!inventory.isActive) {
               throw new BadRequestException(
                 `Inventory ${inventory.name} is not active`,
+              )
+            }
+            if (courtSportForMembership && inventory.sport !== courtSportForMembership) {
+              throw new BadRequestException(
+                `Inventory ${inventory.name} does not match the selected court sport`,
               )
             }
             if (inventory.quantity < inv.quantity) {

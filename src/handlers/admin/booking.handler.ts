@@ -12,7 +12,7 @@ import {
 } from '@/lib/validation'
 import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
-import { BookingStatus, PaymentStatus } from '@prisma/client'
+import { BookingStatus, CourtSport, PaymentStatus } from '@prisma/client'
 import status from 'http-status'
 import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
@@ -27,6 +27,10 @@ const bookingsQuerySchema = searchQuerySchema.extend({
     .enum(['cashier', 'online'])
     .optional()
     .describe('Filter by booking source: cashier or online'),
+  courtSport: z
+    .nativeEnum(CourtSport)
+    .optional()
+    .describe('Filter by court sport: PADEL or TENNIS'),
 })
 
 export const getAllBookingTransactionsHandler = factory.createHandlers(
@@ -45,6 +49,18 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
           where = { ...where, cashierId: { not: null } }
         } else if (query.source === 'online') {
           where = { ...where, cashierId: null }
+        }
+      }
+      if (query.courtSport) {
+        where = {
+          ...where,
+          details: {
+            some: {
+              court: {
+                sport: query.courtSport,
+              },
+            },
+          },
         }
       }
 
@@ -74,6 +90,7 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
                 select: {
                   id: true,
                   name: true,
+                  sport: true,
                 },
               },
               slot: {
@@ -981,6 +998,7 @@ const bookingsExportQuerySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   source: z.enum(['cashier', 'online']).optional(),
+  courtSport: z.nativeEnum(CourtSport).optional(),
 })
 
 export const exportBookingsHandler = factory.createHandlers(
@@ -1000,6 +1018,7 @@ export const exportBookingsHandler = factory.createHandlers(
         startDate,
         endDate,
         query.source,
+        query.courtSport,
       )
       const filename = `bookings-export-${dayjs().format('YYYY-MM-DD')}.xlsx`
 

@@ -28,12 +28,21 @@ import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { BookingStatus, SlotType } from '@prisma/client'
 import dayjs from 'dayjs'
+import z from 'zod'
 
 export const getAllCourtHandler = factory.createHandlers(
-  zValidator('query', searchQuerySchema, validateHook),
+  zValidator(
+    'query',
+    searchQuerySchema.extend({
+      courtSport: z.enum(['PADEL', 'TENNIS'] as const).optional(),
+    }),
+    validateHook,
+  ),
   async (c) => {
     try {
-      const query = c.req.valid('query') as SearchQuerySchema
+      const query = c.req.valid('query') as SearchQuerySchema & {
+        courtSport?: 'PADEL' | 'TENNIS'
+      }
       const queryOptions = buildFindManyOptions(query, {
         defaultOrderBy: { createdAt: 'desc' },
         searchableFields: ['name', 'description'],
@@ -41,6 +50,10 @@ export const getAllCourtHandler = factory.createHandlers(
 
       const items = await db.court.findMany({
         ...queryOptions,
+        where: {
+          ...(query.courtSport ? { sport: query.courtSport } : {}),
+          ...queryOptions.where,
+        },
       })
 
       for (const item of items) {
@@ -94,7 +107,7 @@ export const createCourtHandler = factory.createHandlers(
   async (c) => {
     try {
       const body = c.req.valid('form') as CreateCourtSchema
-      const { name, description, image, isActive } = body
+      const { name, description, image, isActive, sport } = body
 
       let imageUrl: string | undefined
 
@@ -110,6 +123,7 @@ export const createCourtHandler = factory.createHandlers(
           name,
           description,
           image: imageUrl,
+          sport,
           isActive: isActive ?? false,
         },
       })
@@ -133,7 +147,7 @@ export const updateCourtHandler = factory.createHandlers(
     try {
       const { id } = c.req.valid('param') as IdSchema
       const body = c.req.valid('form') as UpdateCourtSchema
-      const { name, description, image, isActive } = body
+      const { name, description, image, isActive, sport } = body
 
       const existingItem = await db.court.findUnique({
         where: { id },
@@ -171,6 +185,7 @@ export const updateCourtHandler = factory.createHandlers(
           name: name ?? existingItem.name,
           description: description ?? existingItem.description,
           image: imageUrl,
+          sport: sport ?? existingItem.sport,
           isActive: Boolean(
             isActive !== undefined ? isActive : existingItem.isActive,
           ),
@@ -247,6 +262,7 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
     try {
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
+        courtSport?: 'PADEL' | 'TENNIS'
       }
 
       const where: any = {
@@ -262,7 +278,10 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
           },
         },
         court: {
-          isActive: true,
+          is: {
+            isActive: true,
+            ...(query.courtSport ? { sport: query.courtSport } : {}),
+          },
         },
       }
 

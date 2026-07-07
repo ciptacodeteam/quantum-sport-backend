@@ -16,24 +16,34 @@ import {
   updateMembershipSchema,
 } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
-import { PaymentStatus } from '@prisma/client'
+import { CourtSport, PaymentStatus } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
 import { hashPassword } from '@/lib/password'
 
+const membershipQuerySchema = searchQuerySchema.extend({
+  sport: z.nativeEnum(CourtSport).optional(),
+})
+
 export const getAllMembershipHandler = factory.createHandlers(
-  zValidator('query', searchQuerySchema, validateHook),
+  zValidator('query', membershipQuerySchema, validateHook),
   async (c) => {
     try {
-      const query = c.req.valid('query') as SearchQuerySchema
+      const query = c.req.valid('query') as SearchQuerySchema & {
+        sport?: CourtSport
+      }
       const queryOptions = buildFindManyOptions(query, {
-        defaultOrderBy: { createdAt: 'desc' },
+        defaultOrderBy: { sequence: 'asc' },
         searchableFields: ['name', 'description'],
       })
 
       const items = await db.membership.findMany({
         ...queryOptions,
+        where: {
+          ...queryOptions.where,
+          ...(query.sport ? { sport: query.sport } : {}),
+        },
         include: {
           benefits: true,
         },
@@ -84,6 +94,8 @@ export const createMembershipHandler = factory.createHandlers(
           price: membershipData.price,
           content: membershipData.content,
           contentHtml: membershipData.contentHtml,
+          sport: membershipData.sport,
+          type: membershipData.type,
           sessions: membershipData.sessions,
           duration: membershipData.duration,
           sequence: membershipData.sequence,
@@ -151,6 +163,8 @@ export const updateMembershipHandler = factory.createHandlers(
           price: membershipData.price,
           content: membershipData.content,
           contentHtml: membershipData.contentHtml,
+          sport: membershipData.sport,
+          type: membershipData.type,
           sessions: membershipData.sessions,
           duration: membershipData.duration,
           sequence: membershipData.sequence,

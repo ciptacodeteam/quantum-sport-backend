@@ -6,7 +6,7 @@ import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
 import dayjs from 'dayjs'
-import { BookingStatus, SlotType } from '@prisma/client'
+import { BookingStatus, CoachType, CourtSport, SlotType } from '@prisma/client'
 import { getFileUrl } from '@/services/upload.service'
 
 // GET /coaches
@@ -51,13 +51,20 @@ export const getAvailableCoachesHandler = factory.createHandlers(
   zValidator('query', availableCoachesQuerySchema, validateHook),
   async (c) => {
     try {
-      const { startAt, endAt } = c.req.valid('query') as {
+      const { startAt, endAt, courtSport } = c.req.valid('query') as {
         startAt: string
         endAt: string
+        courtSport?: CourtSport
       }
 
       const startDateTime = dayjs(startAt).toDate()
       const endDateTime = dayjs(endAt).toDate()
+      const coachTypes =
+        courtSport === CourtSport.PADEL
+          ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
+          : courtSport === CourtSport.TENNIS
+            ? [CoachType.TENNIS, CoachType.PADEL_TENNIS]
+            : undefined
 
       // Find all available coach slots that overlap with the requested time range
       // A slot overlaps if: slot.startAt < request.endAt AND slot.endAt > request.startAt
@@ -77,6 +84,15 @@ export const getAvailableCoachesHandler = factory.createHandlers(
             },
           ],
           isAvailable: true,
+          ...(coachTypes
+            ? {
+                staff: {
+                  coachType: {
+                    in: coachTypes,
+                  },
+                },
+              }
+            : {}),
           bookingCoaches: {
             none: {
               booking: {
@@ -96,6 +112,7 @@ export const getAvailableCoachesHandler = factory.createHandlers(
               phone: true,
               image: true,
               role: true,
+              coachType: true,
             },
           },
         },

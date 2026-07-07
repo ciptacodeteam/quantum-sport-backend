@@ -37,6 +37,7 @@ export const getAllCourtHandler = factory.createHandlers(
             message: 'Invalid datetime format for endAt',
           })
           .optional(),
+        courtSport: z.enum(['PADEL', 'TENNIS'] as const).optional(),
       })
       .refine(
         (vals) =>
@@ -51,6 +52,7 @@ export const getAllCourtHandler = factory.createHandlers(
       const query = c.req.valid('query') as SearchQuerySchema & {
         startAt?: string
         endAt?: string
+        courtSport?: 'PADEL' | 'TENNIS'
       }
       const queryOptions = buildFindManyOptions(query, {
         defaultOrderBy: { createdAt: 'desc' },
@@ -99,6 +101,7 @@ export const getAllCourtHandler = factory.createHandlers(
         ...queryOptions,
         where: {
           isActive: true,
+          ...(query.courtSport ? { sport: query.courtSport } : {}),
           slot: {
             some: slotWhere,
           },
@@ -236,6 +239,7 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
     try {
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
+        courtSport?: 'PADEL' | 'TENNIS'
       }
 
       const where: any = {
@@ -251,7 +255,10 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
           },
         },
         court: {
-          isActive: true,
+          is: {
+            isActive: true,
+            ...(query.courtSport ? { sport: query.courtSport } : {}),
+          },
         },
       }
 

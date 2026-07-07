@@ -62,6 +62,17 @@ enum CoachType {
   TENNIS
 }
 
+enum CourtSport {
+  PADEL
+  TENNIS
+}
+
+enum MembershipType {
+  ALL_HOUR
+  HAPPY_HOUR
+  AFTER_HOUR
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -238,6 +249,7 @@ model Court {
   name        String
   description String?
   image       String?
+  sport       CourtSport @default(PADEL)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -247,6 +259,7 @@ model Court {
   slot          Slot[]
 
   @@unique([name])
+  @@index([sport])
   @@index([isActive])
   @@map("courts")
 }
@@ -255,6 +268,7 @@ model Inventory {
   id          String   @id @default(cuid())
   name        String
   description String?
+  sport       CourtSport @default(PADEL)
   quantity    Int      @default(0) // stock on hand
   price       Int      @default(0) @db.Integer // unit price in rupiah
   isActive    Boolean  @default(true)
@@ -264,6 +278,7 @@ model Inventory {
   bookingInventory BookingInventory[]
 
   @@unique([name])
+  @@index([sport, isActive])
   @@index([isActive])
   @@map("inventories")
 }
@@ -581,6 +596,8 @@ model Membership {
   description String?
   content     String?
   contentHtml String?
+  sport       CourtSport @default(PADEL)
+  type        MembershipType @default(ALL_HOUR)
   price       Int      @db.Integer
   sessions    Int // how many sessions included (e.g., court bookings) in hours
   duration    Int // how many days valid after applying membership in days
@@ -593,7 +610,7 @@ model Membership {
   membershipUser MembershipUser[]
 
   @@unique([name])
-  @@index([isActive, sequence])
+  @@index([sport, type, isActive, sequence])
   @@map("memberships")
 }
 

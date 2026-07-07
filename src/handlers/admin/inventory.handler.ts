@@ -6,6 +6,7 @@ import buildFindManyOptions from '@/lib/query'
 import { err, ok } from '@/lib/response'
 import {
   availableInventoryQuerySchema,
+  AvailableInventoryQuerySchema,
   createInventorySchema,
   CreateInventorySchema,
   idSchema,
@@ -21,11 +22,12 @@ export const getInventoryAvailabilityHandler = factory.createHandlers(
   zValidator('query', availableInventoryQuerySchema, validateHook),
   async (c) => {
     try {
-      c.req.valid('query')
+      const query = c.req.valid('query') as AvailableInventoryQuerySchema
 
       const inventories = await db.inventory.findMany({
         where: {
           isActive: true,
+          ...(query.courtSport ? { sport: query.courtSport } : {}),
         },
         orderBy: {
           name: 'asc',
@@ -37,6 +39,7 @@ export const getInventoryAvailabilityHandler = factory.createHandlers(
           id: inventory.id,
           name: inventory.name,
           description: inventory.description,
+          sport: inventory.sport,
           price: inventory.price,
           totalQuantity: inventory.quantity,
           availableQuantity: inventory.quantity, // Remaining stock
@@ -99,7 +102,7 @@ export const createInventoryHandler = factory.createHandlers(
   async (c) => {
     try {
       const body = c.req.valid('json') as CreateInventorySchema
-      const { name, description, quantity, price } = body
+      const { name, description, sport, quantity, price } = body
 
       const existingName = await db.inventory.findFirst({
         where: { name },
@@ -119,6 +122,7 @@ export const createInventoryHandler = factory.createHandlers(
         data: {
           name,
           description,
+          sport,
           quantity,
           price,
           isActive: true,

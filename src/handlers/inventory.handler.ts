@@ -4,7 +4,10 @@ import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
-import { availableInventoryQuerySchema } from '@/lib/validation'
+import {
+  availableInventoryQuerySchema,
+  AvailableInventoryQuerySchema,
+} from '@/lib/validation'
 
 // GET /inventories/availability
 // Returns all active inventory items with their current stock
@@ -12,12 +15,12 @@ export const getAvailableInventoryHandler = factory.createHandlers(
   zValidator('query', availableInventoryQuerySchema, validateHook),
   async (c) => {
     try {
-      // validated but currently unused; kept for parity with schedule selection
-      c.req.valid('query')
+      const query = c.req.valid('query') as AvailableInventoryQuerySchema
       // Get all active inventory items
       const inventories = await db.inventory.findMany({
         where: {
           isActive: true,
+          ...(query.courtSport ? { sport: query.courtSport } : {}),
         },
         orderBy: {
           name: 'asc',
@@ -30,6 +33,7 @@ export const getAvailableInventoryHandler = factory.createHandlers(
           id: inventory.id,
           name: inventory.name,
           description: inventory.description,
+          sport: inventory.sport,
           price: inventory.price,
           totalQuantity: inventory.quantity,
           availableQuantity: inventory.quantity, // Remaining stock

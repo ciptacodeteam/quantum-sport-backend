@@ -149,6 +149,8 @@ export const searchCustomersHandler = factory.createHandlers(
               id: true,
               name: true,
               price: true,
+              sport: true,
+              type: true,
             },
           },
         },
@@ -185,6 +187,8 @@ export const searchCustomersHandler = factory.createHandlers(
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
                   price: activeMembership.membership.price,
+                  sport: activeMembership.membership.sport,
+                  type: activeMembership.membership.type,
                 },
               }
             : null, // Always include activeMembership field, set to null if no active membership
@@ -276,6 +280,7 @@ export const getUserDetailHandler = factory.createHandlers(
                 select: {
                   id: true,
                   name: true,
+                  sport: true,
                 },
               },
             },
@@ -727,6 +732,8 @@ export const getCustomerMembershipDetailsHandler = factory.createHandlers(
               id: true,
               name: true,
               price: true,
+              sport: true,
+              type: true,
             },
           },
         },
@@ -748,6 +755,8 @@ export const getCustomerMembershipDetailsHandler = factory.createHandlers(
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
                   price: activeMembership.membership.price,
+                  sport: activeMembership.membership.sport,
+                  type: activeMembership.membership.type,
                 },
               }
             : null,
@@ -760,4 +769,3 @@ export const getCustomerMembershipDetailsHandler = factory.createHandlers(
     }
   },
 )
-
