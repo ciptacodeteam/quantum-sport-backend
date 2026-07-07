@@ -2,6 +2,7 @@ import { env } from '@/env'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
+import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { generateInvoiceNumber } from '@/lib/utils'
@@ -14,7 +15,8 @@ import { requireAuth } from '@/middlewares/auth'
 import { notificationService } from '@/services/notification.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
-import { BookingStatus, PaymentStatus, SlotType } from '@prisma/client'
+import { BookingStatus, CoachType, CourtSport, PaymentStatus, SlotType } from '@prisma/client'
+import type { Membership, MembershipUser } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
@@ -449,6 +451,7 @@ export const checkoutHandler = factory.createHandlers(
         coachSlots: rawCoachSlots,
         ballboySlots: rawBallboySlots,
         inventories,
+        useMembership,
         promoCode: rawPromoCode,
       } = validated
 
@@ -554,6 +557,8 @@ export const checkoutHandler = factory.createHandlers(
         let promoDiscountAmount = 0
         let appliedPromoCodeId: string | null = null
         let appliedPromoCodeText: string | null = null
+        let selectedCourtSport: CourtSport | null = null
+        let activeMembership: (MembershipUser & { membership: Membership }) | null = null
         const xenditItems: Array<{
           name: string
           quantity: number
@@ -569,6 +574,11 @@ export const checkoutHandler = factory.createHandlers(
               isAvailable: true,
             },
             include: {
+              court: {
+                select: {
+                  sport: true,
+                },
+              },
               bookingDetails: {
                 where: {
                   booking: {
@@ -588,6 +598,44 @@ export const checkoutHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          const courtSports = Array.from(
+            new Set(courtSlotData.map((slot) => slot.court?.sport).filter(Boolean)),
+          ) as CourtSport[]
+          if (courtSports.length > 1) {
+            throw new BadRequestException(
+              'Cannot checkout mixed padel and tennis court slots',
+            )
+          }
+          selectedCourtSport = courtSports[0] ?? null
+
+          if (useMembership && selectedCourtSport) {
+            const membershipCandidates = await tx.membershipUser.findMany({
+              where: {
+                userId: user.id,
+                isExpired: false,
+                isSuspended: false,
+                startDate: { lte: new Date() },
+                endDate: { gt: new Date() },
+                remainingSessions: { gte: courtSlotData.length },
+                membership: {
+                  sport: selectedCourtSport,
+                },
+              },
+              include: {
+                membership: true,
+              },
+              orderBy: {
+                endDate: 'asc',
+              },
+            })
+
+            activeMembership =
+              membershipCandidates.find((candidate) =>
+                courtSlotData.every((slot) =>
+                  isSlotAllowedForMembershipType(candidate.membership.type, slot.startAt),
+                ),
+              ) ?? null
+          }
 
           for (const slot of courtSlotData) {
             if (slot.bookingDetails.length > 0) {
@@ -600,24 +648,27 @@ export const checkoutHandler = factory.createHandlers(
               slot.discountPrice && slot.discountPrice > 0
                 ? slot.discountPrice
                 : slot.price
+            const paidCourtPrice = activeMembership ? 0 : discountedPrice
             courtNormalPrice += normalPrice
-            courtDiscountPrice += discountedPrice
-            totalPrice += discountedPrice
+            courtDiscountPrice += paidCourtPrice
+            totalPrice += paidCourtPrice
 
             await tx.bookingDetail.create({
               data: {
                 bookingId: booking.id,
                 slotId: slot.id,
                 price: normalPrice,
-                discountPrice: discountedPrice,
+                discountPrice: paidCourtPrice,
                 courtId: slot.courtId || undefined,
               },
             })
-            xenditItems.push({
-              name: `Court booking ${dayjs(slot.startAt).format('YYYY-MM-DD HH:mm')} - ${dayjs(slot.endAt).format('HH:mm')}`,
-              quantity: 1,
-              price: discountedPrice,
-            })
+            if (paidCourtPrice > 0) {
+              xenditItems.push({
+                name: `Court booking ${dayjs(slot.startAt).format('YYYY-MM-DD HH:mm')} - ${dayjs(slot.endAt).format('HH:mm')}`,
+                quantity: 1,
+                price: paidCourtPrice,
+              })
+            }
           }
           // Update slots to unavailable
           await tx.slot.updateMany({
@@ -639,6 +690,11 @@ export const checkoutHandler = factory.createHandlers(
               isAvailable: true,
             },
             include: {
+              staff: {
+                select: {
+                  coachType: true,
+                },
+              },
               bookingCoaches: {
                 where: {
                   booking: {
@@ -657,6 +713,23 @@ export const checkoutHandler = factory.createHandlers(
             throw new BadRequestException(
               'One or more coach slots not found or unavailable',
             )
+          }
+          if (selectedCourtSport) {
+            const allowedCoachTypes =
+              selectedCourtSport === CourtSport.PADEL
+                ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
+                : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
+            if (
+              coachSlotData.some(
+                (slot) =>
+                  slot.staff?.coachType &&
+                  !allowedCoachTypes.includes(slot.staff.coachType),
+              )
+            ) {
+              throw new BadRequestException(
+                'One or more coach slots do not match the selected court sport',
+              )
+            }
           }
 
           for (const slot of coachSlotData) {
@@ -776,6 +849,11 @@ export const checkoutHandler = factory.createHandlers(
                 `Inventory ${inventory.name} is not active`,
               )
             }
+            if (selectedCourtSport && inventory.sport !== selectedCourtSport) {
+              throw new BadRequestException(
+                `Inventory ${inventory.name} does not match the selected court sport`,
+              )
+            }
             if (inventory.quantity < inv.quantity) {
               throw new BadRequestException(
                 `Insufficient quantity for ${inventory.name}`,
@@ -806,6 +884,26 @@ export const checkoutHandler = factory.createHandlers(
               price: inventory.price,
             })
           }
+        }
+
+        if (activeMembership && courtSlots && courtSlots.length > 0) {
+          const newRemainingSessions = Math.max(
+            0,
+            activeMembership.remainingSessions - courtSlots.length,
+          )
+
+          await tx.membershipUser.update({
+            where: { id: activeMembership.id },
+            data: {
+              remainingSessions: newRemainingSessions,
+              isExpired: newRemainingSessions === 0,
+            },
+          })
+
+          c.var.logger.info(
+            `Deducted ${courtSlots.length} slots from membership ${activeMembership.id}. ` +
+              `Remaining: ${newRemainingSessions} sessions`,
+          )
         }
 
         if (promoCode) {

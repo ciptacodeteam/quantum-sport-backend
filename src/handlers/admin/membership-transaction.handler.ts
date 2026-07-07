@@ -11,7 +11,7 @@ import {
   searchQuerySchema,
 } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
-import { PaymentStatus } from '@prisma/client'
+import { CourtSport, PaymentStatus } from '@prisma/client'
 import status from 'http-status'
 import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
@@ -24,6 +24,7 @@ const membershipTransactionsQuerySchema = searchQuerySchema.extend({
     .enum(['cashier', 'online'])
     .optional()
     .describe('Filter by transaction source: cashier or online'),
+  sport: z.nativeEnum(CourtSport).optional(),
 })
 
 export const getAllMembershipTransactionsHandler = factory.createHandlers(
@@ -48,6 +49,14 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
           where = { ...where, invoice: { booking: { cashierId: null } } }
         }
       }
+      if (query.sport) {
+        where = {
+          ...where,
+          membership: {
+            sport: query.sport,
+          },
+        }
+      }
 
       const membershipTransactions = await db.membershipUser.findMany({
         ...queryOptions,
@@ -67,6 +76,7 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
               name: true,
               description: true,
               price: true,
+              sport: true,
               sessions: true,
               duration: true,
               benefits: {
@@ -132,6 +142,7 @@ export const getMembershipTransactionDetailHandler = factory.createHandlers(
               description: true,
               content: true,
               price: true,
+              sport: true,
               sessions: true,
               duration: true,
               benefits: {
@@ -415,17 +426,29 @@ export const unsuspendMembershipTransactionHandler = factory.createHandlers(
 // Export membership transactions to Excel
 export const exportMembershipTransactionsToExcelHandler =
   factory.createHandlers(
-    zValidator('query', searchQuerySchema, validateHook),
+    zValidator('query', membershipTransactionsQuerySchema, validateHook),
     async (c) => {
       try {
-        const query = c.req.valid('query') as SearchQuerySchema
+        const query = c.req.valid('query') as SearchQuerySchema & {
+          sport?: CourtSport
+        }
         const queryOptions = buildFindManyOptions(query, {
           defaultOrderBy: { createdAt: 'desc' },
           searchableFields: [],
         })
+        let where = queryOptions.where || {}
+        if (query.sport) {
+          where = {
+            ...where,
+            membership: {
+              sport: query.sport,
+            },
+          }
+        }
 
         const membershipTransactions = await db.membershipUser.findMany({
           ...queryOptions,
+          where,
           include: {
             user: {
               select: {
@@ -440,6 +463,7 @@ export const exportMembershipTransactionsToExcelHandler =
                 id: true,
                 name: true,
                 description: true,
+                sport: true,
                 price: true,
                 sessions: true,
                 duration: true,
@@ -482,6 +506,7 @@ export const exportMembershipTransactionsToExcelHandler =
             'Customer Email': transaction.user.email || 'N/A',
             'Customer Phone': transaction.user.phone,
             'Membership Name': transaction.membership.name,
+            'Membership Sport': transaction.membership.sport,
             'Membership Description':
               transaction.membership.description || 'N/A',
             'Membership Price': transaction.membership.price,
@@ -526,6 +551,7 @@ export const exportMembershipTransactionsToExcelHandler =
           { wch: 30 }, // Customer Email
           { wch: 20 }, // Customer Phone
           { wch: 25 }, // Membership Name
+          { wch: 16 }, // Membership Sport
           { wch: 40 }, // Membership Description
           { wch: 15 }, // Membership Price
           { wch: 15 }, // Total Sessions

@@ -1,5 +1,5 @@
 import { DEFAULT_DATE_FORMAT } from '@/config'
-import { Gender } from '@prisma/client'
+import { CourtSport, Gender, MembershipType } from '@prisma/client'
 import dayjs from 'dayjs'
 import z from 'zod'
 
@@ -94,6 +94,7 @@ export type UpdateAdminProfileSchema = z.infer<typeof updateAdminProfileSchema>
 export const createInventorySchema = z.object({
   name: z.string().min(3).max(100),
   description: z.string().max(500).optional(),
+  sport: z.nativeEnum(CourtSport).optional().default(CourtSport.PADEL),
   quantity: z.number().min(0),
   price: z.number().min(0),
   isActive: z.coerce.boolean().optional().default(true),
@@ -235,6 +236,7 @@ export const createCourtSchema = z.object({
   name: z.string().min(3).max(100),
   description: z.string().max(500).optional(),
   image: z.file().optional(),
+  sport: z.enum(['PADEL', 'TENNIS'] as const).default('PADEL'),
   isActive: z.coerce.boolean().optional(),
 })
 
@@ -472,6 +474,8 @@ export const createMembershipSchema = z.object({
   description: z.string().max(500).optional(),
   content: z.string().optional(),
   contentHtml: z.string().optional(),
+  sport: z.nativeEnum(CourtSport).optional().default(CourtSport.PADEL),
+  type: z.nativeEnum(MembershipType).optional().default(MembershipType.ALL_HOUR),
   price: z.number().min(0),
   sessions: z.number().min(1),
   duration: z.number().min(1),
@@ -623,6 +627,7 @@ export type UpdatePromoCodeSchema = z.infer<typeof updatePromoCodeSchema>
 export const checkoutSchema = z.object({
   bookingId: z.string().optional(), // Optional: for updating existing DRAFT booking
   paymentMethodId: z.string(),
+  useMembership: z.boolean().optional().default(true),
   courtSlots: z.array(z.string()).optional(), // Array of slot IDs for court bookings
   coachSlots: z.array(z.string()).optional(), // Array of slot IDs for coach bookings
   ballboySlots: z.array(z.string()).optional(), // Array of slot IDs for ballboy bookings
@@ -654,6 +659,7 @@ export const availableCoachesQuerySchema = z.object({
   endAt: z.string().refine((val) => dayjs(val).isValid(), {
     message: 'Invalid datetime format for endAt',
   }),
+  courtSport: z.nativeEnum(CourtSport).optional(),
 })
 
 export type AvailableCoachesQuerySchema = z.infer<
@@ -664,6 +670,7 @@ export const availableInventoryQuerySchema = z
   .object({
     startAt: z.string().optional(),
     endAt: z.string().optional(),
+    courtSport: z.nativeEnum(CourtSport).optional(),
   })
   .refine(
     (vals) =>
@@ -691,6 +698,7 @@ export const availableCourtSlotsQuerySchema = z
       })
       .optional(),
     courtId: z.string().optional(),
+    courtSport: z.enum(['PADEL', 'TENNIS'] as const).optional(),
   })
   .refine(
     (vals) =>
@@ -846,6 +854,7 @@ export type CreditCardPaymentSchema = z.infer<typeof creditCardPaymentSchema>
 export const extendedCheckoutSchema = z.object({
   bookingId: z.string().optional(),
   paymentMethodId: z.string(),
+  useMembership: z.boolean().optional().default(true),
   courtSlots: z.array(z.string()).optional(),
   coachSlots: z.array(z.string()).optional(),
   ballboySlots: z.array(z.string()).optional(),

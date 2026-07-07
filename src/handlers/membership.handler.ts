@@ -11,16 +11,24 @@ import {
   SearchQuerySchema,
 } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
+import { CourtSport } from '@prisma/client'
 import status from 'http-status'
 import { InvoiceStatus } from 'xendit-node/invoice/models'
+import { z } from 'zod'
+
+const membershipQuerySchema = searchQuerySchema.extend({
+  sport: z.nativeEnum(CourtSport).optional(),
+})
 
 export const getAllMembershipHandler = factory.createHandlers(
-  zValidator('query', searchQuerySchema, validateHook),
+  zValidator('query', membershipQuerySchema, validateHook),
   async (c) => {
     try {
-      const query = c.req.valid('query') as SearchQuerySchema
+      const query = c.req.valid('query') as SearchQuerySchema & {
+        sport?: CourtSport
+      }
       const queryOptions = buildFindManyOptions(query, {
-        defaultOrderBy: { createdAt: 'desc' },
+        defaultOrderBy: { sequence: 'asc' },
         searchableFields: ['name', 'description'],
       })
 
@@ -29,6 +37,7 @@ export const getAllMembershipHandler = factory.createHandlers(
         where: {
           ...queryOptions.where,
           isActive: true,
+          ...(query.sport ? { sport: query.sport } : {}),
         },
         include: {
           benefits: true,
@@ -159,6 +168,8 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
               id: true,
               name: true,
               price: true,
+              sport: true,
+              type: true,
             },
           },
         },
@@ -179,6 +190,8 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
                   price: activeMembership.membership.price,
+                  sport: activeMembership.membership.sport,
+                  type: activeMembership.membership.type,
                 },
               }
             : null,

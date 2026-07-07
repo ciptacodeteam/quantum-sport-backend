@@ -1,5 +1,5 @@
 import { db } from '@/lib/prisma'
-import { PaymentStatus, BookingStatus } from '@prisma/client'
+import { BookingStatus, CourtSport, PaymentStatus } from '@prisma/client'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
 import { getFileUrl } from './upload.service'
@@ -275,6 +275,7 @@ export async function exportDataToExcel(
   startDate?: Date,
   endDate?: Date,
   source?: 'cashier' | 'online',
+  courtSport?: CourtSport,
 ): Promise<Buffer> {
   const workbook = XLSX.utils.book_new()
 
@@ -385,6 +386,15 @@ export async function exportDataToExcel(
     } else if (source === 'online') {
       where.cashierId = null
     }
+    if (courtSport) {
+      where.details = {
+        some: {
+          court: {
+            sport: courtSport,
+          },
+        },
+      }
+    }
 
     const bookings = await db.booking.findMany({
       where,
@@ -393,7 +403,7 @@ export async function exportDataToExcel(
         cashier: { select: { id: true, name: true, email: true } },
         details: {
           include: {
-            court: { select: { id: true, name: true } },
+            court: { select: { id: true, name: true, sport: true } },
             slot: { select: { startAt: true, endAt: true, price: true } },
           },
         },
@@ -420,6 +430,9 @@ export async function exportDataToExcel(
     const bookingsData = bookings.map((b) => {
       const courts = Array.from(
         new Set((b.details || []).map((d) => d.court?.name).filter(Boolean)),
+      )
+      const courtSports = Array.from(
+        new Set((b.details || []).map((d) => d.court?.sport).filter(Boolean)),
       )
       const slots = (b.details || [])
         .map((d) =>
@@ -460,6 +473,7 @@ export async function exportDataToExcel(
           ? dayjs(b.invoice.paidAt).format('YYYY-MM-DD HH:mm')
           : 'N/A',
         'Payment Method': b.invoice?.payment?.method?.name || 'N/A',
+        'Court Sport': courtSports.join('; '),
         Courts: courts.join('; '),
         Slots: slots.join('; '),
         'Court Price Sum (IDR)': courtPriceSum,
@@ -489,6 +503,7 @@ export async function exportDataToExcel(
       { wch: 18 }, // Net Amount
       { wch: 20 }, // Paid At
       { wch: 16 }, // Payment Method
+      { wch: 12 }, // Court Sport
       { wch: 24 }, // Courts
       { wch: 36 }, // Slots
       { wch: 18 }, // Court Price Sum
