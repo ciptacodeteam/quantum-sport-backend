@@ -8,6 +8,7 @@ import { availableCoachesQuerySchema } from '@/lib/validation'
 import dayjs from 'dayjs'
 import { BookingStatus, CoachType, CourtSport, SlotType } from '@prisma/client'
 import { getFileUrl } from '@/services/upload.service'
+import { filterCoachSlotsWithoutBookingConflicts } from '@/services/coach-booking-conflict.service'
 
 // GET /coaches
 export const getCoachesHandler = factory.createHandlers(async (c) => {
@@ -119,8 +120,15 @@ export const getAvailableCoachesHandler = factory.createHandlers(
         orderBy: { price: 'asc' },
       })
 
+      const availableSlots = await filterCoachSlotsWithoutBookingConflicts<
+        (typeof slots)[number]
+      >(
+        db,
+        slots,
+      )
+
       // Format the response
-      const coaches = slots.map((slot) => ({
+      const coaches = availableSlots.map((slot) => ({
         slotId: slot.id,
         coach: slot.staff,
         price: slot.price,

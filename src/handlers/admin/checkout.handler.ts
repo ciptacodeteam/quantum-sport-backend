@@ -5,6 +5,7 @@ import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { generateInvoiceNumber, formatPhone } from '@/lib/utils'
+import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { zValidator } from '@hono/zod-validator'
 import {
@@ -427,6 +428,15 @@ export const adminCheckoutHandler = factory.createHandlers(
                 'One or more coach slots do not match the selected court sport',
               )
             }
+          }
+          try {
+            await assertCoachSlotsDoNotConflict(tx, slotData)
+          } catch (error) {
+            throw new BadRequestException(
+              error instanceof Error
+                ? error.message
+                : 'Coach schedule conflicts with another booking',
+            )
           }
           // Use a generic coach type; if none exists, create a default one.
           let defaultCoachType = await tx.bookingCoachType.findFirst()

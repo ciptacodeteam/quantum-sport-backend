@@ -13,6 +13,7 @@ import {
 } from '@/lib/validation'
 import { requireAuth } from '@/middlewares/auth'
 import { notificationService } from '@/services/notification.service'
+import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
@@ -362,6 +363,16 @@ export const applyPromoCodeHandler = factory.createHandlers(
           if (coachSlotData.length !== coachSlots.length) {
             throw new BadRequestException(
               'One or more coach slots not found or unavailable',
+            )
+          }
+
+          try {
+            await assertCoachSlotsDoNotConflict(tx, coachSlotData)
+          } catch (error) {
+            throw new BadRequestException(
+              error instanceof Error
+                ? error.message
+                : 'Coach schedule conflicts with another booking',
             )
           }
 
@@ -815,6 +826,16 @@ export const checkoutHandler = factory.createHandlers(
                 'One or more coach slots do not match the selected court sport',
               )
             }
+          }
+
+          try {
+            await assertCoachSlotsDoNotConflict(tx, coachSlotData)
+          } catch (error) {
+            throw new BadRequestException(
+              error instanceof Error
+                ? error.message
+                : 'Coach schedule conflicts with another booking',
+            )
           }
 
           for (const slot of coachSlotData) {
