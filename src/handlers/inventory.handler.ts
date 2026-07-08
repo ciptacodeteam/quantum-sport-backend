@@ -8,6 +8,7 @@ import {
   availableInventoryQuerySchema,
   AvailableInventoryQuerySchema,
 } from '@/lib/validation'
+import { getInventoryAvailability } from '@/services/inventory-availability.service'
 
 // GET /inventories/availability
 // Returns all active inventory items with their current stock
@@ -16,36 +17,9 @@ export const getAvailableInventoryHandler = factory.createHandlers(
   async (c) => {
     try {
       const query = c.req.valid('query') as AvailableInventoryQuerySchema
-      // Get all active inventory items
-      const inventories = await db.inventory.findMany({
-        where: {
-          isActive: true,
-          ...(query.courtSport ? { sport: query.courtSport } : {}),
-        },
-        orderBy: {
-          name: 'asc',
-        },
-      })
+      const availableInventories = await getInventoryAvailability(db, query)
 
-      // Return remaining stock directly (stock is decremented immediately on checkout)
-      const availableInventories = inventories
-        .map((inventory) => ({
-          id: inventory.id,
-          name: inventory.name,
-          description: inventory.description,
-          sport: inventory.sport,
-          price: inventory.price,
-          totalQuantity: inventory.quantity,
-          availableQuantity: inventory.quantity, // Remaining stock
-        }))
-        .filter((inv) => inv.availableQuantity > 0)
-
-      // Filter out items with zero availability
-      const filteredInventories = availableInventories.filter(
-        (inv) => inv.availableQuantity > 0,
-      )
-
-      return c.json(ok(filteredInventories), status.OK)
+      return c.json(ok(availableInventories), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getAvailableInventoryHandler: ${error}`)
       throw error

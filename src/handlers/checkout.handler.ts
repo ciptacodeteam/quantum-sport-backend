@@ -13,6 +13,7 @@ import {
 } from '@/lib/validation'
 import { requireAuth } from '@/middlewares/auth'
 import { notificationService } from '@/services/notification.service'
+import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
 import { BookingStatus, CoachType, CourtSport, PaymentStatus, SlotType } from '@prisma/client'
@@ -919,6 +920,27 @@ export const checkoutHandler = factory.createHandlers(
 
         // Process inventories
         if (inventories && inventories.length > 0) {
+          const inventoryAvailabilityById =
+            selectedCourtSlots.length > 0
+              ? await getInventoryAvailabilityMap(tx, {
+                  courtSport: selectedCourtSport ?? undefined,
+                  startAt: dayjs(
+                    Math.min(
+                      ...selectedCourtSlots.map((slot) =>
+                        dayjs(slot.startAt).valueOf(),
+                      ),
+                    ),
+                  ).toISOString(),
+                  endAt: dayjs(
+                    Math.max(
+                      ...selectedCourtSlots.map((slot) =>
+                        dayjs(slot.endAt).valueOf(),
+                      ),
+                    ),
+                  ).toISOString(),
+                })
+              : null
+
           for (const inv of inventories) {
             const inventory = await tx.inventory.findUnique({
               where: { id: inv.inventoryId },
@@ -938,9 +960,12 @@ export const checkoutHandler = factory.createHandlers(
                 `Inventory ${inventory.name} does not match the selected court sport`,
               )
             }
-            if (inventory.quantity < inv.quantity) {
+            const availableQuantity =
+              inventoryAvailabilityById?.get(inv.inventoryId)?.availableQuantity ??
+              inventory.quantity
+            if (availableQuantity < inv.quantity) {
               throw new BadRequestException(
-                `Insufficient quantity for ${inventory.name}`,
+                `Insufficient quantity for ${inventory.name} at the selected booking time`,
               )
             }
 

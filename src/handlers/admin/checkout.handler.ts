@@ -5,6 +5,7 @@ import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { generateInvoiceNumber, formatPhone } from '@/lib/utils'
+import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { zValidator } from '@hono/zod-validator'
 import {
   BookingStatus,
@@ -524,6 +525,27 @@ export const adminCheckoutHandler = factory.createHandlers(
 
         // Inventories
         if (inventories && inventories.length > 0) {
+          const inventoryAvailabilityById =
+            selectedCourtSlots.length > 0
+              ? await getInventoryAvailabilityMap(tx, {
+                  courtSport: courtSportForMembership ?? undefined,
+                  startAt: dayjs(
+                    Math.min(
+                      ...selectedCourtSlots.map((slot) =>
+                        dayjs(slot.startAt).valueOf(),
+                      ),
+                    ),
+                  ).toISOString(),
+                  endAt: dayjs(
+                    Math.max(
+                      ...selectedCourtSlots.map((slot) =>
+                        dayjs(slot.endAt).valueOf(),
+                      ),
+                    ),
+                  ).toISOString(),
+                })
+              : null
+
           for (const inv of inventories) {
             const inventory = await tx.inventory.findUnique({
               where: { id: inv.inventoryId },
@@ -543,9 +565,12 @@ export const adminCheckoutHandler = factory.createHandlers(
                 `Inventory ${inventory.name} does not match the selected court sport`,
               )
             }
-            if (inventory.quantity < inv.quantity) {
+            const availableQuantity =
+              inventoryAvailabilityById?.get(inv.inventoryId)?.availableQuantity ??
+              inventory.quantity
+            if (availableQuantity < inv.quantity) {
               throw new BadRequestException(
-                `Insufficient quantity for ${inventory.name}`,
+                `Insufficient quantity for ${inventory.name} at the selected booking time`,
               )
             }
             const inventoryPrice = inventory.price * inv.quantity

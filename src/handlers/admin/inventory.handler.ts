@@ -15,6 +15,7 @@ import {
   SearchQuerySchema,
   updateInventorySchema,
 } from '@/lib/validation'
+import { getInventoryAvailability } from '@/services/inventory-availability.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 
@@ -24,27 +25,7 @@ export const getInventoryAvailabilityHandler = factory.createHandlers(
     try {
       const query = c.req.valid('query') as AvailableInventoryQuerySchema
 
-      const inventories = await db.inventory.findMany({
-        where: {
-          isActive: true,
-          ...(query.courtSport ? { sport: query.courtSport } : {}),
-        },
-        orderBy: {
-          name: 'asc',
-        },
-      })
-
-      const availability = inventories
-        .map((inventory) => ({
-          id: inventory.id,
-          name: inventory.name,
-          description: inventory.description,
-          sport: inventory.sport,
-          price: inventory.price,
-          totalQuantity: inventory.quantity,
-          availableQuantity: inventory.quantity, // Remaining stock
-        }))
-        .filter((item) => item.availableQuantity > 0)
+      const availability = await getInventoryAvailability(db, query)
 
       return c.json(ok(availability), status.OK)
     } catch (error) {
