@@ -539,7 +539,7 @@ model BookingBallboy {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   slot    Slot    @relation(fields: [slotId], references: [id])
 
-  @@unique([slotId], map: "uq_bookingballboy_slot")
+  @@index([slotId])
   @@map("booking_ballboys")
 }
 

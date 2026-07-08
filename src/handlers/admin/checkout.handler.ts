@@ -55,6 +55,10 @@ const adminCheckoutSchema = z
 
 type AdminCheckoutSchema = z.infer<typeof adminCheckoutSchema>
 
+function uniqueSlotIds(slotIds: string[] | undefined): string[] | undefined {
+  return slotIds ? Array.from(new Set(slotIds)) : slotIds
+}
+
 function getSlotTimeKey(slot: { startAt: Date; endAt: Date }): string {
   return `${dayjs(slot.startAt).toISOString()}|${dayjs(slot.endAt).toISOString()}`
 }
@@ -126,13 +130,16 @@ export const adminCheckoutHandler = factory.createHandlers(
       name,
       phone,
       totalHours,
-      courtSlots,
-      coachSlots,
+      courtSlots: rawCourtSlots,
+      coachSlots: rawCoachSlots,
       coachDescription,
       useMembership,
-      ballboySlots,
+      ballboySlots: rawBallboySlots,
       inventories,
     } = c.req.valid('json') as AdminCheckoutSchema
+    const courtSlots = uniqueSlotIds(rawCourtSlots)
+    const coachSlots = uniqueSlotIds(rawCoachSlots)
+    const ballboySlots = uniqueSlotIds(rawBallboySlots)
 
     // Get the admin (cashier) creating this booking
     const admin = c.get('admin')

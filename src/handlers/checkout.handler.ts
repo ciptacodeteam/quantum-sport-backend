@@ -33,7 +33,9 @@ function cleanSlotIds(slotIds: string[] | undefined): string[] | undefined {
     return slotIds
   }
   // Remove time suffix patterns like "-06:00" or "-06:00:00" from slot IDs
-  return slotIds.map((id) => id.replace(/-\d{2}:\d{2}(:\d{2})?$/, ''))
+  return Array.from(
+    new Set(slotIds.map((id) => id.replace(/-\d{2}:\d{2}(:\d{2})?$/, ''))),
+  )
 }
 
 function normalizePromoCode(code?: string): string | undefined {
