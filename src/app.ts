@@ -10,6 +10,7 @@ import { JAKARTA_TZ } from './config'
 import createApp from './lib/create-app'
 import adminAnalyticsRoute from './routes/admin/analytics.route'
 import adminAuthRoute from './routes/admin/auth.route'
+import adminBallboyRoute from './routes/admin/ballboy.route'
 import adminBallboyCostRoute from './routes/admin/ballboy-cost.route'
 import adminBannerRoute from './routes/admin/banner.route'
 import adminPartnershipRoute from './routes/admin/partnership.route'
@@ -111,6 +112,7 @@ const adminRoutes = [
   adminStaffRoute,
   adminCourtRoute,
   adminCourtCostRoute,
+  adminBallboyRoute,
   adminBallboyCostRoute,
   adminCoachCostRoute,
   adminCoachRoute,

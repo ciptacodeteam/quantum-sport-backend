@@ -54,6 +54,55 @@ const adminCheckoutSchema = z
 
 type AdminCheckoutSchema = z.infer<typeof adminCheckoutSchema>
 
+function getSlotTimeKey(slot: { startAt: Date; endAt: Date }): string {
+  return `${dayjs(slot.startAt).toISOString()}|${dayjs(slot.endAt).toISOString()}`
+}
+
+function validateBallboysForTennisCourts(
+  ballboySlots: Array<{ startAt: Date; endAt: Date }>,
+  courtSlots: Array<{ startAt: Date; endAt: Date; court?: { sport: CourtSport } | null }>,
+) {
+  if (ballboySlots.length === 0) {
+    return
+  }
+
+  if (courtSlots.length === 0) {
+    throw new BadRequestException(
+      'Ballboy can only be added with tennis court bookings',
+    )
+  }
+
+  if (courtSlots.some((slot) => slot.court?.sport !== CourtSport.TENNIS)) {
+    throw new BadRequestException('Ballboy is only available for tennis courts')
+  }
+
+  const courtSlotCountByTime = new Map<string, number>()
+  for (const slot of courtSlots) {
+    const key = getSlotTimeKey(slot)
+    courtSlotCountByTime.set(key, (courtSlotCountByTime.get(key) ?? 0) + 1)
+  }
+
+  const ballboySlotCountByTime = new Map<string, number>()
+  for (const slot of ballboySlots) {
+    const key = getSlotTimeKey(slot)
+    ballboySlotCountByTime.set(key, (ballboySlotCountByTime.get(key) ?? 0) + 1)
+  }
+
+  for (const [key, ballboyCount] of ballboySlotCountByTime) {
+    const courtCount = courtSlotCountByTime.get(key) ?? 0
+    if (courtCount === 0) {
+      throw new BadRequestException(
+        'Ballboy slots must match selected tennis court booking times',
+      )
+    }
+    if (ballboyCount > courtCount) {
+      throw new BadRequestException(
+        'Only one ballboy can be used per tennis court booking slot',
+      )
+    }
+  }
+}
+
 export const adminCheckoutHandler = factory.createHandlers(
   zValidator('json', adminCheckoutSchema, validateHook),
   async (c) => {
@@ -201,6 +250,11 @@ export const adminCheckoutHandler = factory.createHandlers(
         let courtNormalPrice = 0
         let courtDiscountPrice = 0
         let courtCostCoveredByMembership = 0 // Track court costs covered by membership
+        let selectedCourtSlots: Array<{
+          startAt: Date
+          endAt: Date
+          court?: { sport: CourtSport } | null
+        }> = []
         const bookedItems = {
           courtSlots: [] as string[],
           coachSlots: [] as string[],
@@ -217,6 +271,11 @@ export const adminCheckoutHandler = factory.createHandlers(
               isAvailable: true,
             },
             include: {
+              court: {
+                select: {
+                  sport: true,
+                },
+              },
               bookingDetails: {
                 where: {
                   booking: {
@@ -235,6 +294,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          selectedCourtSlots = slotData
           activeMembership =
             activeMembershipCandidates.find((candidate) =>
               slotData.every((slot) =>
@@ -420,6 +480,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more ballboy slots not found or unavailable',
             )
           }
+          validateBallboysForTennisCourts(slotData, selectedCourtSlots)
           for (const slot of slotData) {
             if (slot.bookingBallboys.length > 0) {
               throw new BadRequestException(

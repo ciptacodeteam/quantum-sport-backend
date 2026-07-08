@@ -58,6 +58,55 @@ function calculatePromoDiscount(
   return discount
 }
 
+function getSlotTimeKey(slot: { startAt: Date; endAt: Date }): string {
+  return `${dayjs(slot.startAt).toISOString()}|${dayjs(slot.endAt).toISOString()}`
+}
+
+function validateBallboysForTennisCourts(
+  ballboySlots: Array<{ startAt: Date; endAt: Date }>,
+  courtSlots: Array<{ startAt: Date; endAt: Date; court?: { sport: CourtSport } | null }>,
+) {
+  if (ballboySlots.length === 0) {
+    return
+  }
+
+  if (courtSlots.length === 0) {
+    throw new BadRequestException(
+      'Ballboy can only be added with tennis court bookings',
+    )
+  }
+
+  if (courtSlots.some((slot) => slot.court?.sport !== CourtSport.TENNIS)) {
+    throw new BadRequestException('Ballboy is only available for tennis courts')
+  }
+
+  const courtSlotCountByTime = new Map<string, number>()
+  for (const slot of courtSlots) {
+    const key = getSlotTimeKey(slot)
+    courtSlotCountByTime.set(key, (courtSlotCountByTime.get(key) ?? 0) + 1)
+  }
+
+  const ballboySlotCountByTime = new Map<string, number>()
+  for (const slot of ballboySlots) {
+    const key = getSlotTimeKey(slot)
+    ballboySlotCountByTime.set(key, (ballboySlotCountByTime.get(key) ?? 0) + 1)
+  }
+
+  for (const [key, ballboyCount] of ballboySlotCountByTime) {
+    const courtCount = courtSlotCountByTime.get(key) ?? 0
+    if (courtCount === 0) {
+      throw new BadRequestException(
+        'Ballboy slots must match selected tennis court booking times',
+      )
+    }
+    if (ballboyCount > courtCount) {
+      throw new BadRequestException(
+        'Only one ballboy can be used per tennis court booking slot',
+      )
+    }
+  }
+}
+
 /**
  * Handle credit card payment with Payment Sessions (Correct Flow)
  *
@@ -217,6 +266,11 @@ export const applyPromoCodeHandler = factory.createHandlers(
 
       const subtotal = await db.$transaction(async (tx) => {
         let totalPrice = 0
+        let selectedCourtSlots: Array<{
+          startAt: Date
+          endAt: Date
+          court?: { sport: CourtSport } | null
+        }> = []
 
         if (courtSlots && courtSlots.length > 0) {
           const courtSlotData = await tx.slot.findMany({
@@ -226,6 +280,11 @@ export const applyPromoCodeHandler = factory.createHandlers(
               isAvailable: true,
             },
             include: {
+              court: {
+                select: {
+                  sport: true,
+                },
+              },
               bookingDetails: {
                 where: {
                   booking: {
@@ -245,6 +304,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          selectedCourtSlots = courtSlotData
 
           for (const slot of courtSlotData) {
             if (slot.bookingDetails.length > 0) {
@@ -325,6 +385,8 @@ export const applyPromoCodeHandler = factory.createHandlers(
               'One or more ballboy slots not found or unavailable',
             )
           }
+
+          validateBallboysForTennisCourts(ballboySlotData, selectedCourtSlots)
 
           for (const slot of ballboySlotData) {
             if (slot.bookingBallboys.length > 0) {
@@ -558,6 +620,11 @@ export const checkoutHandler = factory.createHandlers(
         let appliedPromoCodeId: string | null = null
         let appliedPromoCodeText: string | null = null
         let selectedCourtSport: CourtSport | null = null
+        let selectedCourtSlots: Array<{
+          startAt: Date
+          endAt: Date
+          court?: { sport: CourtSport } | null
+        }> = []
         let activeMembership: (MembershipUser & { membership: Membership }) | null = null
         const xenditItems: Array<{
           name: string
@@ -598,6 +665,7 @@ export const checkoutHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          selectedCourtSlots = courtSlotData
           const courtSports = Array.from(
             new Set(courtSlotData.map((slot) => slot.court?.sport).filter(Boolean)),
           ) as CourtSport[]
@@ -800,6 +868,8 @@ export const checkoutHandler = factory.createHandlers(
               'One or more ballboy slots not found or unavailable',
             )
           }
+
+          validateBallboysForTennisCourts(ballboySlotData, selectedCourtSlots)
 
           for (const slot of ballboySlotData) {
             if (slot.bookingBallboys.length > 0) {
