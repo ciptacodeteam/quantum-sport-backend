@@ -713,6 +713,56 @@ const rescheduleCourtSchema = z.object({
 
 type RescheduleCourtSchema = z.infer<typeof rescheduleCourtSchema>
 
+async function restoreMembershipSessionsForCancelledBooking(
+  tx: any,
+  booking: { membershipUserId?: string | null; membershipSessionsUsed?: number | null },
+) {
+  if (!booking.membershipUserId || !booking.membershipSessionsUsed) {
+    return 0
+  }
+
+  const sessionsToRestore = Math.max(0, Math.trunc(booking.membershipSessionsUsed))
+  if (sessionsToRestore === 0) {
+    return 0
+  }
+
+  const membershipUser = await tx.membershipUser.findUnique({
+    where: { id: booking.membershipUserId },
+    include: {
+      membership: {
+        select: {
+          sessions: true,
+        },
+      },
+    },
+  })
+
+  if (!membershipUser) {
+    return 0
+  }
+
+  const restoredSessions = Math.min(
+    sessionsToRestore,
+    Math.max(0, membershipUser.membership.sessions - membershipUser.remainingSessions),
+  )
+
+  if (restoredSessions === 0) {
+    return 0
+  }
+
+  const nextRemainingSessions = membershipUser.remainingSessions + restoredSessions
+
+  await tx.membershipUser.update({
+    where: { id: membershipUser.id },
+    data: {
+      remainingSessions: nextRemainingSessions,
+      isExpired: membershipUser.endDate <= new Date(),
+    },
+  })
+
+  return restoredSessions
+}
+
 // PUT /admin/booked-courts/:id/cancel
 // Cancel a specific booking and update all related records
 export const cancelBookingHandler = factory.createHandlers(
@@ -771,6 +821,7 @@ export const cancelBookingHandler = factory.createHandlers(
           coachSlots: booking.coaches.length,
           ballboySlots: booking.ballboys.length,
           inventories: booking.inventories.length,
+          membershipSessions: 0,
         }
 
         // 3. Update booking status to CANCELLED
@@ -824,6 +875,9 @@ export const cancelBookingHandler = factory.createHandlers(
             },
           })
         }
+
+        releasedCounts.membershipSessions =
+          await restoreMembershipSessionsForCancelledBooking(tx, booking)
 
         // 8. Update invoice status to CANCELLED
         if (booking.invoice) {
@@ -900,6 +954,7 @@ export const cancelBookingHandler = factory.createHandlers(
               ballboySlots: result.releasedCounts.ballboySlots,
             },
             restoredInventories: result.releasedCounts.inventories,
+            restoredMembershipSessions: result.releasedCounts.membershipSessions,
           },
           'Booking cancelled successfully. All related records have been updated.',
         ),

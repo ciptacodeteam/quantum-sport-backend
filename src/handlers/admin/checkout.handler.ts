@@ -616,6 +616,8 @@ export const adminCheckoutHandler = factory.createHandlers(
             processingFee,
             courtNormalPrice,
             courtDiscountPrice,
+            membershipUserId: activeMembership?.id,
+            membershipSessionsUsed: activeMembership ? totalHours : 0,
           },
         })
 

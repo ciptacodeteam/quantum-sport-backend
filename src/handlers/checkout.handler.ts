@@ -1067,6 +1067,8 @@ export const checkoutHandler = factory.createHandlers(
             promoCodeId: appliedPromoCodeId,
             promoCodeText: appliedPromoCodeText,
             promoDiscountAmount,
+            membershipUserId: activeMembership?.id,
+            membershipSessionsUsed: activeMembership ? courtSlots?.length ?? 0 : 0,
           },
         })
 

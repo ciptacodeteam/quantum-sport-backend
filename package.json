@@ -20,6 +20,7 @@
     "db:studio": "prisma studio",
     "db:fix-coach-type-enum": "bun prisma/fix-coach-type-enum.ts",
     "db:fix-sport-schema": "bun prisma/fix-sport-schema.ts",
+    "db:fix-membership-booking-usage": "bun prisma/fix-membership-booking-usage.ts",
     "db:fix-slots": "bun run scripts/fix-slots.ts",
     "db:check-expired": "bun run scripts/check-expired-data.ts",
     "db:resolve-failed": "bun prisma/resolve-failed-migration.ts",

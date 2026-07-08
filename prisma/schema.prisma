@@ -245,14 +245,14 @@ model Partnership {
 }
 
 model Court {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   description String?
   image       String?
   sport       CourtSport @default(PADEL)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
 
   costSchedules CourtCostSchedule[]
   bookingDetail BookingDetail[]
@@ -265,15 +265,15 @@ model Court {
 }
 
 model Inventory {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   description String?
   sport       CourtSport @default(PADEL)
-  quantity    Int      @default(0) // stock on hand
-  price       Int      @default(0) @db.Integer // unit price in rupiah
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  quantity    Int        @default(0) // stock on hand
+  price       Int        @default(0) @db.Integer // unit price in rupiah
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
 
   bookingInventory BookingInventory[]
 
@@ -444,35 +444,39 @@ model Invoice {
 // Booking (Courts + optional add-ons)
 // ------------------------------
 model Booking {
-  id                  String        @id @default(cuid())
-  userId              String
-  status              BookingStatus @default(HOLD)
-  totalPrice          Int           @default(0) @db.Integer
-  processingFee       Int           @default(0) @db.Integer
-  courtNormalPrice    Int           @default(0) @db.Integer
-  courtDiscountPrice  Int           @default(0) @db.Integer
-  promoCodeId         String?
-  promoCodeText       String?
-  promoDiscountAmount Int           @default(0) @db.Integer
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @default(now()) @updatedAt
-  holdExpiresAt       DateTime? // for HOLD; auto-release slots when passed
-  cancelledAt         DateTime?
-  cancellationReason  String?
+  id                     String        @id @default(cuid())
+  userId                 String
+  status                 BookingStatus @default(HOLD)
+  totalPrice             Int           @default(0) @db.Integer
+  processingFee          Int           @default(0) @db.Integer
+  courtNormalPrice       Int           @default(0) @db.Integer
+  courtDiscountPrice     Int           @default(0) @db.Integer
+  promoCodeId            String?
+  promoCodeText          String?
+  promoDiscountAmount    Int           @default(0) @db.Integer
+  membershipUserId       String?
+  membershipSessionsUsed Int           @default(0)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @default(now()) @updatedAt
+  holdExpiresAt          DateTime? // for HOLD; auto-release slots when passed
+  cancelledAt            DateTime?
+  cancellationReason     String?
 
   cashierId String? // cashier who handled the payment
 
-  user        User               @relation(fields: [userId], references: [id])
-  cashier     Staff?             @relation(fields: [cashierId], references: [id])
-  promoCode   PromoCode?         @relation(fields: [promoCodeId], references: [id])
-  details     BookingDetail[]
-  inventories BookingInventory[]
-  ballboys    BookingBallboy[]
-  coaches     BookingCoach[]
-  invoice     Invoice?
+  user           User               @relation(fields: [userId], references: [id])
+  cashier        Staff?             @relation(fields: [cashierId], references: [id])
+  promoCode      PromoCode?         @relation(fields: [promoCodeId], references: [id])
+  membershipUser MembershipUser?    @relation("BookingMembershipUsage", fields: [membershipUserId], references: [id], onDelete: SetNull)
+  details        BookingDetail[]
+  inventories    BookingInventory[]
+  ballboys       BookingBallboy[]
+  coaches        BookingCoach[]
+  invoice        Invoice?
 
   @@index([userId, status, createdAt])
   @@index([promoCodeId])
+  @@index([membershipUserId])
   @@map("bookings")
 }
 
@@ -591,20 +595,20 @@ model BookingCoach {
 // Membership
 // ------------------------------
 model Membership {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   description String?
   content     String?
   contentHtml String?
-  sport       CourtSport @default(PADEL)
+  sport       CourtSport     @default(PADEL)
   type        MembershipType @default(ALL_HOUR)
-  price       Int      @db.Integer
+  price       Int            @db.Integer
   sessions    Int // how many sessions included (e.g., court bookings) in hours
   duration    Int // how many days valid after applying membership in days
-  sequence    Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  sequence    Int            @default(0)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
 
   benefits       MembershipBenefit[]
   membershipUser MembershipUser[]
@@ -641,9 +645,10 @@ model MembershipUser {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  invoice    Invoice?
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  invoice      Invoice?
+  usedBookings Booking[]  @relation("BookingMembershipUsage")
 
   @@index([userId, isExpired, isSuspended])
   @@map("membership_users")
