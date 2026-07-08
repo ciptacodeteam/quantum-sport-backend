@@ -58,6 +58,16 @@ function getSlotTimeKey(slot: { startAt: Date; endAt: Date }): string {
   return `${dayjs(slot.startAt).toISOString()}|${dayjs(slot.endAt).toISOString()}`
 }
 
+function ballboyCoversCourtSlot(
+  ballboySlot: { startAt: Date; endAt: Date },
+  courtSlot: { startAt: Date; endAt: Date },
+): boolean {
+  return (
+    dayjs(ballboySlot.startAt).valueOf() <= dayjs(courtSlot.startAt).valueOf() &&
+    dayjs(ballboySlot.endAt).valueOf() >= dayjs(courtSlot.endAt).valueOf()
+  )
+}
+
 function validateBallboysForTennisCourts(
   ballboySlots: Array<{ startAt: Date; endAt: Date }>,
   courtSlots: Array<{ startAt: Date; endAt: Date; court?: { sport: CourtSport } | null }>,
@@ -76,26 +86,30 @@ function validateBallboysForTennisCourts(
     throw new BadRequestException('Ballboy is only available for tennis courts')
   }
 
-  const courtSlotCountByTime = new Map<string, number>()
-  for (const slot of courtSlots) {
-    const key = getSlotTimeKey(slot)
-    courtSlotCountByTime.set(key, (courtSlotCountByTime.get(key) ?? 0) + 1)
-  }
+  const ballboyCountByCourtSlot = new Map<string, number>()
 
-  const ballboySlotCountByTime = new Map<string, number>()
-  for (const slot of ballboySlots) {
-    const key = getSlotTimeKey(slot)
-    ballboySlotCountByTime.set(key, (ballboySlotCountByTime.get(key) ?? 0) + 1)
-  }
+  for (const ballboySlot of ballboySlots) {
+    const matchingCourtSlots = courtSlots.filter((courtSlot) =>
+      ballboyCoversCourtSlot(ballboySlot, courtSlot),
+    )
 
-  for (const [key, ballboyCount] of ballboySlotCountByTime) {
-    const courtCount = courtSlotCountByTime.get(key) ?? 0
-    if (courtCount === 0) {
+    if (matchingCourtSlots.length === 0) {
       throw new BadRequestException(
         'Ballboy slots must match selected tennis court booking times',
       )
     }
-    if (ballboyCount > courtCount) {
+
+    for (const courtSlot of matchingCourtSlots) {
+      const key = getSlotTimeKey(courtSlot)
+      ballboyCountByCourtSlot.set(
+        key,
+        (ballboyCountByCourtSlot.get(key) ?? 0) + 1,
+      )
+    }
+  }
+
+  for (const ballboyCount of ballboyCountByCourtSlot.values()) {
+    if (ballboyCount > 1) {
       throw new BadRequestException(
         'Only one ballboy can be used per tennis court booking slot',
       )
