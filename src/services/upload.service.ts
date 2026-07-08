@@ -176,16 +176,26 @@ export async function getFileUrl(relativePath: string | null): Promise<string> {
     ? relativePath
     : `/${relativePath}`
 
-  // If no cached URL yet, try to get it from env variable
-  const envBlobUrl = env.blobToken
-  if (envBlobUrl) {
-    const token = envBlobUrl.split('_')[3]
-    const baseUrl = `${token}.public.blob.vercel-storage.com⁠`
-    return `https://${baseUrl.toLowerCase()}${cleanPath}`
+  // Prefer the base URL learned from a real upload in this process — it's the
+  // authoritative host returned by Vercel Blob.
+  if (blobBaseUrl) {
+    return `${blobBaseUrl}${cleanPath}`
   }
 
-  // Fallback: return the path as-is
-  // This will happen on the first request before any upload
-  log.warn(`No blob base URL available yet for path: ${relativePath}`)
-  return `${env.baseUrl}/storage${cleanPath}`
+  // Otherwise derive the public host from the blob token.
+  // Token format: vercel_blob_rw_<STORE_ID>_<SECRET>
+  // Public host:  https://<STORE_ID>.public.blob.vercel-storage.com
+  if (env.blobToken) {
+    const storeId = env.blobToken.split('_')[3]
+    if (storeId) {
+      const host = `${storeId.toLowerCase()}.public.blob.vercel-storage.com`
+      return `https://${host}${cleanPath}`
+    }
+  }
+
+  // Fallback to local static serving (matches the /storage/* route in app.ts,
+  // which serves files from src/storage/uploads). Used only when no blob token
+  // is configured.
+  log.warn(`No blob base URL available for path: ${relativePath}`)
+  return `${env.baseUrl}/storage/uploads${cleanPath}`
 }

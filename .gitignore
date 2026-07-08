@@ -21,5 +21,9 @@ test-results/
 
 storage/*
 
+.backups/
+logs/
+.deploy-last-good-image
+
 # prisma generate output
 generated/

@@ -164,7 +164,9 @@ print_info "Fetching latest changes from repository..."
 if git pull origin main; then
     print_success "Code updated successfully"
 else
-    print_warning "Git pull failed or no changes. Continuing anyway..."
+    print_warning "git pull failed (often CRLF or local edits on tracked files)"
+    print_info "Recover with: git fetch origin main && git reset --hard origin/main"
+    print_info "Continuing with current checkout..."
 fi
 
 print_header "Building Docker Images"

@@ -89,6 +89,26 @@ validate_env_production() {
   validate_env_file
 }
 
+# Pull latest code. If this fails on the VPS (usually CRLF/chmod drift on
+# tracked files), recover with: git fetch origin main && git reset --hard origin/main
+sync_repo_for_deploy() {
+  local branch="${DEPLOY_BRANCH:-main}"
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    print_warning "Not a git repository; skipping code sync"
+    return 0
+  fi
+
+  print_info "Pulling latest code from origin/${branch}..."
+  if git pull origin "$branch"; then
+    print_success "Code updated"
+  else
+    print_warning "git pull failed (often CRLF or local edits on tracked files)"
+    print_info "Recover with: git fetch origin ${branch} && git reset --hard origin/${branch}"
+    print_info "Continuing with current checkout..."
+  fi
+}
+
 # Read a single KEY=value from the env file without shell expansion ($, !, etc.).
 read_env_value() {
   local key="$1"
@@ -138,15 +158,21 @@ export_compose_env() {
   db_name="${db_name:-quantum_sport}"
   db_host="$(read_env_value DB_HOST 2>/dev/null || true)"
   db_host="${db_host:-db}"
-  db_port="$(read_env_value DB_PORT 2>/dev/null || true)"
-  db_port="${db_port:-5432}"
+
+  # Host-published port (for pgAdmin/SSH tunnel only). Decoupled from the
+  # internal connection: Postgres always listens on 5432 inside the container,
+  # and the app reaches it over the compose network as ${db_host}:5432.
+  # Bound to 127.0.0.1 in docker-compose.prod.yml so it never conflicts with a
+  # native Postgres on 5432 and is never exposed publicly.
+  db_host_port="$(read_env_value DB_HOST_PORT 2>/dev/null || true)"
+  db_host_port="${db_host_port:-5433}"
 
   export DB_PASSWORD="$db_password"
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$db_password}"
   export DB_USER="$db_user"
   export DB_NAME="$db_name"
   export DB_HOST="$db_host"
-  export DB_PORT="$db_port"
+  export DB_HOST_PORT="$db_host_port"
 
   existing_url="$(read_env_value DATABASE_URL 2>/dev/null || true)"
   if [ -n "$existing_url" ]; then
@@ -154,8 +180,8 @@ export_compose_env() {
     export DATABASE_URL_WORKER="$existing_url"
   else
     encoded_pass="$(urlencode_component "$db_password")"
-    export DATABASE_URL="postgresql://${db_user}:${encoded_pass}@${db_host}:${db_port}/${db_name}?schema=public&connection_limit=10&pool_timeout=20"
-    export DATABASE_URL_WORKER="postgresql://${db_user}:${encoded_pass}@${db_host}:${db_port}/${db_name}?schema=public&connection_limit=5&pool_timeout=20"
+    export DATABASE_URL="postgresql://${db_user}:${encoded_pass}@${db_host}:5432/${db_name}?schema=public&connection_limit=10&pool_timeout=20"
+    export DATABASE_URL_WORKER="postgresql://${db_user}:${encoded_pass}@${db_host}:5432/${db_name}?schema=public&connection_limit=5&pool_timeout=20"
   fi
 
   if port="$(read_env_value PORT 2>/dev/null || true)" && [ -n "$port" ]; then
@@ -196,4 +222,161 @@ wait_for_app_healthy() {
   print_error "Application did not become healthy in time"
   compose -f docker-compose.prod.yml logs --tail=50 app || true
   return 1
+}
+
+# --- Registry deploy / rollback (CI/CD) ---
+
+resolve_app_port() {
+  local port
+  port="$(read_env_value PORT 2>/dev/null || true)"
+  echo "${port:-8000}"
+}
+
+probe_app_http_health() {
+  local port="${1:-$(resolve_app_port)}"
+  local max_attempts="${2:-12}"
+  local attempt=1
+
+  while [ "$attempt" -le "$max_attempts" ]; do
+    if curl -fsS --max-time 5 "http://127.0.0.1:${port}/health" 2>/dev/null \
+      | grep -qE '"success"[[:space:]]*:[[:space:]]*true|"up"[[:space:]]*:[[:space:]]*true'; then
+      return 0
+    fi
+    print_info "HTTP health attempt ${attempt}/${max_attempts} not ready..."
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+persist_app_image() {
+  local image="$1"
+  local env_file="${ENV_FILE:-.env}"
+
+  [ -n "$image" ] || return 0
+  touch "$env_file"
+
+  if grep -q '^APP_IMAGE=' "$env_file" 2>/dev/null; then
+    sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${image}|" "$env_file"
+  else
+    echo "APP_IMAGE=${image}" >> "$env_file"
+  fi
+}
+
+read_persisted_app_image() {
+  read_env_value APP_IMAGE 2>/dev/null || true
+}
+
+read_running_app_image() {
+  docker inspect quantum-sport-app-prod --format '{{.Config.Image}}' 2>/dev/null | tr -d '\r' || true
+}
+
+read_last_good_app_image() {
+  local marker=".deploy-last-good-image"
+  if [ -f "$marker" ]; then
+    head -n1 "$marker" | tr -d '\r'
+  fi
+}
+
+save_last_good_app_image() {
+  local image="$1"
+  [ -n "$image" ] && printf '%s\n' "$image" > ".deploy-last-good-image"
+}
+
+rollback_app_deployment() {
+  local rollback_image="$1"
+
+  if [ -z "$rollback_image" ]; then
+    print_error "No previous image to roll back to"
+    return 1
+  fi
+
+  print_header "Rolling back to previous image"
+  print_warning "Target: $rollback_image"
+
+  export APP_IMAGE="$rollback_image"
+  compose -f docker-compose.prod.yml pull app 2>/dev/null || true
+  compose -f docker-compose.prod.yml up -d --no-deps app
+
+  if wait_for_app_healthy 30 && probe_app_http_health "$(resolve_app_port)" 12; then
+    compose -f docker-compose.prod.yml up -d --no-deps email-worker scheduler-worker
+    persist_app_image "$rollback_image"
+    save_last_good_app_image "$rollback_image"
+    print_success "Rollback complete — previous version is serving again"
+    return 0
+  fi
+
+  print_error "Rollback failed — manual intervention required"
+  return 1
+}
+
+make_scripts_executable() {
+  chmod +x scripts/*.sh 2>/dev/null || true
+  chmod +x scripts/lib/*.sh 2>/dev/null || true
+}
+
+# --- Database backup (Vercel Blob) ---
+
+resolve_local_backup_dir() {
+  LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-.backups}"
+  mkdir -p "$LOCAL_BACKUP_DIR"
+}
+
+load_backup_env() {
+  DB_NAME="$(read_env_value DB_NAME 2>/dev/null || true)"
+  DB_NAME="${DB_NAME:-quantum_sport}"
+  DB_USER="$(read_env_value DB_USER 2>/dev/null || true)"
+  DB_USER="${DB_USER:-postgres}"
+  BLOB_READ_WRITE_TOKEN="$(read_env_value BLOB_READ_WRITE_TOKEN 2>/dev/null || true)"
+  BLOB_BACKUP_PREFIX="$(read_env_value BLOB_BACKUP_PREFIX 2>/dev/null || true)"
+  BLOB_BACKUP_PREFIX="${BLOB_BACKUP_PREFIX:-quantum-sport/db}"
+  BACKUP_RETENTION_DAYS="$(read_env_value BACKUP_RETENTION_DAYS 2>/dev/null || true)"
+  BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
+}
+
+blob_cli() {
+  local script_host script_container
+  script_host="$(pwd)/scripts/blob-backup.ts"
+  script_container="/app/scripts/blob-backup.ts"
+
+  if [ ! -f "$script_host" ]; then
+    print_error "Missing ${script_host} — git pull the latest backup scripts"
+    exit 1
+  fi
+
+  # Prefer the running app container when the image already includes the script.
+  if compose -f docker-compose.prod.yml exec -T app test -f "$script_container" 2>/dev/null; then
+    compose -f docker-compose.prod.yml exec -T app bun "$script_container" "$@"
+    return
+  fi
+
+  # Fallback: mount script from the host (works before the next image deploy).
+  compose -f docker-compose.prod.yml run --rm -T --no-deps \
+    -v "${script_host}:${script_container}:ro" \
+    -e "BLOB_READ_WRITE_TOKEN=${BLOB_READ_WRITE_TOKEN}" \
+    -e "BLOB_BACKUP_PREFIX=${BLOB_BACKUP_PREFIX:-quantum-sport/db}" \
+    -e "BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}" \
+    app bun "$script_container" "$@"
+}
+
+blob_assert_safe_prefix() {
+  local prefix="${BLOB_BACKUP_PREFIX:-quantum-sport/db}"
+
+  if [[ ! "$prefix" =~ ^quantum-sport/ ]]; then
+    print_error "BLOB_BACKUP_PREFIX must start with 'quantum-sport/' (current: $prefix)"
+    exit 1
+  fi
+
+  if [[ "$prefix" == *"*"* ]] || [[ "$prefix" == *".."* ]]; then
+    print_error "BLOB_BACKUP_PREFIX contains invalid characters"
+    exit 1
+  fi
+}
+
+blob_validate_credentials() {
+  if [ -z "${BLOB_READ_WRITE_TOKEN:-}" ]; then
+    print_error "BLOB_READ_WRITE_TOKEN is missing from ${ENV_FILE:-.env}"
+    print_info "Create a token at: Vercel → Storage → Blob → your store"
+    exit 1
+  fi
 }
