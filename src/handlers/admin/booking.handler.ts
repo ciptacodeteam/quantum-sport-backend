@@ -31,6 +31,17 @@ const bookingsQuerySchema = searchQuerySchema.extend({
     .nativeEnum(CourtSport)
     .optional()
     .describe('Filter by court sport: PADEL or TENNIS'),
+  coach: z
+    .enum(['with', 'without'])
+    .optional()
+    .describe('Filter bookings that include or do not include coach add-ons'),
+})
+
+const scheduleQuerySchema = searchQuerySchema.extend({
+  courtSport: z
+    .nativeEnum(CourtSport)
+    .optional()
+    .describe('Filter schedule by court sport: PADEL or TENNIS'),
 })
 
 async function restoreMembershipSessionsForCancelledBooking(
@@ -108,6 +119,21 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
                 sport: query.courtSport,
               },
             },
+          },
+        }
+      }
+      if (query.coach === 'with') {
+        where = {
+          ...where,
+          coaches: {
+            some: {},
+          },
+        }
+      } else if (query.coach === 'without') {
+        where = {
+          ...where,
+          coaches: {
+            none: {},
           },
         }
       }
@@ -220,23 +246,40 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
 // GET /admin/bookings/schedule
 // Get all bookings with full coach and inventory details for schedule tab
 export const getAllBookingScheduleHandler = factory.createHandlers(
-  zValidator('query', searchQuerySchema, validateHook),
+  zValidator('query', scheduleQuerySchema, validateHook),
   async (c) => {
     try {
-      const query = c.req.valid('query') as SearchQuerySchema
+      const query = c.req.valid('query') as SearchQuerySchema & {
+        courtSport?: CourtSport
+      }
       const queryOptions = buildFindManyOptions(query, {
         defaultOrderBy: { createdAt: 'desc' },
         searchableFields: [],
       })
 
+      let where = {
+        ...queryOptions.where,
+        status: {
+          not: BookingStatus.CANCELLED,
+        },
+      } as any
+
+      if (query.courtSport) {
+        where = {
+          ...where,
+          details: {
+            some: {
+              court: {
+                sport: query.courtSport,
+              },
+            },
+          },
+        }
+      }
+
       const bookings = await db.booking.findMany({
         ...queryOptions,
-        where: {
-          ...queryOptions.where,
-          status: {
-            not: BookingStatus.CANCELLED,
-          },
-        },
+        where,
         include: {
           user: {
             select: {
@@ -263,6 +306,7 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                   name: true,
                   description: true,
                   image: true,
+                  sport: true,
                 },
               },
               slot: {
@@ -1049,6 +1093,7 @@ const bookingsExportQuerySchema = z.object({
   endDate: z.string().optional(),
   source: z.enum(['cashier', 'online']).optional(),
   courtSport: z.nativeEnum(CourtSport).optional(),
+  coach: z.enum(['with', 'without']).optional(),
 })
 
 export const exportBookingsHandler = factory.createHandlers(
@@ -1069,6 +1114,7 @@ export const exportBookingsHandler = factory.createHandlers(
         endDate,
         query.source,
         query.courtSport,
+        query.coach,
       )
       const filename = `bookings-export-${dayjs().format('YYYY-MM-DD')}.xlsx`
 

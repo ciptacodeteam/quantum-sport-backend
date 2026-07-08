@@ -461,6 +461,7 @@ model Booking {
   holdExpiresAt          DateTime? // for HOLD; auto-release slots when passed
   cancelledAt            DateTime?
   cancellationReason     String?
+  adminNote              String?       @db.Text
 
   cashierId String? // cashier who handled the payment
 

@@ -276,6 +276,7 @@ export async function exportDataToExcel(
   endDate?: Date,
   source?: 'cashier' | 'online',
   courtSport?: CourtSport,
+  coach?: 'with' | 'without',
 ): Promise<Buffer> {
   const workbook = XLSX.utils.book_new()
 
@@ -394,6 +395,11 @@ export async function exportDataToExcel(
           },
         },
       }
+    }
+    if (coach === 'with') {
+      where.coaches = { some: {} }
+    } else if (coach === 'without') {
+      where.coaches = { none: {} }
     }
 
     const bookings = await db.booking.findMany({

@@ -31,6 +31,7 @@ const adminCheckoutSchema = z
     coachSlots: z.array(z.string()).optional(),
     // Optional description for coach booking – e.g. names of up to 4 members
     coachDescription: z.string().max(500).optional(),
+    adminNote: z.string().max(1000).optional(),
     useMembership: z.boolean().optional().default(true),
     ballboySlots: z.array(z.string()).optional(),
     inventories: z
@@ -134,6 +135,7 @@ export const adminCheckoutHandler = factory.createHandlers(
       courtSlots: rawCourtSlots,
       coachSlots: rawCoachSlots,
       coachDescription,
+      adminNote,
       useMembership,
       ballboySlots: rawBallboySlots,
       inventories,
@@ -265,6 +267,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             totalPrice: 0,
             processingFee: 0,
             holdExpiresAt: null,
+            adminNote: adminNote?.trim() || null,
             ...(cashierId && { cashierId }),
           },
         })
