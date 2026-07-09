@@ -99,10 +99,6 @@ function normalizeBallboySelections(
   return Array.from(uniqueSelections.values())
 }
 
-function getSlotTimeKey(slot: { startAt: Date; endAt: Date }): string {
-  return `${dayjs(slot.startAt).toISOString()}|${dayjs(slot.endAt).toISOString()}`
-}
-
 function ballboyCoversCourtSlot(
   ballboySlot: { startAt: Date; endAt: Date },
   courtSlot: { startAt: Date; endAt: Date },
@@ -187,10 +183,9 @@ function validateBallboysForTennisCourts(
     }
 
     for (const courtSlot of matchingCourtSlots) {
-      const key = getSlotTimeKey(courtSlot)
       ballboyCountByCourtSlot.set(
-        key,
-        (ballboyCountByCourtSlot.get(key) ?? 0) + 1,
+        courtSlot.id,
+        (ballboyCountByCourtSlot.get(courtSlot.id) ?? 0) + 1,
       )
     }
   }
