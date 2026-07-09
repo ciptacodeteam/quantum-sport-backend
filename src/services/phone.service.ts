@@ -1,5 +1,6 @@
 import { env } from '@/env'
 import { log } from '@/lib/logger'
+import { formatPhoneForFazpass } from '@/lib/utils'
 import axios from 'axios'
 import {
   SendOTPPayload,
@@ -27,7 +28,12 @@ export async function sendPhoneOtp(
   otp: string,
 ): Promise<string> {
   try {
-    const payload = new SendOTPPayload(phone, otp, FAZPASS_GATEWAY_KEY).toJson()
+    const fazpassPhone = formatPhoneForFazpass(phone)
+    const payload = new SendOTPPayload(
+      fazpassPhone,
+      otp,
+      FAZPASS_GATEWAY_KEY,
+    ).toJson()
 
     const response = await axios.post(SEND_OTP_URL, payload, {
       headers: {
