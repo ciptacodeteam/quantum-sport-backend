@@ -39,6 +39,41 @@ function cleanSlotIds(slotIds: string[] | undefined): string[] | undefined {
   )
 }
 
+type BallboySelectionInput = {
+  slotId: string
+  courtSlotId?: string
+}
+
+function normalizeBallboySelections(
+  rawBallboySlots:
+    | Array<string | { slotId: string; courtSlotId: string }>
+    | undefined,
+): BallboySelectionInput[] {
+  if (!rawBallboySlots || rawBallboySlots.length === 0) {
+    return []
+  }
+
+  const uniqueSelections = new Map<string, BallboySelectionInput>()
+
+  for (const item of rawBallboySlots) {
+    const slotId =
+      typeof item === 'string'
+        ? item.replace(/-\d{2}:\d{2}(:\d{2})?$/, '')
+        : item.slotId.replace(/-\d{2}:\d{2}(:\d{2})?$/, '')
+    const courtSlotId =
+      typeof item === 'string'
+        ? undefined
+        : item.courtSlotId.replace(/-\d{2}:\d{2}(:\d{2})?$/, '')
+
+    uniqueSelections.set(
+      `${slotId}|${courtSlotId ?? ''}`,
+      courtSlotId ? { slotId, courtSlotId } : { slotId },
+    )
+  }
+
+  return Array.from(uniqueSelections.values())
+}
+
 function normalizePromoCode(code?: string): string | undefined {
   if (!code) {
     return undefined
@@ -77,8 +112,14 @@ function ballboyCoversCourtSlot(
 }
 
 function validateBallboysForTennisCourts(
-  ballboySlots: Array<{ startAt: Date; endAt: Date }>,
-  courtSlots: Array<{ startAt: Date; endAt: Date; court?: { sport: CourtSport } | null }>,
+  ballboySelections: BallboySelectionInput[],
+  ballboySlots: Array<{ id: string; startAt: Date; endAt: Date }>,
+  courtSlots: Array<{
+    id: string
+    startAt: Date
+    endAt: Date
+    court?: { sport: CourtSport } | null
+  }>,
 ) {
   if (ballboySlots.length === 0) {
     return
@@ -95,15 +136,51 @@ function validateBallboysForTennisCourts(
   }
 
   const ballboyCountByCourtSlot = new Map<string, number>()
+  const ballboySlotById = new Map(ballboySlots.map((slot) => [slot.id, slot]))
+  const courtSlotById = new Map(courtSlots.map((slot) => [slot.id, slot]))
 
-  for (const ballboySlot of ballboySlots) {
-    const matchingCourtSlots = courtSlots.filter((courtSlot) =>
-      ballboyCoversCourtSlot(ballboySlot, courtSlot),
-    )
+  for (const selection of ballboySelections) {
+    const ballboySlot = ballboySlotById.get(selection.slotId)
+
+    if (!ballboySlot) {
+      throw new BadRequestException(
+        'One or more ballboy slots not found or unavailable',
+      )
+    }
+
+    let matchingCourtSlots: typeof courtSlots = []
+
+    if (selection.courtSlotId) {
+      const selectedCourtSlot = courtSlotById.get(selection.courtSlotId)
+
+      if (!selectedCourtSlot) {
+        throw new BadRequestException(
+          'Ballboy selection must match a selected tennis court booking slot',
+        )
+      }
+
+      if (!ballboyCoversCourtSlot(ballboySlot, selectedCourtSlot)) {
+        throw new BadRequestException(
+          'Ballboy slots must match selected tennis court booking times',
+        )
+      }
+
+      matchingCourtSlots = [selectedCourtSlot]
+    } else {
+      matchingCourtSlots = courtSlots.filter((courtSlot) =>
+        ballboyCoversCourtSlot(ballboySlot, courtSlot),
+      )
+    }
 
     if (matchingCourtSlots.length === 0) {
       throw new BadRequestException(
         'Ballboy slots must match selected tennis court booking times',
+      )
+    }
+
+    if (!selection.courtSlotId && matchingCourtSlots.length > 1) {
+      throw new BadRequestException(
+        'Ballboy selection must be linked to a specific tennis court booking slot',
       )
     }
 
@@ -260,7 +337,10 @@ export const applyPromoCodeHandler = factory.createHandlers(
       const promoCode = normalizePromoCode(rawPromoCode)
       const courtSlots = cleanSlotIds(rawCourtSlots)
       const coachSlots = cleanSlotIds(rawCoachSlots)
-      const ballboySlots = cleanSlotIds(rawBallboySlots)
+      const ballboySelections = normalizeBallboySelections(rawBallboySlots)
+      const ballboySlots = Array.from(
+        new Set(ballboySelections.map((selection) => selection.slotId)),
+      )
 
       const hasItems =
         (courtSlots && courtSlots.length > 0) ||
@@ -285,6 +365,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
       const subtotal = await db.$transaction(async (tx) => {
         let totalPrice = 0
         let selectedCourtSlots: Array<{
+          id: string
           startAt: Date
           endAt: Date
           court?: { sport: CourtSport } | null
@@ -414,7 +495,11 @@ export const applyPromoCodeHandler = factory.createHandlers(
             )
           }
 
-          validateBallboysForTennisCourts(ballboySlotData, selectedCourtSlots)
+          validateBallboysForTennisCourts(
+            ballboySelections,
+            ballboySlotData,
+            selectedCourtSlots,
+          )
 
           for (const slot of ballboySlotData) {
             if (slot.bookingBallboys.length > 0) {
@@ -548,7 +633,10 @@ export const checkoutHandler = factory.createHandlers(
       // Clean slot IDs to remove any accidentally appended time suffixes
       const courtSlots = cleanSlotIds(rawCourtSlots)
       const coachSlots = cleanSlotIds(rawCoachSlots)
-      const ballboySlots = cleanSlotIds(rawBallboySlots)
+      const ballboySelections = normalizeBallboySelections(rawBallboySlots)
+      const ballboySlots = Array.from(
+        new Set(ballboySelections.map((selection) => selection.slotId)),
+      )
       const promoCode = normalizePromoCode(rawPromoCode)
 
       // Validate at least one slot is provided
@@ -649,6 +737,7 @@ export const checkoutHandler = factory.createHandlers(
         let appliedPromoCodeText: string | null = null
         let selectedCourtSport: CourtSport | null = null
         let selectedCourtSlots: Array<{
+          id: string
           startAt: Date
           endAt: Date
           court?: { sport: CourtSport } | null
@@ -907,7 +996,11 @@ export const checkoutHandler = factory.createHandlers(
             )
           }
 
-          validateBallboysForTennisCourts(ballboySlotData, selectedCourtSlots)
+          validateBallboysForTennisCourts(
+            ballboySelections,
+            ballboySlotData,
+            selectedCourtSlots,
+          )
 
           for (const slot of ballboySlotData) {
             if (slot.bookingBallboys.length > 0) {

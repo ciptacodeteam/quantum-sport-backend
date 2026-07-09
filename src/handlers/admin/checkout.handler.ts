@@ -33,7 +33,17 @@ const adminCheckoutSchema = z
     coachDescription: z.string().max(500).optional(),
     adminNote: z.string().max(1000).optional(),
     useMembership: z.boolean().optional().default(true),
-    ballboySlots: z.array(z.string()).optional(),
+    ballboySlots: z
+      .array(
+        z.union([
+          z.string(),
+          z.object({
+            slotId: z.string(),
+            courtSlotId: z.string(),
+          }),
+        ]),
+      )
+      .optional(),
     inventories: z
       .array(
         z.object({
@@ -61,6 +71,34 @@ function uniqueSlotIds(slotIds: string[] | undefined): string[] | undefined {
   return slotIds ? Array.from(new Set(slotIds)) : slotIds
 }
 
+type BallboySelectionInput = {
+  slotId: string
+  courtSlotId?: string
+}
+
+function normalizeBallboySelections(
+  rawBallboySlots:
+    | Array<string | { slotId: string; courtSlotId: string }>
+    | undefined,
+): BallboySelectionInput[] {
+  if (!rawBallboySlots || rawBallboySlots.length === 0) {
+    return []
+  }
+
+  const uniqueSelections = new Map<string, BallboySelectionInput>()
+
+  for (const item of rawBallboySlots) {
+    const slotId = typeof item === 'string' ? item : item.slotId
+    const courtSlotId = typeof item === 'string' ? undefined : item.courtSlotId
+    uniqueSelections.set(
+      `${slotId}|${courtSlotId ?? ''}`,
+      courtSlotId ? { slotId, courtSlotId } : { slotId },
+    )
+  }
+
+  return Array.from(uniqueSelections.values())
+}
+
 function getSlotTimeKey(slot: { startAt: Date; endAt: Date }): string {
   return `${dayjs(slot.startAt).toISOString()}|${dayjs(slot.endAt).toISOString()}`
 }
@@ -76,8 +114,14 @@ function ballboyCoversCourtSlot(
 }
 
 function validateBallboysForTennisCourts(
-  ballboySlots: Array<{ startAt: Date; endAt: Date }>,
-  courtSlots: Array<{ startAt: Date; endAt: Date; court?: { sport: CourtSport } | null }>,
+  ballboySelections: BallboySelectionInput[],
+  ballboySlots: Array<{ id: string; startAt: Date; endAt: Date }>,
+  courtSlots: Array<{
+    id: string
+    startAt: Date
+    endAt: Date
+    court?: { sport: CourtSport } | null
+  }>,
 ) {
   if (ballboySlots.length === 0) {
     return
@@ -94,15 +138,51 @@ function validateBallboysForTennisCourts(
   }
 
   const ballboyCountByCourtSlot = new Map<string, number>()
+  const ballboySlotById = new Map(ballboySlots.map((slot) => [slot.id, slot]))
+  const courtSlotById = new Map(courtSlots.map((slot) => [slot.id, slot]))
 
-  for (const ballboySlot of ballboySlots) {
-    const matchingCourtSlots = courtSlots.filter((courtSlot) =>
-      ballboyCoversCourtSlot(ballboySlot, courtSlot),
-    )
+  for (const selection of ballboySelections) {
+    const ballboySlot = ballboySlotById.get(selection.slotId)
+
+    if (!ballboySlot) {
+      throw new BadRequestException(
+        'One or more ballboy slots not found or unavailable',
+      )
+    }
+
+    let matchingCourtSlots: typeof courtSlots = []
+
+    if (selection.courtSlotId) {
+      const selectedCourtSlot = courtSlotById.get(selection.courtSlotId)
+
+      if (!selectedCourtSlot) {
+        throw new BadRequestException(
+          'Ballboy selection must match a selected tennis court booking slot',
+        )
+      }
+
+      if (!ballboyCoversCourtSlot(ballboySlot, selectedCourtSlot)) {
+        throw new BadRequestException(
+          'Ballboy slots must match selected tennis court booking times',
+        )
+      }
+
+      matchingCourtSlots = [selectedCourtSlot]
+    } else {
+      matchingCourtSlots = courtSlots.filter((courtSlot) =>
+        ballboyCoversCourtSlot(ballboySlot, courtSlot),
+      )
+    }
 
     if (matchingCourtSlots.length === 0) {
       throw new BadRequestException(
         'Ballboy slots must match selected tennis court booking times',
+      )
+    }
+
+    if (!selection.courtSlotId && matchingCourtSlots.length > 1) {
+      throw new BadRequestException(
+        'Ballboy selection must be linked to a specific tennis court booking slot',
       )
     }
 
@@ -142,7 +222,10 @@ export const adminCheckoutHandler = factory.createHandlers(
     } = c.req.valid('json') as AdminCheckoutSchema
     const courtSlots = uniqueSlotIds(rawCourtSlots)
     const coachSlots = uniqueSlotIds(rawCoachSlots)
-    const ballboySlots = uniqueSlotIds(rawBallboySlots)
+    const ballboySelections = normalizeBallboySelections(rawBallboySlots)
+    const ballboySlots = Array.from(
+      new Set(ballboySelections.map((selection) => selection.slotId)),
+    )
 
     // Get the admin (cashier) creating this booking
     const admin = c.get('admin')
@@ -277,6 +360,7 @@ export const adminCheckoutHandler = factory.createHandlers(
         let courtDiscountPrice = 0
         let courtCostCoveredByMembership = 0 // Track court costs covered by membership
         let selectedCourtSlots: Array<{
+          id: string
           startAt: Date
           endAt: Date
           court?: { sport: CourtSport } | null
@@ -515,7 +599,11 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more ballboy slots not found or unavailable',
             )
           }
-          validateBallboysForTennisCourts(slotData, selectedCourtSlots)
+          validateBallboysForTennisCourts(
+            ballboySelections,
+            slotData,
+            selectedCourtSlots,
+          )
           for (const slot of slotData) {
             if (slot.bookingBallboys.length > 0) {
               throw new BadRequestException(

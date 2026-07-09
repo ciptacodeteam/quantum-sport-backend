@@ -623,6 +623,14 @@ export const updatePromoCodeSchema = z
 
 export type UpdatePromoCodeSchema = z.infer<typeof updatePromoCodeSchema>
 
+const ballboySelectionSchema = z.union([
+  z.string(),
+  z.object({
+    slotId: z.string(),
+    courtSlotId: z.string(),
+  }),
+])
+
 // Checkout schema
 export const checkoutSchema = z.object({
   bookingId: z.string().optional(), // Optional: for updating existing DRAFT booking
@@ -630,7 +638,7 @@ export const checkoutSchema = z.object({
   useMembership: z.boolean().optional().default(true),
   courtSlots: z.array(z.string()).optional(), // Array of slot IDs for court bookings
   coachSlots: z.array(z.string()).optional(), // Array of slot IDs for coach bookings
-  ballboySlots: z.array(z.string()).optional(), // Array of slot IDs for ballboy bookings
+  ballboySlots: z.array(ballboySelectionSchema).optional(),
   inventories: z
     .array(
       z.object({
@@ -857,7 +865,7 @@ export const extendedCheckoutSchema = z.object({
   useMembership: z.boolean().optional().default(true),
   courtSlots: z.array(z.string()).optional(),
   coachSlots: z.array(z.string()).optional(),
-  ballboySlots: z.array(z.string()).optional(),
+  ballboySlots: z.array(ballboySelectionSchema).optional(),
   inventories: z
     .array(
       z.object({
@@ -886,7 +894,7 @@ export const applyPromoCodeSchema = z.object({
   }),
   courtSlots: z.array(z.string()).optional(),
   coachSlots: z.array(z.string()).optional(),
-  ballboySlots: z.array(z.string()).optional(),
+  ballboySlots: z.array(ballboySelectionSchema).optional(),
   inventories: z
     .array(
       z.object({
