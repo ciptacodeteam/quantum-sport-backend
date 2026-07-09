@@ -203,6 +203,15 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
                   startAt: true,
                   endAt: true,
                   price: true,
+                  staff: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      phone: true,
+                      role: true,
+                    },
+                  },
                 },
               },
             },
