@@ -29,7 +29,7 @@ export async function formatPhone(phone: string) {
 }
 
 export function formatPhoneForFazpass(phone: string) {
-  return phone.replace(/^\+/, '')
+  return phone.replace(/\D/g, '')
 }
 
 export async function generateOtp(otpLength: number) {

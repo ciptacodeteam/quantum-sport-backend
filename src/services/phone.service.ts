@@ -23,6 +23,14 @@ if (!FAZPASS_API_URL || !FAZPASS_MERCHANT_KEY || !FAZPASS_GATEWAY_KEY) {
 const SEND_OTP_URL = `${FAZPASS_API_URL}/otp/send`
 const VERIFY_OTP_URL = `${FAZPASS_API_URL}/otp/verify`
 
+function maskPhone(phone: string) {
+  if (phone.length <= 6) {
+    return phone
+  }
+
+  return `${phone.slice(0, 4)}****${phone.slice(-3)}`
+}
+
 export async function sendPhoneOtp(
   phone: string,
   otp: string,
@@ -41,17 +49,48 @@ export async function sendPhoneOtp(
       },
     })
 
-    if (!response.status) {
-      log.error(`Failed to send OTP: ${response}`)
+    if (!response.status || response.data?.status === false) {
+      log.error(
+        {
+          phone: maskPhone(fazpassPhone),
+          httpStatus: response.status,
+          providerStatus: response.data?.status,
+          providerCode: response.data?.code,
+          providerMessage: response.data?.message,
+        },
+        'Fazpass rejected OTP send request',
+      )
       throw new Error('Failed to send OTP')
     }
 
     const responseData = SendOTPResponse.fromJson(response.data)
-    log.info(`OTP Generation Response: ${responseData}`)
+    log.info(
+      {
+        phone: maskPhone(fazpassPhone),
+        requestId: responseData.getId(),
+        providerStatus: responseData.status,
+        providerCode: responseData.code,
+        providerMessage: responseData.message,
+        channel: responseData.getData().channel,
+        provider: responseData.getData().provider,
+      },
+      'Fazpass OTP send response',
+    )
 
     return responseData.getId()
   } catch (error) {
-    log.error(`Error sending OTP: ${error}`)
+    if (axios.isAxiosError(error)) {
+      log.error(
+        {
+          phone: maskPhone(formatPhoneForFazpass(phone)),
+          httpStatus: error.response?.status,
+          providerResponse: error.response?.data,
+        },
+        'Error sending OTP via Fazpass',
+      )
+    } else {
+      log.error(`Error sending OTP: ${error}`)
+    }
     throw error
   }
 }
