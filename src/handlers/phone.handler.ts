@@ -4,6 +4,7 @@ import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
+import { hashPassword } from '@/lib/password'
 import { formatPhone, generateOtp } from '@/lib/utils'
 import {
   phoneSchema,
@@ -14,17 +15,63 @@ import {
 import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
-import { PhoneVerificationType } from '@prisma/client'
+import { PhoneVerificationType, UserSource } from '@prisma/client'
 import status from 'http-status'
+import z from 'zod'
+
+const sendPhoneOtpSchema = phoneSchema.extend({
+  name: z.string().min(3).max(100).optional(),
+  password: z.string().min(6).max(100).optional(),
+})
 
 export const sendPhoneVerificationOtpHandler = factory.createHandlers(
-  zValidator('json', phoneSchema, validateHook),
+  zValidator('json', sendPhoneOtpSchema, validateHook),
   async (c) => {
     try {
-      const validated = c.req.valid('json') as PhoneSchema
-      const { phone } = validated
+      const validated = c.req.valid('json') as PhoneSchema & {
+        name?: string
+        password?: string
+      }
+      const { phone, name, password } = validated
 
       const formattedPhone = await formatPhone(phone)
+      const isRegisterRequest = !!name && !!password
+
+      if (isRegisterRequest) {
+        const existingUser = await db.user.findUnique({
+          where: { phone: formattedPhone },
+          select: { id: true, phoneVerified: true },
+        })
+
+        if (existingUser?.phoneVerified) {
+          return c.json(
+            err('User already exists', status.BAD_REQUEST),
+            status.BAD_REQUEST,
+          )
+        }
+
+        const hashedPassword = await hashPassword(password)
+
+        if (existingUser) {
+          await db.user.update({
+            where: { id: existingUser.id },
+            data: {
+              name,
+              password: hashedPassword,
+            },
+          })
+        } else {
+          await db.user.create({
+            data: {
+              name,
+              phone: formattedPhone,
+              password: hashedPassword,
+              phoneVerified: false,
+              source: UserSource.ONLINE,
+            },
+          })
+        }
+      }
 
       const existingRecord = await db.phoneVerification.findFirst({
         where: {

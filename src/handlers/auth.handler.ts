@@ -59,14 +59,15 @@ export const checkAccountHandler = factory.createHandlers(
       const existingUser = await db.user.findUnique({
         where: { phone: formattedPhone },
       })
+      const verifiedAccountExists = !!existingUser?.phoneVerified
 
       return c.json(
         ok(
           {
             phone: formattedPhone,
-            exists: !!existingUser,
+            exists: verifiedAccountExists,
           },
-          existingUser ? 'Account exists' : 'Account does not exist',
+          verifiedAccountExists ? 'Account exists' : 'Account does not exist',
         ),
       )
     } catch (err) {
@@ -109,6 +110,16 @@ export const loginHandler = factory.createHandlers(
         return c.json(
           err('Phone number or password is incorrect', status.UNAUTHORIZED),
           status.UNAUTHORIZED,
+        )
+      }
+
+      if (!existingUser.phoneVerified) {
+        c.var.logger.warn(
+          `Login blocked for unverified phone number: ${formattedPhone}`,
+        )
+        return c.json(
+          err('WhatsApp number is not verified', status.FORBIDDEN),
+          status.FORBIDDEN,
         )
       }
 
@@ -169,7 +180,7 @@ export const registerHandler = factory.createHandlers(
           where: { phone: formattedPhone },
         })
 
-        if (existingUser) {
+        if (existingUser?.phoneVerified) {
           c.var.logger.error(
             `User already exists with phone number: ${formattedPhone}`,
           )
@@ -192,15 +203,24 @@ export const registerHandler = factory.createHandlers(
 
         const hashPwd = await hashPassword(password)
 
-        const user = await tx.user.create({
-          data: {
-            name,
-            phone: formattedPhone,
-            password: hashPwd,
-            phoneVerified: true, // Phone is verified since OTP was validated during registration
-            source: UserSource.ONLINE,
-          },
-        })
+        const user = existingUser
+          ? await tx.user.update({
+              where: { id: existingUser.id },
+              data: {
+                name,
+                password: hashPwd,
+                phoneVerified: true,
+              },
+            })
+          : await tx.user.create({
+              data: {
+                name,
+                phone: formattedPhone,
+                password: hashPwd,
+                phoneVerified: true, // Phone is verified since OTP was validated during registration
+                source: UserSource.ONLINE,
+              },
+            })
 
         if (!user) {
           c.var.logger.error(
