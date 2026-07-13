@@ -6,7 +6,6 @@ import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
 import { ok } from '@/lib/response'
 import { formatPhone } from '@/lib/utils'
-import { generateOtp } from '@/lib/generators'
 import {
   IdSchema,
   idSchema,
@@ -21,7 +20,6 @@ import {
   buildPasswordResetLink,
   createPasswordResetToken,
 } from '@/services/password-reset.service'
-import { sendPhoneOtp } from '@/services/phone.service'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
 import status from 'http-status'
@@ -481,30 +479,7 @@ export const sendResetPasswordLinkHandler = factory.createHandlers(
         }
       }
 
-      // Fallback: Send to phone if email not available or failed
-      if (!channels.includes('email') && user.phone && user.phoneVerified) {
-        try {
-          const otp = generateOtp(6)
-          const requestId = await sendPhoneOtp(user.phone, otp)
-
-          if (requestId) {
-            channels.push('phone')
-            c.var.logger.info(
-              { userId: user.id, phone: user.phone },
-              'Password reset OTP sent via phone',
-            )
-          }
-        } catch (phoneError) {
-          c.var.logger.error(
-            { userId: user.id, error: phoneError },
-            'Failed to send password reset OTP via phone',
-          )
-        }
-      }
-
-      if (channels.length === 0) {
-        channels.push('manual')
-      }
+      channels.push('manual')
 
       return c.json(
         ok(
@@ -517,7 +492,7 @@ export const sendResetPasswordLinkHandler = factory.createHandlers(
               : `Password reset link sent successfully via ${channels.join(' and ')}`,
             sentTo: {
               email: channels.includes('email') ? user.email : null,
-              phone: channels.includes('phone') ? user.phone : null,
+              phone: null,
             },
             expiresAt,
           },
