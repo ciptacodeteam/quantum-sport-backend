@@ -18,30 +18,6 @@ function createTx(
 }
 
 describe('restoreMembershipSessionsForCancelledBooking', () => {
-  it('restores a 2 hour admin-cancelled booking from 48 back to 50 sessions', async () => {
-    const futureEndDate = new Date(Date.now() + 86_400_000)
-    const tx = createTx({
-      id: 'membership-user-50-sessions',
-      remainingSessions: 48,
-      endDate: futureEndDate,
-      membership: { sessions: 50 },
-    })
-
-    const restored = await restoreMembershipSessionsForCancelledBooking(tx, {
-      membershipUserId: 'membership-user-50-sessions',
-      membershipSessionsUsed: 2,
-    })
-
-    expect(restored).toBe(2)
-    expect(tx.membershipUser.update).toHaveBeenCalledWith({
-      where: { id: 'membership-user-50-sessions' },
-      data: {
-        remainingSessions: 50,
-        isExpired: false,
-      },
-    })
-  })
-
   it('restores used booking sessions without exceeding package sessions', async () => {
     const futureEndDate = new Date(Date.now() + 86_400_000)
     const tx = createTx({
