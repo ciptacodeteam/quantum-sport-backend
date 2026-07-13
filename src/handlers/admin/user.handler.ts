@@ -222,6 +222,7 @@ export const getAllUsersHandler = factory.createHandlers(
           emailVerified: true,
           phone: true,
           phoneVerified: true,
+          source: true,
           image: true,
           banned: true,
           banReason: true,

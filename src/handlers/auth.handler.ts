@@ -41,7 +41,7 @@ import { sendPhoneOtp } from '@/services/phone.service'
 import { getFileUrl } from '@/services/upload.service'
 import { AppRouteHandler, UserTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
-import { AuthTokenType, PhoneVerificationType } from '@prisma/client'
+import { AuthTokenType, PhoneVerificationType, UserSource } from '@prisma/client'
 import crypto from 'crypto'
 import dayjs from 'dayjs'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -198,6 +198,7 @@ export const registerHandler = factory.createHandlers(
             phone: formattedPhone,
             password: hashPwd,
             phoneVerified: true, // Phone is verified since OTP was validated during registration
+            source: UserSource.ONLINE,
           },
         })
 

@@ -14,6 +14,7 @@ import {
   CourtSport,
   PaymentStatus,
   SlotType,
+  UserSource,
 } from '@prisma/client'
 import type { Membership, MembershipUser } from '@prisma/client'
 import dayjs from 'dayjs'
@@ -264,6 +265,7 @@ export const adminCheckoutHandler = factory.createHandlers(
                 name: name!,
                 phone: formattedPhone,
                 password: hashed,
+                source: UserSource.WALK_IN,
               },
               select: { id: true },
             })

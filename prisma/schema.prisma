@@ -89,6 +89,12 @@ enum PromoCodeStatus {
   INACTIVE
 }
 
+enum UserSource {
+  ONLINE
+  WALK_IN
+  ADMIN_CREATED
+}
+
 // ------------------------------
 // Notifications
 // ------------------------------
@@ -120,6 +126,7 @@ model User {
 
   phone         String  @unique
   phoneVerified Boolean @default(false)
+  source        UserSource @default(ONLINE)
 
   banned     Boolean   @default(false)
   banReason  String?

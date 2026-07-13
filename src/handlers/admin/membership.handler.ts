@@ -16,7 +16,7 @@ import {
   updateMembershipSchema,
 } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
-import { CourtSport, PaymentStatus } from '@prisma/client'
+import { CourtSport, PaymentStatus, UserSource } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
@@ -274,6 +274,7 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
               name: name!,
               phone: formattedPhone,
               password: hashedPassword,
+              source: UserSource.WALK_IN,
             },
             select: { id: true },
           })
