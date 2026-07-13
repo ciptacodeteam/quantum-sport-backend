@@ -502,11 +502,8 @@ export const sendResetPasswordLinkHandler = factory.createHandlers(
         }
       }
 
-      // If no channel was successful, throw error
       if (channels.length === 0) {
-        throw new BadRequestException(
-          'Unable to send password reset link. Please ensure your email and/or phone are verified.',
-        )
+        channels.push('manual')
       }
 
       return c.json(
@@ -514,19 +511,69 @@ export const sendResetPasswordLinkHandler = factory.createHandlers(
           {
             userId: user.id,
             channels,
-            message: `Password reset link sent successfully via ${channels.join(' and ')}`,
+            resetLink,
+            message: channels.includes('manual')
+              ? 'Password reset link created for manual sharing'
+              : `Password reset link sent successfully via ${channels.join(' and ')}`,
             sentTo: {
               email: channels.includes('email') ? user.email : null,
               phone: channels.includes('phone') ? user.phone : null,
             },
             expiresAt,
           },
-          `Reset password link sent via ${channels.join(' and ')}`,
+          channels.includes('manual')
+            ? 'Reset password link created'
+            : `Reset password link sent via ${channels.join(' and ')}`,
         ),
         status.OK,
       )
     } catch (error) {
       c.var.logger.error(`Error in sendResetPasswordLinkHandler: ${error}`)
+      throw error
+    }
+  },
+)
+
+export const verifyUserPhoneManuallyHandler = factory.createHandlers(
+  zValidator('param', idSchema, validateHook),
+  async (c) => {
+    try {
+      const { id } = c.req.valid('param') as IdSchema
+
+      const user = await db.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          phone: true,
+          phoneVerified: true,
+        },
+      })
+
+      if (!user) {
+        throw new NotFoundException('User not found')
+      }
+
+      if (!user.phone) {
+        throw new BadRequestException('User has no phone number on file')
+      }
+
+      if (user.phoneVerified) {
+        return c.json(ok(user, 'WhatsApp number is already verified'), status.OK)
+      }
+
+      const updatedUser = await db.user.update({
+        where: { id },
+        data: {
+          phoneVerified: true,
+        },
+      })
+
+      return c.json(
+        ok(updatedUser, 'WhatsApp number verified manually'),
+        status.OK,
+      )
+    } catch (error) {
+      c.var.logger.fatal(`Error in verifyUserPhoneManuallyHandler: ${error}`)
       throw error
     }
   },
