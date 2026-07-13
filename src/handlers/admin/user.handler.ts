@@ -280,7 +280,6 @@ export const getUserDetailHandler = factory.createHandlers(
                 select: {
                   id: true,
                   name: true,
-                  sport: true,
                 },
               },
             },
