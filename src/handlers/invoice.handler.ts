@@ -13,6 +13,7 @@ import xenditService from '@/services/xendit.service'
 import { getFileUrl } from '@/services/upload.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import dayjs from 'dayjs'
+import { restoreMembershipSessionsForCancelledBooking } from '@/services/membership-booking.service'
 
 // GET /invoices
 export const getUserInvoicesHandler = factory.createHandlers(
@@ -601,6 +602,7 @@ export const cancelUserBookingHandler = factory.createHandlers(
           coachSlots: booking.coaches.length,
           ballboySlots: booking.ballboys.length,
           inventories: booking.inventories.length,
+          membershipSessions: 0,
         }
 
         // 3. Update booking status to CANCELLED
@@ -655,6 +657,9 @@ export const cancelUserBookingHandler = factory.createHandlers(
           })
         }
 
+        releasedCounts.membershipSessions =
+          await restoreMembershipSessionsForCancelledBooking(tx, booking)
+
         // 8. Update invoice status to CANCELLED
         await tx.invoice.update({
           where: { id: invoice.id },
@@ -706,6 +711,8 @@ export const cancelUserBookingHandler = factory.createHandlers(
               ballboySlots: result.releasedCounts.ballboySlots,
             },
             restoredInventories: result.releasedCounts.inventories,
+            restoredMembershipSessions:
+              result.releasedCounts.membershipSessions,
             refund: result.refundInfo,
           },
           'Booking cancelled successfully. All resources have been released.',
