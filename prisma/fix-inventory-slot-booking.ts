@@ -1,4 +1,8 @@
-import { db } from '../src/lib/prisma'
+import { PrismaClient } from '@prisma/client'
+
+const db = new PrismaClient({
+  log: ['error', 'warn'],
+})
 
 async function main() {
   await db.$executeRawUnsafe(`
