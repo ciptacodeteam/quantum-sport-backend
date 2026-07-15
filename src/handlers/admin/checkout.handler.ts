@@ -112,6 +112,16 @@ function ballboyCoversCourtSlot(
   )
 }
 
+function timeRangesOverlap(
+  first: { startAt: Date; endAt: Date },
+  second: { startAt: Date; endAt: Date },
+): boolean {
+  return (
+    dayjs(first.startAt).valueOf() < dayjs(second.endAt).valueOf() &&
+    dayjs(first.endAt).valueOf() > dayjs(second.startAt).valueOf()
+  )
+}
+
 function validateBallboysForTennisCourts(
   ballboySelections: BallboySelectionInput[],
   ballboySlots: Array<{ id: string; startAt: Date; endAt: Date }>,
@@ -650,6 +660,31 @@ export const adminCheckoutHandler = factory.createHandlers(
           const courtSlotById = new Map(
             selectedCourtSlots.map((slot) => [slot.id, slot]),
           )
+          const processedInventorySelections: Array<{
+            inventoryId: string
+            quantity: number
+            startAt?: Date
+            endAt?: Date
+          }> = []
+          const overallInventoryRange =
+            selectedCourtSlots.length > 0
+              ? {
+                  startAt: dayjs(
+                    Math.min(
+                      ...selectedCourtSlots.map((slot) =>
+                        dayjs(slot.startAt).valueOf(),
+                      ),
+                    ),
+                  ).toDate(),
+                  endAt: dayjs(
+                    Math.max(
+                      ...selectedCourtSlots.map((slot) =>
+                        dayjs(slot.endAt).valueOf(),
+                      ),
+                    ),
+                  ).toDate(),
+                }
+              : null
           const inventoryAvailabilityByRange = new Map<
             string,
             Awaited<ReturnType<typeof getInventoryAvailabilityMap>>
@@ -672,25 +707,12 @@ export const adminCheckoutHandler = factory.createHandlers(
             }
             return inventoryAvailabilityByRange.get(key) ?? null
           }
-          const overallAvailability =
-            selectedCourtSlots.length > 0
-              ? await getAvailabilityForRange(
-                  dayjs(
-                    Math.min(
-                      ...selectedCourtSlots.map((slot) =>
-                        dayjs(slot.startAt).valueOf(),
-                      ),
-                    ),
-                  ).toDate(),
-                  dayjs(
-                    Math.max(
-                      ...selectedCourtSlots.map((slot) =>
-                        dayjs(slot.endAt).valueOf(),
-                      ),
-                    ),
-                  ).toDate(),
-                )
-              : null
+          const overallAvailability = overallInventoryRange
+            ? await getAvailabilityForRange(
+                overallInventoryRange.startAt,
+                overallInventoryRange.endAt,
+              )
+            : null
 
           for (const inv of inventories) {
             const courtSlot = inv.courtSlotId
@@ -722,6 +744,9 @@ export const adminCheckoutHandler = factory.createHandlers(
                 `Inventory ${inventory.name} does not match the selected court sport`,
               )
             }
+            const selectionRange = courtSlot
+              ? { startAt: courtSlot.startAt, endAt: courtSlot.endAt }
+              : overallInventoryRange
             const availableQuantity =
               (courtSlot
                 ? await getAvailabilityForRange(
@@ -730,7 +755,28 @@ export const adminCheckoutHandler = factory.createHandlers(
                   )
                 : overallAvailability
               )?.get(inv.inventoryId)?.availableQuantity ?? inventory.quantity
-            if (availableQuantity < inv.quantity) {
+            const overlappingRequestedQuantity = processedInventorySelections
+              .filter((selection) => selection.inventoryId === inv.inventoryId)
+              .reduce((total, selection) => {
+                if (
+                  !selectionRange ||
+                  !selection.startAt ||
+                  !selection.endAt ||
+                  timeRangesOverlap(selectionRange, {
+                    startAt: selection.startAt,
+                    endAt: selection.endAt,
+                  })
+                ) {
+                  return total + selection.quantity
+                }
+
+                return total
+              }, 0)
+            const remainingAvailableQuantity = Math.max(
+              0,
+              availableQuantity - overlappingRequestedQuantity,
+            )
+            if (remainingAvailableQuantity < inv.quantity) {
               throw new BadRequestException(
                 `Insufficient quantity for ${inventory.name} at the selected booking time`,
               )
@@ -745,6 +791,12 @@ export const adminCheckoutHandler = factory.createHandlers(
                 quantity: inv.quantity,
                 price: inventory.price,
               },
+            })
+            processedInventorySelections.push({
+              inventoryId: inv.inventoryId,
+              quantity: inv.quantity,
+              startAt: selectionRange?.startAt,
+              endAt: selectionRange?.endAt,
             })
             bookedItems.inventories.push({
               inventoryId: inv.inventoryId,
