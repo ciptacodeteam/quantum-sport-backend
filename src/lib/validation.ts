@@ -91,13 +91,26 @@ export const updateAdminProfileSchema = z.object({
 
 export type UpdateAdminProfileSchema = z.infer<typeof updateAdminProfileSchema>
 
+const formBooleanSchema = z.preprocess((value) => {
+  if (value === true || value === 'true' || value === '1' || value === 1) {
+    return true
+  }
+
+  if (value === false || value === 'false' || value === '0' || value === 0) {
+    return false
+  }
+
+  return value
+}, z.boolean())
+
 export const createInventorySchema = z.object({
   name: z.string().min(3).max(100),
   description: z.string().max(500).optional(),
+  image: z.file().optional(),
   sport: z.nativeEnum(CourtSport).optional().default(CourtSport.PADEL),
-  quantity: z.number().min(0),
-  price: z.number().min(0),
-  isActive: z.coerce.boolean().optional().default(true),
+  quantity: z.coerce.number().min(0),
+  price: z.coerce.number().min(0),
+  isActive: formBooleanSchema.optional().default(true),
 })
 
 export type CreateInventorySchema = z.infer<typeof createInventorySchema>

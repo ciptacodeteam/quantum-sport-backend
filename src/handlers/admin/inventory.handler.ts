@@ -1,3 +1,4 @@
+import { INVENTORY_SUBDIR } from '@/config'
 import { NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -16,6 +17,7 @@ import {
   updateInventorySchema,
 } from '@/lib/validation'
 import { getInventoryAvailability } from '@/services/inventory-availability.service'
+import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 
@@ -48,6 +50,13 @@ export const getAllInventoryHandler = factory.createHandlers(
       const items = await db.inventory.findMany({
         ...queryOptions,
       })
+
+      for (const item of items) {
+        if (item.image) {
+          item.image = await getFileUrl(item.image)
+        }
+      }
+
       return c.json(ok(items), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getInventoryItemsHandler: ${error}`)
@@ -70,6 +79,10 @@ export const getInventoryHandler = factory.createHandlers(
         throw new NotFoundException('Inventory item not found')
       }
 
+      if (item.image) {
+        item.image = await getFileUrl(item.image)
+      }
+
       return c.json(ok(item), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getInventoryHandler: ${error}`)
@@ -79,11 +92,12 @@ export const getInventoryHandler = factory.createHandlers(
 )
 
 export const createInventoryHandler = factory.createHandlers(
-  zValidator('json', createInventorySchema, validateHook),
+  zValidator('form', createInventorySchema, validateHook),
   async (c) => {
     try {
-      const body = c.req.valid('json') as CreateInventorySchema
-      const { name, description, sport, quantity, price } = body
+      const body = c.req.valid('form') as CreateInventorySchema
+      const { name, description, image, sport, quantity, price, isActive } =
+        body
 
       const existingName = await db.inventory.findFirst({
         where: { name },
@@ -99,16 +113,30 @@ export const createInventoryHandler = factory.createHandlers(
         )
       }
 
+      let imageUrl: string | undefined
+
+      if (image) {
+        const uploaded = await uploadFile(image, {
+          subdir: INVENTORY_SUBDIR,
+        })
+        imageUrl = uploaded.relativePath
+      }
+
       const newItem = await db.inventory.create({
         data: {
           name,
           description,
+          image: imageUrl,
           sport,
           quantity,
           price,
-          isActive: true,
+          isActive,
         },
       })
+
+      if (newItem.image) {
+        newItem.image = await getFileUrl(newItem.image)
+      }
 
       return c.json(ok(newItem), status.CREATED)
     } catch (error) {
@@ -120,11 +148,12 @@ export const createInventoryHandler = factory.createHandlers(
 
 export const updateInventoryHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
-  zValidator('json', updateInventorySchema, validateHook),
+  zValidator('form', updateInventorySchema, validateHook),
   async (c) => {
     try {
       const { id } = c.req.valid('param') as IdSchema
-      const body = c.req.valid('json') as Partial<CreateInventorySchema>
+      const body = c.req.valid('form') as Partial<CreateInventorySchema>
+      const { image, ...inventoryData } = body
 
       const existingItem = await db.inventory.findUnique({
         where: { id },
@@ -134,10 +163,40 @@ export const updateInventoryHandler = factory.createHandlers(
         throw new NotFoundException('Inventory item not found')
       }
 
+      let imageUrl = existingItem.image
+
+      if (image) {
+        if (existingItem.image) {
+          const oldImageUrl = await getFileUrl(existingItem.image)
+          const deleted = await deleteFile(oldImageUrl)
+          if (deleted) {
+            c.var.logger.info(
+              `Old image deleted for inventory ID: ${existingItem.id}`,
+            )
+          } else {
+            c.var.logger.warn(
+              `Failed to delete old image for inventory ID: ${existingItem.id}`,
+            )
+          }
+        }
+
+        const uploaded = await uploadFile(image, {
+          subdir: INVENTORY_SUBDIR,
+        })
+        imageUrl = uploaded.relativePath
+      }
+
       const updatedItem = await db.inventory.update({
         where: { id },
-        data: body,
+        data: {
+          ...inventoryData,
+          image: imageUrl,
+        },
       })
+
+      if (updatedItem.image) {
+        updatedItem.image = await getFileUrl(updatedItem.image)
+      }
 
       return c.json(ok(updatedItem), status.OK)
     } catch (error) {
@@ -173,6 +232,20 @@ export const deleteInventoryHandler = factory.createHandlers(
           ),
           status.BAD_REQUEST,
         )
+      }
+
+      if (existingItem.image) {
+        const imageUrl = await getFileUrl(existingItem.image)
+        const deleted = await deleteFile(imageUrl)
+        if (deleted) {
+          c.var.logger.info(
+            `Image deleted for inventory ID: ${existingItem.id}`,
+          )
+        } else {
+          c.var.logger.warn(
+            `Failed to delete image for inventory ID: ${existingItem.id}`,
+          )
+        }
       }
 
       await db.inventory.delete({

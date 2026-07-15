@@ -275,6 +275,7 @@ model Inventory {
   id          String     @id @default(cuid())
   name        String
   description String?
+  image       String?
   sport       CourtSport @default(PADEL)
   quantity    Int        @default(0) // stock on hand
   price       Int        @default(0) @db.Integer // unit price in rupiah

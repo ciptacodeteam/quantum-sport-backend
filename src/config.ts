@@ -21,6 +21,7 @@ export const JAKARTA_TZ = 'Asia/Jakarta'
 // Subdirectory constants for different file types, and declared only for database with public URL usage
 export const ADMIN_PROFILE_SUBDIR = 'admin-profiles'
 export const COURT_SUBDIR = 'courts'
+export const INVENTORY_SUBDIR = 'inventories'
 export const BANNER_SUBDIR = 'banners'
 export const CLASS_SUBDIR = 'classes'
 export const CLUB_SUBDIR = 'clubs'
