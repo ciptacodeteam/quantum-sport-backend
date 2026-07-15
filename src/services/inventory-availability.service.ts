@@ -1,5 +1,6 @@
 import { BookingStatus, CourtSport } from '@prisma/client'
 import dayjs from 'dayjs'
+import { getFileUrl } from '@/services/upload.service'
 
 type InventoryAvailabilityParams = {
   courtSport?: CourtSport
@@ -11,6 +12,7 @@ type InventoryAvailabilityItem = {
   id: string
   name: string
   description: string | null
+  image: string | null
   sport: CourtSport
   price: number
   totalQuantity: number
@@ -51,17 +53,22 @@ export async function getInventoryAvailability(
   const hasTimeRange = Boolean(params.startAt && params.endAt)
 
   if (!hasTimeRange) {
-    return inventories
-      .map((inventory: any) => ({
+    const availability = await Promise.all(
+      inventories.map(async (inventory: any) => ({
         id: inventory.id,
         name: inventory.name,
         description: inventory.description,
+        image: inventory.image ? await getFileUrl(inventory.image) : null,
         sport: inventory.sport,
         price: inventory.price,
         totalQuantity: inventory.quantity,
         availableQuantity: inventory.quantity,
-      }))
-      .filter((item: InventoryAvailabilityItem) => item.availableQuantity > 0)
+      })),
+    )
+
+    return availability.filter(
+      (item: InventoryAvailabilityItem) => item.availableQuantity > 0,
+    )
   }
 
   const startDateTime = dayjs(params.startAt).toDate()
@@ -113,8 +120,8 @@ export async function getInventoryAvailability(
   const activeBookedByInventoryId = sumByInventoryId(activeBookedTotals)
   const overlappingBookedByInventoryId = sumByInventoryId(overlappingBookedTotals)
 
-  return inventories
-    .map((inventory: any) => {
+  const availability = await Promise.all(
+    inventories.map(async (inventory: any) => {
       const totalQuantity =
         inventory.quantity + (activeBookedByInventoryId.get(inventory.id) ?? 0)
       const unavailableQuantity = overlappingBookedByInventoryId.get(inventory.id) ?? 0
@@ -124,13 +131,18 @@ export async function getInventoryAvailability(
         id: inventory.id,
         name: inventory.name,
         description: inventory.description,
+        image: inventory.image ? await getFileUrl(inventory.image) : null,
         sport: inventory.sport,
         price: inventory.price,
         totalQuantity,
         availableQuantity,
       }
-    })
-    .filter((item: InventoryAvailabilityItem) => item.availableQuantity > 0)
+    }),
+  )
+
+  return availability.filter(
+    (item: InventoryAvailabilityItem) => item.availableQuantity > 0,
+  )
 }
 
 export async function getInventoryAvailabilityMap(

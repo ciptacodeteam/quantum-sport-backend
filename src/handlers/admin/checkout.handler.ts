@@ -125,9 +125,13 @@ function validateBallboysForTennisCourts(
   }
 
   if (courtSlots.length === 0) {
-    throw new BadRequestException(
-      'Ballboy can only be added with tennis court bookings',
-    )
+    if (ballboySelections.some((selection) => selection.courtSlotId)) {
+      throw new BadRequestException(
+        'Ballboy selection must match a selected tennis court booking slot',
+      )
+    }
+
+    return
   }
 
   if (courtSlots.some((slot) => slot.court?.sport !== CourtSport.TENNIS)) {
