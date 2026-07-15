@@ -17,7 +17,13 @@ import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
-import { BookingStatus, CoachType, CourtSport, PaymentStatus, SlotType } from '@prisma/client'
+import {
+  BookingStatus,
+  CoachType,
+  CourtSport,
+  PaymentStatus,
+  SlotType,
+} from '@prisma/client'
 import type { Membership, MembershipUser } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
@@ -102,7 +108,8 @@ function ballboyCoversCourtSlot(
   courtSlot: { startAt: Date; endAt: Date },
 ): boolean {
   return (
-    dayjs(ballboySlot.startAt).valueOf() <= dayjs(courtSlot.startAt).valueOf() &&
+    dayjs(ballboySlot.startAt).valueOf() <=
+      dayjs(courtSlot.startAt).valueOf() &&
     dayjs(ballboySlot.endAt).valueOf() >= dayjs(courtSlot.endAt).valueOf()
   )
 }
@@ -539,10 +546,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
 
       if (!promo) {
         return c.json(
-          ok(
-            { isValid: false, discountAmount: 0 },
-            'Promo code not found',
-          ),
+          ok({ isValid: false, discountAmount: 0 }, 'Promo code not found'),
           status.OK,
         )
       }
@@ -550,10 +554,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
       const now = dayjs()
       if (promo.status !== 'ACTIVE') {
         return c.json(
-          ok(
-            { isValid: false, discountAmount: 0 },
-            'Promo code is not active',
-          ),
+          ok({ isValid: false, discountAmount: 0 }, 'Promo code is not active'),
           status.OK,
         )
       }
@@ -634,14 +635,15 @@ export const checkoutHandler = factory.createHandlers(
       )
       const promoCode = normalizePromoCode(rawPromoCode)
 
-      // Validate at least one slot is provided
-      const hasSlots =
+      // Validate at least one item is provided
+      const hasItems =
         (courtSlots && courtSlots.length > 0) ||
         (coachSlots && coachSlots.length > 0) ||
-        (ballboySlots && ballboySlots.length > 0)
-      if (!hasSlots) {
+        (ballboySlots && ballboySlots.length > 0) ||
+        (inventories && inventories.length > 0)
+      if (!hasItems) {
         return c.json(
-          err('At least one slot must be selected', status.BAD_REQUEST),
+          err('At least one item must be selected', status.BAD_REQUEST),
           status.BAD_REQUEST,
         )
       }
@@ -698,6 +700,16 @@ export const checkoutHandler = factory.createHandlers(
           await tx.bookingBallboy.deleteMany({
             where: { bookingId: booking.id },
           })
+          for (const bookingInventory of booking.inventories.filter(
+            (inventory: { returnedAt: Date | null }) => !inventory.returnedAt,
+          )) {
+            await tx.inventory.update({
+              where: { id: bookingInventory.inventoryId },
+              data: {
+                quantity: { increment: bookingInventory.quantity },
+              },
+            })
+          }
           await tx.bookingInventory.deleteMany({
             where: { bookingId: booking.id },
           })
@@ -737,7 +749,9 @@ export const checkoutHandler = factory.createHandlers(
           endAt: Date
           court?: { sport: CourtSport } | null
         }> = []
-        let activeMembership: (MembershipUser & { membership: Membership }) | null = null
+        let activeMembership:
+          | (MembershipUser & { membership: Membership })
+          | null = null
         const xenditItems: Array<{
           name: string
           quantity: number
@@ -779,7 +793,9 @@ export const checkoutHandler = factory.createHandlers(
           }
           selectedCourtSlots = courtSlotData
           const courtSports = Array.from(
-            new Set(courtSlotData.map((slot) => slot.court?.sport).filter(Boolean)),
+            new Set(
+              courtSlotData.map((slot) => slot.court?.sport).filter(Boolean),
+            ),
           ) as CourtSport[]
           if (courtSports.length > 1) {
             throw new BadRequestException(
@@ -812,7 +828,10 @@ export const checkoutHandler = factory.createHandlers(
             activeMembership =
               membershipCandidates.find((candidate) =>
                 courtSlotData.every((slot) =>
-                  isSlotAllowedForMembershipType(candidate.membership.type, slot.startAt),
+                  isSlotAllowedForMembershipType(
+                    candidate.membership.type,
+                    slot.startAt,
+                  ),
                 ),
               ) ?? null
           }
@@ -1031,28 +1050,60 @@ export const checkoutHandler = factory.createHandlers(
 
         // Process inventories
         if (inventories && inventories.length > 0) {
-          const inventoryAvailabilityById =
-            selectedCourtSlots.length > 0
-              ? await getInventoryAvailabilityMap(tx, {
+          const courtSlotById = new Map(
+            selectedCourtSlots.map((slot) => [slot.id, slot]),
+          )
+          const inventoryAvailabilityByRange = new Map<
+            string,
+            Awaited<ReturnType<typeof getInventoryAvailabilityMap>>
+          >()
+          const getAvailabilityForRange = async (
+            startAt?: Date,
+            endAt?: Date,
+          ) => {
+            if (!startAt || !endAt) return null
+            const key = `${startAt.toISOString()}|${endAt.toISOString()}`
+            if (!inventoryAvailabilityByRange.has(key)) {
+              inventoryAvailabilityByRange.set(
+                key,
+                await getInventoryAvailabilityMap(tx, {
                   courtSport: selectedCourtSport ?? undefined,
-                  startAt: dayjs(
+                  startAt: startAt.toISOString(),
+                  endAt: endAt.toISOString(),
+                }),
+              )
+            }
+            return inventoryAvailabilityByRange.get(key) ?? null
+          }
+          const overallAvailability =
+            selectedCourtSlots.length > 0
+              ? await getAvailabilityForRange(
+                  dayjs(
                     Math.min(
                       ...selectedCourtSlots.map((slot) =>
                         dayjs(slot.startAt).valueOf(),
                       ),
                     ),
-                  ).toISOString(),
-                  endAt: dayjs(
+                  ).toDate(),
+                  dayjs(
                     Math.max(
                       ...selectedCourtSlots.map((slot) =>
                         dayjs(slot.endAt).valueOf(),
                       ),
                     ),
-                  ).toISOString(),
-                })
+                  ).toDate(),
+                )
               : null
 
           for (const inv of inventories) {
+            const courtSlot = inv.courtSlotId
+              ? courtSlotById.get(inv.courtSlotId)
+              : undefined
+            if (inv.courtSlotId && !courtSlot) {
+              throw new BadRequestException(
+                'Inventory selection must match a selected court booking slot',
+              )
+            }
             const inventory = await tx.inventory.findUnique({
               where: { id: inv.inventoryId },
             })
@@ -1072,8 +1123,13 @@ export const checkoutHandler = factory.createHandlers(
               )
             }
             const availableQuantity =
-              inventoryAvailabilityById?.get(inv.inventoryId)?.availableQuantity ??
-              inventory.quantity
+              (courtSlot
+                ? await getAvailabilityForRange(
+                    courtSlot.startAt,
+                    courtSlot.endAt,
+                  )
+                : overallAvailability
+              )?.get(inv.inventoryId)?.availableQuantity ?? inventory.quantity
             if (availableQuantity < inv.quantity) {
               throw new BadRequestException(
                 `Insufficient quantity for ${inventory.name} at the selected booking time`,
@@ -1087,6 +1143,7 @@ export const checkoutHandler = factory.createHandlers(
               data: {
                 bookingId: booking.id,
                 inventoryId: inv.inventoryId,
+                slotId: inv.courtSlotId,
                 quantity: inv.quantity,
                 price: inventory.price, // unit price captured at checkout
               },
@@ -1204,7 +1261,9 @@ export const checkoutHandler = factory.createHandlers(
             promoCodeText: appliedPromoCodeText,
             promoDiscountAmount,
             membershipUserId: activeMembership?.id,
-            membershipSessionsUsed: activeMembership ? courtSlots?.length ?? 0 : 0,
+            membershipSessionsUsed: activeMembership
+              ? (courtSlots?.length ?? 0)
+              : 0,
           },
         })
 

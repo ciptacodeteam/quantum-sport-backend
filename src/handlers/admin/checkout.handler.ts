@@ -50,6 +50,7 @@ const adminCheckoutSchema = z
         z.object({
           inventoryId: z.string(),
           quantity: z.number().int().positive(),
+          courtSlotId: z.string().optional(),
         }),
       )
       .optional(),
@@ -105,7 +106,8 @@ function ballboyCoversCourtSlot(
   courtSlot: { startAt: Date; endAt: Date },
 ): boolean {
   return (
-    dayjs(ballboySlot.startAt).valueOf() <= dayjs(courtSlot.startAt).valueOf() &&
+    dayjs(ballboySlot.startAt).valueOf() <=
+      dayjs(courtSlot.startAt).valueOf() &&
     dayjs(ballboySlot.endAt).valueOf() >= dayjs(courtSlot.endAt).valueOf()
   )
 }
@@ -302,7 +304,9 @@ export const adminCheckoutHandler = factory.createHandlers(
             },
           })
           const sports = Array.from(
-            new Set(courtSlotSports.map((slot) => slot.court?.sport).filter(Boolean)),
+            new Set(
+              courtSlotSports.map((slot) => slot.court?.sport).filter(Boolean),
+            ),
           ) as CourtSport[]
 
           if (sports.length > 1) {
@@ -316,7 +320,9 @@ export const adminCheckoutHandler = factory.createHandlers(
 
         // Check for active membership BEFORE calculating prices
         // This determines if court costs should be excluded from totalPrice
-        let activeMembership: (MembershipUser & { membership: Membership }) | null = null
+        let activeMembership:
+          | (MembershipUser & { membership: Membership })
+          | null = null
         let activeMembershipCandidates: Array<
           MembershipUser & { membership: Membership }
         > = []
@@ -370,7 +376,11 @@ export const adminCheckoutHandler = factory.createHandlers(
           courtSlots: [] as string[],
           coachSlots: [] as string[],
           ballboySlots: [] as string[],
-          inventories: [] as Array<{ inventoryId: string; quantity: number }>,
+          inventories: [] as Array<{
+            inventoryId: string
+            quantity: number
+            courtSlotId?: string
+          }>,
         }
 
         // Courts
@@ -409,7 +419,10 @@ export const adminCheckoutHandler = factory.createHandlers(
           activeMembership =
             activeMembershipCandidates.find((candidate) =>
               slotData.every((slot) =>
-                isSlotAllowedForMembershipType(candidate.membership.type, slot.startAt),
+                isSlotAllowedForMembershipType(
+                  candidate.membership.type,
+                  slot.startAt,
+                ),
               ),
             ) ?? null
 
@@ -634,28 +647,60 @@ export const adminCheckoutHandler = factory.createHandlers(
 
         // Inventories
         if (inventories && inventories.length > 0) {
-          const inventoryAvailabilityById =
-            selectedCourtSlots.length > 0
-              ? await getInventoryAvailabilityMap(tx, {
+          const courtSlotById = new Map(
+            selectedCourtSlots.map((slot) => [slot.id, slot]),
+          )
+          const inventoryAvailabilityByRange = new Map<
+            string,
+            Awaited<ReturnType<typeof getInventoryAvailabilityMap>>
+          >()
+          const getAvailabilityForRange = async (
+            startAt?: Date,
+            endAt?: Date,
+          ) => {
+            if (!startAt || !endAt) return null
+            const key = `${startAt.toISOString()}|${endAt.toISOString()}`
+            if (!inventoryAvailabilityByRange.has(key)) {
+              inventoryAvailabilityByRange.set(
+                key,
+                await getInventoryAvailabilityMap(tx, {
                   courtSport: courtSportForMembership ?? undefined,
-                  startAt: dayjs(
+                  startAt: startAt.toISOString(),
+                  endAt: endAt.toISOString(),
+                }),
+              )
+            }
+            return inventoryAvailabilityByRange.get(key) ?? null
+          }
+          const overallAvailability =
+            selectedCourtSlots.length > 0
+              ? await getAvailabilityForRange(
+                  dayjs(
                     Math.min(
                       ...selectedCourtSlots.map((slot) =>
                         dayjs(slot.startAt).valueOf(),
                       ),
                     ),
-                  ).toISOString(),
-                  endAt: dayjs(
+                  ).toDate(),
+                  dayjs(
                     Math.max(
                       ...selectedCourtSlots.map((slot) =>
                         dayjs(slot.endAt).valueOf(),
                       ),
                     ),
-                  ).toISOString(),
-                })
+                  ).toDate(),
+                )
               : null
 
           for (const inv of inventories) {
+            const courtSlot = inv.courtSlotId
+              ? courtSlotById.get(inv.courtSlotId)
+              : undefined
+            if (inv.courtSlotId && !courtSlot) {
+              throw new BadRequestException(
+                'Inventory selection must match a selected court booking slot',
+              )
+            }
             const inventory = await tx.inventory.findUnique({
               where: { id: inv.inventoryId },
             })
@@ -669,14 +714,22 @@ export const adminCheckoutHandler = factory.createHandlers(
                 `Inventory ${inventory.name} is not active`,
               )
             }
-            if (courtSportForMembership && inventory.sport !== courtSportForMembership) {
+            if (
+              courtSportForMembership &&
+              inventory.sport !== courtSportForMembership
+            ) {
               throw new BadRequestException(
                 `Inventory ${inventory.name} does not match the selected court sport`,
               )
             }
             const availableQuantity =
-              inventoryAvailabilityById?.get(inv.inventoryId)?.availableQuantity ??
-              inventory.quantity
+              (courtSlot
+                ? await getAvailabilityForRange(
+                    courtSlot.startAt,
+                    courtSlot.endAt,
+                  )
+                : overallAvailability
+              )?.get(inv.inventoryId)?.availableQuantity ?? inventory.quantity
             if (availableQuantity < inv.quantity) {
               throw new BadRequestException(
                 `Insufficient quantity for ${inventory.name} at the selected booking time`,
@@ -688,6 +741,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               data: {
                 bookingId: booking.id,
                 inventoryId: inv.inventoryId,
+                slotId: inv.courtSlotId,
                 quantity: inv.quantity,
                 price: inventory.price,
               },
@@ -695,6 +749,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             bookedItems.inventories.push({
               inventoryId: inv.inventoryId,
               quantity: inv.quantity,
+              courtSlotId: inv.courtSlotId,
             })
             // Decrement inventory stock
             await tx.inventory.update({

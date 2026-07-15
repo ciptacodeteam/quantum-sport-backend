@@ -488,7 +488,10 @@ export const createMembershipSchema = z.object({
   content: z.string().optional(),
   contentHtml: z.string().optional(),
   sport: z.nativeEnum(CourtSport).optional().default(CourtSport.PADEL),
-  type: z.nativeEnum(MembershipType).optional().default(MembershipType.ALL_HOUR),
+  type: z
+    .nativeEnum(MembershipType)
+    .optional()
+    .default(MembershipType.ALL_HOUR),
   price: z.number().min(0),
   sessions: z.number().min(1),
   duration: z.number().min(1),
@@ -657,6 +660,7 @@ export const checkoutSchema = z.object({
       z.object({
         inventoryId: z.string(),
         quantity: z.number().min(1),
+        courtSlotId: z.string().optional(),
       }),
     )
     .optional(),

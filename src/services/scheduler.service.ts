@@ -130,7 +130,10 @@ export async function checkExpiredTransactions() {
           if (payment.invoice.booking) {
             // Restore inventory quantities (they were decremented during checkout)
             const bookingInventories = await tx.bookingInventory.findMany({
-              where: { bookingId: payment.invoice.booking.id },
+              where: {
+                bookingId: payment.invoice.booking.id,
+                returnedAt: null,
+              },
             })
             for (const bookingInv of bookingInventories) {
               await tx.inventory.update({
@@ -138,6 +141,10 @@ export async function checkExpiredTransactions() {
                 data: {
                   quantity: { increment: bookingInv.quantity },
                 },
+              })
+              await tx.bookingInventory.update({
+                where: { id: bookingInv.id },
+                data: { returnedAt: now },
               })
               log.info(
                 `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} for expired payment ${payment.id}`,
@@ -242,7 +249,7 @@ export async function checkExpiredTransactions() {
 
         // Restore inventory quantities (they were decremented during checkout)
         const bookingInventories = await tx.bookingInventory.findMany({
-          where: { bookingId: booking.id },
+          where: { bookingId: booking.id, returnedAt: null },
         })
         for (const bookingInv of bookingInventories) {
           await tx.inventory.update({
@@ -250,6 +257,10 @@ export async function checkExpiredTransactions() {
             data: {
               quantity: { increment: bookingInv.quantity },
             },
+          })
+          await tx.bookingInventory.update({
+            where: { id: bookingInv.id },
+            data: { returnedAt: now },
           })
           log.info(
             `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} for expired hold booking ${booking.id}`,
@@ -286,6 +297,70 @@ export async function checkExpiredTransactions() {
   } catch (error) {
     log.error(`Error checking expired transactions: ${error}`)
     throw error
+  }
+}
+
+/**
+ * Restore racket/equipment stock once the booked court session has finished.
+ * Inventory bookings without a slotId are legacy records and keep the old
+ * cancellation-based restore behavior.
+ */
+export async function restoreCompletedInventorySessions() {
+  const now = new Date()
+
+  const completedInventoryBookings = await db.bookingInventory.findMany({
+    where: {
+      returnedAt: null,
+      slotId: { not: null },
+      booking: {
+        status: BookingStatus.CONFIRMED,
+      },
+      slot: {
+        endAt: {
+          lte: now,
+        },
+      },
+    },
+    select: {
+      id: true,
+      inventoryId: true,
+      quantity: true,
+      slotId: true,
+      bookingId: true,
+    },
+  })
+
+  for (const bookingInventory of completedInventoryBookings) {
+    await db.$transaction(async (tx) => {
+      const marked = await tx.bookingInventory.updateMany({
+        where: {
+          id: bookingInventory.id,
+          returnedAt: null,
+        },
+        data: {
+          returnedAt: now,
+        },
+      })
+
+      if (marked.count === 0) {
+        return
+      }
+
+      await tx.inventory.update({
+        where: { id: bookingInventory.inventoryId },
+        data: {
+          quantity: { increment: bookingInventory.quantity },
+        },
+      })
+    })
+
+    log.info(
+      `Restored inventory ${bookingInventory.inventoryId} by ${bookingInventory.quantity} after session ${bookingInventory.slotId} ended for booking ${bookingInventory.bookingId}`,
+    )
+  }
+
+  return {
+    restoredInventoryBookings: completedInventoryBookings.length,
   }
 }
 
@@ -342,11 +417,17 @@ export function startSchedulerWorker() {
     async (job) => {
       if (job.name === 'check-expired-transactions') {
         log.info('Running scheduled expiry check...')
-        const result = await checkExpiredTransactions()
+        const [expiredResult, inventoryResult] = await Promise.all([
+          checkExpiredTransactions(),
+          restoreCompletedInventorySessions(),
+        ])
         log.info(
-          `Expiry check completed: ${result.expiredPayments} payments, ${result.expiredHoldBookings} hold bookings expired`,
+          `Scheduler check completed: ${expiredResult.expiredPayments} payments, ${expiredResult.expiredHoldBookings} hold bookings expired, ${inventoryResult.restoredInventoryBookings} inventory sessions restored`,
         )
-        return result
+        return {
+          ...expiredResult,
+          ...inventoryResult,
+        }
       }
     },
     {

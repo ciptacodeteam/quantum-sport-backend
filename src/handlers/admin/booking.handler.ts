@@ -778,7 +778,9 @@ export const rejectBookingTransactionHandler = factory.createHandlers(
         }
 
         // Restore inventory quantities
-        for (const bookingInventory of booking.inventories) {
+        for (const bookingInventory of booking.inventories.filter(
+          (inventory) => !inventory.returnedAt,
+        )) {
           await tx.inventory.update({
             where: { id: bookingInventory.inventoryId },
             data: {
@@ -786,6 +788,10 @@ export const rejectBookingTransactionHandler = factory.createHandlers(
                 increment: bookingInventory.quantity,
               },
             },
+          })
+          await tx.bookingInventory.update({
+            where: { id: bookingInventory.id },
+            data: { returnedAt: new Date() },
           })
         }
 

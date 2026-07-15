@@ -288,15 +288,17 @@ export const cancelInventoryBookingHandler = factory.createHandlers(
           )
         }
 
-        // 3. Restore inventory quantity
-        await tx.inventory.update({
-          where: { id: inventoryBooking.inventoryId },
-          data: {
-            quantity: {
-              increment: inventoryBooking.quantity,
+        // 3. Restore inventory quantity if this session has not returned it yet
+        if (!inventoryBooking.returnedAt) {
+          await tx.inventory.update({
+            where: { id: inventoryBooking.inventoryId },
+            data: {
+              quantity: {
+                increment: inventoryBooking.quantity,
+              },
             },
-          },
-        })
+          })
+        }
 
         // 4. Calculate the total price of this inventory booking
         const totalInventoryPrice =

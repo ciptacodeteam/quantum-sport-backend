@@ -49,7 +49,9 @@ export async function getInventoryAvailability(
     return []
   }
 
-  const inventoryIds = inventories.map((inventory: { id: string }) => inventory.id)
+  const inventoryIds = inventories.map(
+    (inventory: { id: string }) => inventory.id,
+  )
   const hasTimeRange = Boolean(params.startAt && params.endAt)
 
   if (!hasTimeRange) {
@@ -77,6 +79,7 @@ export async function getInventoryAvailability(
       by: ['inventoryId'],
       where: {
         inventoryId: { in: inventoryIds },
+        returnedAt: null,
         booking: {
           status: {
             not: BookingStatus.CANCELLED,
@@ -91,21 +94,39 @@ export async function getInventoryAvailability(
       by: ['inventoryId'],
       where: {
         inventoryId: { in: inventoryIds },
-        booking: {
-          status: {
-            not: BookingStatus.CANCELLED,
+        returnedAt: null,
+        OR: [
+          {
+            slot: {
+              startAt: {
+                lt: endDateTime,
+              },
+              endAt: {
+                gt: startDateTime,
+              },
+            },
           },
-          details: {
-            some: {
-              slot: {
-                startAt: {
-                  lt: endDateTime,
-                },
-                endAt: {
-                  gt: startDateTime,
+          {
+            slotId: null,
+            booking: {
+              details: {
+                some: {
+                  slot: {
+                    startAt: {
+                      lt: endDateTime,
+                    },
+                    endAt: {
+                      gt: startDateTime,
+                    },
+                  },
                 },
               },
             },
+          },
+        ],
+        booking: {
+          status: {
+            not: BookingStatus.CANCELLED,
           },
         },
       },
@@ -116,7 +137,9 @@ export async function getInventoryAvailability(
   ])
 
   const activeBookedByInventoryId = sumByInventoryId(activeBookedTotals)
-  const overlappingBookedByInventoryId = sumByInventoryId(overlappingBookedTotals)
+  const overlappingBookedByInventoryId = sumByInventoryId(
+    overlappingBookedTotals,
+  )
 
   const availability = await Promise.all(
     inventories.map(async (inventory: any) => {
@@ -135,7 +158,8 @@ export async function getInventoryAvailability(
 
       const totalQuantity =
         inventory.quantity + (activeBookedByInventoryId.get(inventory.id) ?? 0)
-      const unavailableQuantity = overlappingBookedByInventoryId.get(inventory.id) ?? 0
+      const unavailableQuantity =
+        overlappingBookedByInventoryId.get(inventory.id) ?? 0
       const availableQuantity = Math.max(0, totalQuantity - unavailableQuantity)
 
       return {

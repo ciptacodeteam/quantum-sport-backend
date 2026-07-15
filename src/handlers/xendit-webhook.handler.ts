@@ -238,7 +238,7 @@ async function handlePaymentWebhookV3(c: any, webhook: XenditPaymentWebhook) {
     } else if (event === 'payment.failure') {
       // Restore inventory stock when payment fails (it was decremented during checkout)
       const bookingInventories = await db.bookingInventory.findMany({
-        where: { bookingId: invoice.bookingId },
+        where: { bookingId: invoice.bookingId, returnedAt: null },
       })
 
       for (const bookingInv of bookingInventories) {
@@ -247,6 +247,10 @@ async function handlePaymentWebhookV3(c: any, webhook: XenditPaymentWebhook) {
           data: {
             quantity: { increment: bookingInv.quantity },
           },
+        })
+        await db.bookingInventory.update({
+          where: { id: bookingInv.id },
+          data: { returnedAt: new Date() },
         })
         c.var.logger.info(
           `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} due to payment failure`,
@@ -547,12 +551,18 @@ async function handlePaymentSessionWebhook(
         }
 
         // Restore inventory quantities
-        for (const bookingInv of booking.inventories) {
+        for (const bookingInv of booking.inventories.filter(
+          (inventory) => !inventory.returnedAt,
+        )) {
           await tx.inventory.update({
             where: { id: bookingInv.inventoryId },
             data: {
               quantity: { increment: bookingInv.quantity },
             },
+          })
+          await tx.bookingInventory.update({
+            where: { id: bookingInv.id },
+            data: { returnedAt: new Date() },
           })
         }
 
@@ -716,7 +726,7 @@ async function handleInvoiceWebhookV2(c: any, payload: XenditWebhookPayload) {
     } else if (payload.status === 'EXPIRED') {
       // Restore inventory stock when payment expires (it was decremented during checkout)
       const bookingInventories = await db.bookingInventory.findMany({
-        where: { bookingId: invoice.bookingId },
+        where: { bookingId: invoice.bookingId, returnedAt: null },
       })
 
       for (const bookingInv of bookingInventories) {
@@ -725,6 +735,10 @@ async function handleInvoiceWebhookV2(c: any, payload: XenditWebhookPayload) {
           data: {
             quantity: { increment: bookingInv.quantity },
           },
+        })
+        await db.bookingInventory.update({
+          where: { id: bookingInv.id },
+          data: { returnedAt: new Date() },
         })
         c.var.logger.info(
           `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} due to payment expiration`,
@@ -1127,7 +1141,7 @@ export const xenditPaymentRequestWebhookHandler = factory.createHandlers(
         if (invoice.bookingId) {
           // Restore inventory stock when payment fails/expires (it was decremented during checkout)
           const bookingInventories = await db.bookingInventory.findMany({
-            where: { bookingId: invoice.bookingId },
+            where: { bookingId: invoice.bookingId, returnedAt: null },
           })
 
           for (const bookingInv of bookingInventories) {
@@ -1136,6 +1150,10 @@ export const xenditPaymentRequestWebhookHandler = factory.createHandlers(
               data: {
                 quantity: { increment: bookingInv.quantity },
               },
+            })
+            await db.bookingInventory.update({
+              where: { id: bookingInv.id },
+              data: { returnedAt: new Date() },
             })
             c.var.logger.info(
               `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} due to payment ${payload.data.status.toLowerCase()}`,
