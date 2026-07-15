@@ -120,6 +120,19 @@ export async function getInventoryAvailability(
 
   const availability = await Promise.all(
     inventories.map(async (inventory: any) => {
+      if (inventory.quantity <= 0) {
+        return {
+          id: inventory.id,
+          name: inventory.name,
+          description: inventory.description,
+          image: inventory.image ? await getFileUrl(inventory.image) : null,
+          sport: inventory.sport,
+          price: inventory.price,
+          totalQuantity: 0,
+          availableQuantity: 0,
+        }
+      }
+
       const totalQuantity =
         inventory.quantity + (activeBookedByInventoryId.get(inventory.id) ?? 0)
       const unavailableQuantity = overlappingBookedByInventoryId.get(inventory.id) ?? 0
