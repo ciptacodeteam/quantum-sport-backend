@@ -66,9 +66,7 @@ export async function getInventoryAvailability(
       })),
     )
 
-    return availability.filter(
-      (item: InventoryAvailabilityItem) => item.availableQuantity > 0,
-    )
+    return availability
   }
 
   const startDateTime = dayjs(params.startAt).toDate()
@@ -140,9 +138,7 @@ export async function getInventoryAvailability(
     }),
   )
 
-  return availability.filter(
-    (item: InventoryAvailabilityItem) => item.availableQuantity > 0,
-  )
+  return availability
 }
 
 export async function getInventoryAvailabilityMap(
