@@ -1025,6 +1025,12 @@ export const checkoutHandler = factory.createHandlers(
             ballboySlotData,
             selectedCourtSlots,
           )
+          const ballboySelectionBySlotId = new Map(
+            ballboySelections.map((selection) => [
+              selection.slotId,
+              selection.courtSlotId,
+            ]),
+          )
 
           for (const slot of ballboySlotData) {
             if (slot.bookingBallboys.length > 0) {
@@ -1038,6 +1044,7 @@ export const checkoutHandler = factory.createHandlers(
               data: {
                 bookingId: booking.id,
                 slotId: slot.id,
+                courtSlotId: ballboySelectionBySlotId.get(slot.id),
                 price: slot.price,
               },
             })

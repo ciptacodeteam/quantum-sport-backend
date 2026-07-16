@@ -19,6 +19,29 @@ async function main() {
     ON booking_ballboys ("slotId");
   `)
 
+  await db.$executeRawUnsafe(`
+    ALTER TABLE booking_ballboys
+    ADD COLUMN IF NOT EXISTS "courtSlotId" TEXT;
+  `)
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE booking_ballboys
+    DROP CONSTRAINT IF EXISTS "booking_ballboys_courtSlotId_fkey";
+  `)
+
+  await db.$executeRawUnsafe(`
+    ALTER TABLE booking_ballboys
+    ADD CONSTRAINT "booking_ballboys_courtSlotId_fkey"
+    FOREIGN KEY ("courtSlotId") REFERENCES slots(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL;
+  `)
+
+  await db.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS booking_ballboys_courtSlotId_idx
+    ON booking_ballboys ("courtSlotId");
+  `)
+
   console.log('Ballboy slot reuse schema fixed.')
 }
 

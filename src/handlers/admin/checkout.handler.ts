@@ -628,6 +628,12 @@ export const adminCheckoutHandler = factory.createHandlers(
             slotData,
             selectedCourtSlots,
           )
+          const ballboySelectionBySlotId = new Map(
+            ballboySelections.map((selection) => [
+              selection.slotId,
+              selection.courtSlotId,
+            ]),
+          )
           for (const slot of slotData) {
             if (slot.bookingBallboys.length > 0) {
               throw new BadRequestException(
@@ -639,6 +645,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               data: {
                 bookingId: booking.id,
                 slotId: slot.id,
+                courtSlotId: ballboySelectionBySlotId.get(slot.id),
                 price: slot.price,
               },
             })

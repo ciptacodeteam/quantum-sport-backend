@@ -150,6 +150,20 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
           },
           ballboys: {
             include: {
+              courtSlot: {
+                select: {
+                  id: true,
+                  startAt: true,
+                  endAt: true,
+                  court: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sport: true,
+                    },
+                  },
+                },
+              },
               slot: {
                 select: {
                   id: true,
@@ -324,6 +338,20 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
           },
           ballboys: {
             include: {
+              courtSlot: {
+                select: {
+                  id: true,
+                  startAt: true,
+                  endAt: true,
+                  court: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sport: true,
+                    },
+                  },
+                },
+              },
               slot: {
                 select: {
                   id: true,
@@ -448,6 +476,16 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
           }
           if (ballboy.slot?.endAt) {
             ballboy.slot.endAt = dayjs(ballboy.slot.endAt).format(
+              'YYYY-MM-DD HH:mm:ss',
+            ) as any
+          }
+          if (ballboy.courtSlot?.startAt) {
+            ballboy.courtSlot.startAt = dayjs(ballboy.courtSlot.startAt).format(
+              'YYYY-MM-DD HH:mm:ss',
+            ) as any
+          }
+          if (ballboy.courtSlot?.endAt) {
+            ballboy.courtSlot.endAt = dayjs(ballboy.courtSlot.endAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }

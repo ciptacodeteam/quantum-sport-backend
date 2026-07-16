@@ -338,7 +338,8 @@ model Slot {
 
   bookingDetails     BookingDetail[] // court slots
   bookingCoaches     BookingCoach[] // coach slots
-  bookingBallboys    BookingBallboy[] // ballboy slots
+  bookingBallboys    BookingBallboy[]   @relation("BallboyServiceSlot") // ballboy slots
+  courtBallboys      BookingBallboy[]   @relation("BallboyCourtSlot") // court slots linked to ballboy bookings
   bookingInventories BookingInventory[] // inventory tied to a court slot/session
 
   // Prevent overlaps per resource+time window:
@@ -543,17 +544,20 @@ model BookingInventory {
 }
 
 model BookingBallboy {
-  id        String   @id @default(cuid())
-  bookingId String
-  slotId    String // BALLBOY slot
-  price     Int      @default(0) @db.Integer
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  id          String   @id @default(cuid())
+  bookingId   String
+  slotId      String // BALLBOY slot
+  courtSlotId String?
+  price       Int      @default(0) @db.Integer
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  slot    Slot    @relation(fields: [slotId], references: [id])
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  slot      Slot    @relation("BallboyServiceSlot", fields: [slotId], references: [id])
+  courtSlot Slot?   @relation("BallboyCourtSlot", fields: [courtSlotId], references: [id])
 
   @@index([slotId])
+  @@index([courtSlotId])
   @@map("booking_ballboys")
 }
 
