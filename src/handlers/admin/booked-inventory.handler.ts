@@ -25,7 +25,39 @@ const bookedInventoriesQuerySchema = searchQuerySchema.extend({
     .enum(['cashier', 'online'])
     .optional()
     .describe('Filter by booking source: cashier or online'),
+  category: z
+    .enum(['all', 'bola', 'raket', 'ballboy', 'coach', 'inventory'])
+    .optional()
+    .describe('Filter add-ons by category'),
 })
+
+function getInventoryCategory(name: string) {
+  const normalized = name.toLowerCase()
+
+  if (normalized.includes('bola') || normalized.includes('ball')) {
+    return 'bola'
+  }
+  if (normalized.includes('raket') || normalized.includes('racket')) {
+    return 'raket'
+  }
+
+  return 'inventory'
+}
+
+function buildCourtSlots(
+  details: Array<{
+    court: { id: string; name: string } | null
+    slot: { startAt: Date; endAt: Date }
+  }>,
+) {
+  return details.map((d) => ({
+    court: d.court,
+    startAt: d.slot.startAt,
+    endAt: d.slot.endAt,
+    date: dayjs(d.slot.startAt).format('YYYY-MM-DD'),
+    time: `${dayjs(d.slot.startAt).format('HH:mm')} - ${dayjs(d.slot.endAt).format('HH:mm')}`,
+  }))
+}
 
 export const getAllBookedInventoriesHandler = factory.createHandlers(
   zValidator('query', bookedInventoriesQuerySchema, validateHook),
@@ -36,6 +68,7 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
         defaultOrderBy: { createdAt: 'desc' },
         searchableFields: [],
       })
+      const category = query.category || 'all'
 
       // Add source filter if provided
       let where = queryOptions.where || {}
@@ -47,62 +80,124 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
         }
       }
 
-      const bookedInventories = await db.bookingInventory.findMany({
-        ...queryOptions,
-        where,
-        include: {
-          inventory: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              quantity: true,
-              price: true,
-              isActive: true,
-            },
+      const includeInventory =
+        category === 'all' ||
+        category === 'inventory' ||
+        category === 'bola' ||
+        category === 'raket'
+      const includeBallboys = category === 'all' || category === 'ballboy'
+      const includeCoaches = category === 'all' || category === 'coach'
+
+      const bookingInclude = {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            image: true,
           },
-          booking: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  phone: true,
-                  image: true,
-                },
+        },
+        invoice: {
+          select: {
+            id: true,
+            number: true,
+            status: true,
+            total: true,
+          },
+        },
+        details: {
+          include: {
+            court: {
+              select: {
+                id: true,
+                name: true,
               },
-              invoice: {
-                select: {
-                  id: true,
-                  number: true,
-                  status: true,
-                  total: true,
-                },
-              },
-              details: {
-                include: {
-                  court: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
-                  slot: {
-                    select: {
-                      startAt: true,
-                      endAt: true,
-                    },
-                  },
-                },
+            },
+            slot: {
+              select: {
+                startAt: true,
+                endAt: true,
               },
             },
           },
         },
-      })
+      }
 
-      const formattedInventories = bookedInventories.map((inv) => ({
+      const [bookedInventories, bookedBallboys, bookedCoaches] =
+        await Promise.all([
+          includeInventory
+            ? db.bookingInventory.findMany({
+                where,
+                include: {
+                  inventory: {
+                    select: {
+                      id: true,
+                      name: true,
+                      description: true,
+                      quantity: true,
+                      price: true,
+                      isActive: true,
+                    },
+                  },
+                  booking: {
+                    include: bookingInclude,
+                  },
+                },
+              })
+            : Promise.resolve([]),
+          includeBallboys
+            ? db.bookingBallboy.findMany({
+                where,
+                include: {
+                  slot: {
+                    include: {
+                      staff: {
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true,
+                          phone: true,
+                        },
+                      },
+                    },
+                  },
+                  booking: {
+                    include: bookingInclude,
+                  },
+                },
+              })
+            : Promise.resolve([]),
+          includeCoaches
+            ? db.bookingCoach.findMany({
+                where,
+                include: {
+                  slot: {
+                    include: {
+                      staff: {
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true,
+                          phone: true,
+                        },
+                      },
+                    },
+                  },
+                  bookingCoachType: true,
+                  booking: {
+                    include: bookingInclude,
+                  },
+                },
+              })
+            : Promise.resolve([]),
+        ])
+
+      const formattedInventories = bookedInventories
+        .map((inv) => ({
         id: inv.id,
+        itemType: 'inventory',
+        category: getInventoryCategory(inv.inventory.name),
         inventory: inv.inventory,
         quantity: inv.quantity,
         unitPrice: inv.price,
@@ -113,20 +208,104 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
           totalPrice: inv.booking.totalPrice,
           customer: inv.booking.user,
           invoice: inv.booking.invoice,
-          courtSlots: inv.booking.details.map((d) => ({
-            court: d.court,
-            startAt: d.slot.startAt,
-            endAt: d.slot.endAt,
-            date: dayjs(d.slot.startAt).format('YYYY-MM-DD'),
-            time: `${dayjs(d.slot.startAt).format('HH:mm')} - ${dayjs(d.slot.endAt).format('HH:mm')}`,
-          })),
+          courtSlots: buildCourtSlots(inv.booking.details),
           createdAt: inv.booking.createdAt,
         },
         createdAt: inv.createdAt,
         updatedAt: inv.updatedAt,
       }))
+        .filter((inv) =>
+          category === 'all' || category === 'inventory'
+            ? true
+            : inv.category === category,
+        )
 
-      return c.json(ok(formattedInventories), status.OK)
+      const formattedBallboys = bookedBallboys.map((ballboy) => ({
+        id: ballboy.id,
+        itemType: 'ballboy',
+        category: 'ballboy',
+        inventory: {
+          id: ballboy.slot.staff?.id || ballboy.slot.id,
+          name: ballboy.slot.staff?.name
+            ? `Ballboy - ${ballboy.slot.staff.name}`
+            : 'Ballboy',
+          description: 'Ballboy add-on',
+          quantity: 1,
+          price: ballboy.price,
+          isActive: true,
+        },
+        serviceStaff: ballboy.slot.staff,
+        slot: {
+          startAt: ballboy.slot.startAt,
+          endAt: ballboy.slot.endAt,
+        },
+        quantity: 1,
+        unitPrice: ballboy.price,
+        totalPrice: ballboy.price,
+        booking: {
+          id: ballboy.booking.id,
+          status: ballboy.booking.status,
+          totalPrice: ballboy.booking.totalPrice,
+          customer: ballboy.booking.user,
+          invoice: ballboy.booking.invoice,
+          courtSlots: buildCourtSlots(ballboy.booking.details),
+          createdAt: ballboy.booking.createdAt,
+        },
+        createdAt: ballboy.createdAt,
+        updatedAt: ballboy.updatedAt,
+      }))
+
+      const formattedCoaches = bookedCoaches.map((coach) => ({
+        id: coach.id,
+        itemType: 'coach',
+        category: 'coach',
+        inventory: {
+          id: coach.slot.staff?.id || coach.slot.id,
+          name: coach.slot.staff?.name
+            ? `Coach - ${coach.slot.staff.name}`
+            : 'Coach',
+          description: coach.bookingCoachType.name,
+          quantity: 1,
+          price: coach.price,
+          isActive: true,
+        },
+        serviceStaff: coach.slot.staff,
+        coachType: coach.bookingCoachType,
+        slot: {
+          startAt: coach.slot.startAt,
+          endAt: coach.slot.endAt,
+        },
+        quantity: 1,
+        unitPrice: coach.price,
+        totalPrice: coach.price,
+        booking: {
+          id: coach.booking.id,
+          status: coach.booking.status,
+          totalPrice: coach.booking.totalPrice,
+          customer: coach.booking.user,
+          invoice: coach.booking.invoice,
+          courtSlots: buildCourtSlots(coach.booking.details),
+          createdAt: coach.booking.createdAt,
+        },
+        createdAt: coach.createdAt,
+        updatedAt: coach.updatedAt,
+      }))
+
+      const combinedItems = [
+        ...formattedInventories,
+        ...formattedBallboys,
+        ...formattedCoaches,
+      ].sort(
+        (a, b) =>
+          dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf(),
+      )
+
+      const skip = queryOptions.skip || 0
+      const take = queryOptions.take
+      const paginatedItems =
+        take === undefined ? combinedItems : combinedItems.slice(skip, skip + take)
+
+      return c.json(ok(paginatedItems), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getAllBookedInventoriesHandler: ${error}`)
       throw error
