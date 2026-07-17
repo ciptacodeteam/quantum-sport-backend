@@ -66,6 +66,23 @@ function timeRangesOverlap(
   return first.startAt < second.endAt && first.endAt > second.startAt
 }
 
+function combineWhere(...conditions: Array<Record<string, any> | undefined>) {
+  const activeConditions = conditions.filter(
+    (condition): condition is Record<string, any> =>
+      Boolean(condition && Object.keys(condition).length > 0),
+  )
+
+  if (activeConditions.length === 0) {
+    return undefined
+  }
+
+  if (activeConditions.length === 1) {
+    return activeConditions[0]
+  }
+
+  return { AND: activeConditions }
+}
+
 export const getAllBookedInventoriesHandler = factory.createHandlers(
   zValidator('query', bookedInventoriesQuerySchema, validateHook),
   async (c) => {
@@ -76,9 +93,18 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
         searchableFields: [],
       })
       const category = query.category || 'all'
+      const { createdAt: _ignoredCreatedAt, ...queryWhere } =
+        queryOptions.where || {}
+      const slotStartFilter =
+        query.from || query.to
+          ? {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lte: new Date(query.to) } : {}),
+            }
+          : undefined
 
       // Add source filter if provided
-      let where = queryOptions.where || {}
+      let where = queryWhere
       if (query.source) {
         if (query.source === 'cashier') {
           where = { ...where, booking: { cashierId: { not: null } } }
@@ -136,7 +162,31 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
         await Promise.all([
           includeInventory
             ? db.bookingInventory.findMany({
-                where,
+                where: combineWhere(
+                  where,
+                  slotStartFilter
+                    ? {
+                        OR: [
+                          {
+                            slot: {
+                              startAt: slotStartFilter,
+                            },
+                          },
+                          {
+                            booking: {
+                              details: {
+                                some: {
+                                  slot: {
+                                    startAt: slotStartFilter,
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        ],
+                      }
+                    : undefined,
+                ),
                 include: {
                   inventory: {
                     select: {
@@ -156,7 +206,16 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
             : Promise.resolve([]),
           includeBallboys
             ? db.bookingBallboy.findMany({
-                where,
+                where: combineWhere(
+                  where,
+                  slotStartFilter
+                    ? {
+                        slot: {
+                          startAt: slotStartFilter,
+                        },
+                      }
+                    : undefined,
+                ),
                 include: {
                   slot: {
                     include: {
@@ -178,7 +237,16 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
             : Promise.resolve([]),
           includeCoaches
             ? db.bookingCoach.findMany({
-                where,
+                where: combineWhere(
+                  where,
+                  slotStartFilter
+                    ? {
+                        slot: {
+                          startAt: slotStartFilter,
+                        },
+                      }
+                    : undefined,
+                ),
                 include: {
                   slot: {
                     include: {
