@@ -52,6 +52,17 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
               },
             },
           },
+          courtSlot: {
+            include: {
+              court: {
+                select: {
+                  id: true,
+                  name: true,
+                  sport: true,
+                },
+              },
+            },
+          },
           booking: {
             include: {
               user: {
@@ -69,6 +80,24 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
                   number: true,
                   status: true,
                   total: true,
+                },
+              },
+              details: {
+                include: {
+                  court: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sport: true,
+                    },
+                  },
+                  slot: {
+                    select: {
+                      id: true,
+                      startAt: true,
+                      endAt: true,
+                    },
+                  },
                 },
               },
             },
@@ -95,12 +124,32 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
           price: ballboy.slot.price,
           isAvailable: ballboy.slot.isAvailable,
         },
+        courtSlot: ballboy.courtSlot
+          ? {
+              id: ballboy.courtSlot.id,
+              startAt: ballboy.courtSlot.startAt,
+              endAt: ballboy.courtSlot.endAt,
+              date: dayjs(ballboy.courtSlot.startAt).format('YYYY-MM-DD'),
+              startTime: dayjs(ballboy.courtSlot.startAt).format('HH:mm'),
+              endTime: dayjs(ballboy.courtSlot.endAt).format('HH:mm'),
+              court: ballboy.courtSlot.court,
+            }
+          : null,
         booking: {
           id: ballboy.booking.id,
           status: ballboy.booking.status,
           totalPrice: ballboy.booking.totalPrice,
           customer: ballboy.booking.user,
           invoice: ballboy.booking.invoice,
+          courtSlots: ballboy.booking.details.map((detail) => ({
+            court: detail.court,
+            slot: {
+              ...detail.slot,
+              date: dayjs(detail.slot.startAt).format('YYYY-MM-DD'),
+              startTime: dayjs(detail.slot.startAt).format('HH:mm'),
+              endTime: dayjs(detail.slot.endAt).format('HH:mm'),
+            },
+          })),
           createdAt: ballboy.booking.createdAt,
         },
         price: ballboy.price,

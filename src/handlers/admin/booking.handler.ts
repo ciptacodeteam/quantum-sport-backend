@@ -66,13 +66,26 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
       if (query.courtSport) {
         where = {
           ...where,
-          details: {
-            some: {
-              court: {
-                sport: query.courtSport,
+          OR: [
+            {
+              details: {
+                some: {
+                  court: {
+                    sport: query.courtSport,
+                  },
+                },
               },
             },
-          },
+            ...(query.courtSport === CourtSport.TENNIS
+              ? [
+                  {
+                    ballboys: {
+                      some: {},
+                    },
+                  },
+                ]
+              : []),
+          ],
         }
       }
       if (query.coach === 'with') {
@@ -243,13 +256,26 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
       if (query.courtSport) {
         where = {
           ...where,
-          details: {
-            some: {
-              court: {
-                sport: query.courtSport,
+          OR: [
+            {
+              details: {
+                some: {
+                  court: {
+                    sport: query.courtSport,
+                  },
+                },
               },
             },
-          },
+            ...(query.courtSport === CourtSport.TENNIS
+              ? [
+                  {
+                    ballboys: {
+                      some: {},
+                    },
+                  },
+                ]
+              : []),
+          ],
         }
       }
 
