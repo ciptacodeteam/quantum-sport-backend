@@ -6,7 +6,7 @@ import buildFindManyOptions from '@/lib/query'
 import { ok } from '@/lib/response'
 import { IdSchema, idSchema, searchQuerySchema } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
-import { BookingStatus } from '@prisma/client'
+import { BookingStatus, CourtSport } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
@@ -46,7 +46,7 @@ function getInventoryCategory(name: string) {
 
 function buildCourtSlots(
   details: Array<{
-    court: { id: string; name: string } | null
+    court: { id: string; name: string; sport?: CourtSport } | null
     slot: { startAt: Date; endAt: Date }
   }>,
 ) {
@@ -57,6 +57,13 @@ function buildCourtSlots(
     date: dayjs(d.slot.startAt).format('YYYY-MM-DD'),
     time: `${dayjs(d.slot.startAt).format('HH:mm')} - ${dayjs(d.slot.endAt).format('HH:mm')}`,
   }))
+}
+
+function timeRangesOverlap(
+  first: { startAt: Date; endAt: Date },
+  second: { startAt: Date; endAt: Date },
+) {
+  return first.startAt < second.endAt && first.endAt > second.startAt
 }
 
 export const getAllBookedInventoriesHandler = factory.createHandlers(
@@ -112,6 +119,7 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
               select: {
                 id: true,
                 name: true,
+                sport: true,
               },
             },
             slot: {
@@ -193,6 +201,78 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
             : Promise.resolve([]),
         ])
 
+      const ballboysNeedingCourtInference = bookedBallboys.filter(
+        (ballboy) => ballboy.booking.details.length === 0,
+      )
+      const inferredCourtDetails =
+        ballboysNeedingCourtInference.length > 0
+          ? await db.bookingDetail.findMany({
+              where: {
+                booking: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
+                  userId: {
+                    in: Array.from(
+                      new Set(
+                        ballboysNeedingCourtInference.map(
+                          (ballboy) => ballboy.booking.user.id,
+                        ),
+                      ),
+                    ),
+                  },
+                },
+                court: {
+                  sport: CourtSport.TENNIS,
+                },
+                OR: ballboysNeedingCourtInference.map((ballboy) => ({
+                  slot: {
+                    startAt: {
+                      lt: ballboy.slot.endAt,
+                    },
+                    endAt: {
+                      gt: ballboy.slot.startAt,
+                    },
+                  },
+                })),
+              },
+              include: {
+                booking: {
+                  select: {
+                    userId: true,
+                  },
+                },
+                court: {
+                  select: {
+                    id: true,
+                    name: true,
+                    sport: true,
+                  },
+                },
+                slot: {
+                  select: {
+                    startAt: true,
+                    endAt: true,
+                  },
+                },
+              },
+            })
+          : []
+
+      const getInferredCourtSlotsForBallboy = (ballboy: (typeof bookedBallboys)[number]) => {
+        if (ballboy.booking.details.length > 0) {
+          return buildCourtSlots(ballboy.booking.details)
+        }
+
+        const matches = inferredCourtDetails.filter(
+          (detail) =>
+            detail.booking.userId === ballboy.booking.user.id &&
+            timeRangesOverlap(ballboy.slot, detail.slot),
+        )
+
+        return buildCourtSlots(matches)
+      }
+
       const formattedInventories = bookedInventories
         .map((inv) => ({
         id: inv.id,
@@ -248,7 +328,7 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
           totalPrice: ballboy.booking.totalPrice,
           customer: ballboy.booking.user,
           invoice: ballboy.booking.invoice,
-          courtSlots: buildCourtSlots(ballboy.booking.details),
+          courtSlots: getInferredCourtSlotsForBallboy(ballboy),
           createdAt: ballboy.booking.createdAt,
         },
         createdAt: ballboy.createdAt,
