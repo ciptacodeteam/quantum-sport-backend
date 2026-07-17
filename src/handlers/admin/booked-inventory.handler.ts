@@ -235,6 +235,21 @@ export const getBookedInventoryDetailHandler = factory.createHandlers(
             },
           })),
         },
+        coaches: inventory.booking.coaches.map((c) => ({
+          staff: c.slot.staff,
+          coachType: c.bookingCoachType,
+          slot: {
+            startAt: c.slot.startAt,
+            endAt: c.slot.endAt,
+          },
+        })),
+        ballboys: inventory.booking.ballboys.map((b) => ({
+          staff: b.slot.staff,
+          slot: {
+            startAt: b.slot.startAt,
+            endAt: b.slot.endAt,
+          },
+        })),
         createdAt: inventory.createdAt,
         updatedAt: inventory.updatedAt,
       }
