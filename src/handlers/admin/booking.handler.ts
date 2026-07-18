@@ -81,6 +81,9 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
                   {
                     ballboys: {
                       some: {
+                        status: {
+                          not: BookingStatus.CANCELLED,
+                        },
                         slot: {
                           isAvailable: false,
                         },
@@ -167,6 +170,9 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
           },
           ballboys: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               slot: {
                 isAvailable: false,
               },
@@ -280,6 +286,9 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                   {
                     ballboys: {
                       some: {
+                        status: {
+                          not: BookingStatus.CANCELLED,
+                        },
                         slot: {
                           isAvailable: false,
                         },
@@ -377,6 +386,9 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
           },
           ballboys: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               slot: {
                 isAvailable: false,
               },
@@ -623,6 +635,9 @@ export const getBookingTransactionDetailHandler = factory.createHandlers(
           },
           ballboys: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               slot: {
                 isAvailable: false,
               },
@@ -981,6 +996,9 @@ export const exportBookingTransactionsToExcelHandler = factory.createHandlers(
           },
           ballboys: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               slot: {
                 isAvailable: false,
               },
@@ -1283,6 +1301,9 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
           },
           ballboys: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               slot: {
                 isAvailable: false,
               },

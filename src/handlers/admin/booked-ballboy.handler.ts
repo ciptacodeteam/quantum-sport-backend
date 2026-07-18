@@ -36,74 +36,66 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
       })
       const { where: queryWhere, ...findManyOptions } = queryOptions
       const search = query.search?.trim()
-      const where = {
-        AND: [
-          queryWhere,
-          {
-            booking: {
-              status: {
-                not: BookingStatus.CANCELLED,
-              },
-            },
-          },
-          search
-            ? {
-                OR: [
-                  {
-                    booking: {
-                      user: {
-                        name: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
+      const filters = [
+        queryWhere,
+        search
+          ? {
+              OR: [
+                {
+                  booking: {
+                    user: {
+                      name: {
+                        contains: search,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                  {
-                    booking: {
-                      user: {
-                        email: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
+                },
+                {
+                  booking: {
+                    user: {
+                      email: {
+                        contains: search,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                  {
-                    booking: {
-                      user: {
-                        phone: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
+                },
+                {
+                  booking: {
+                    user: {
+                      phone: {
+                        contains: search,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                  {
-                    slot: {
-                      staff: {
-                        name: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
+                },
+                {
+                  slot: {
+                    staff: {
+                      name: {
+                        contains: search,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                  {
-                    booking: {
-                      invoice: {
-                        number: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
+                },
+                {
+                  booking: {
+                    invoice: {
+                      number: {
+                        contains: search,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                ],
-              }
-            : undefined,
-        ].filter(Boolean),
-      }
+                },
+              ],
+            }
+          : undefined,
+      ].filter(Boolean)
+      const where = filters.length > 0 ? { AND: filters } : undefined
 
       const bookedBallboys = await db.bookingBallboy.findMany({
         ...findManyOptions,
@@ -178,6 +170,14 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
 
       const formattedBallboys = bookedBallboys.map((ballboy) => ({
         id: ballboy.id,
+        status:
+          ballboy.status === BookingStatus.CANCELLED ||
+          ballboy.booking.status === BookingStatus.CANCELLED
+            ? BookingStatus.CANCELLED
+            : ballboy.booking.status,
+        ballboyStatus: ballboy.status,
+        cancelledAt: ballboy.cancelledAt,
+        cancellationReason: ballboy.cancellationReason,
         staff: ballboy.slot.staff,
         slot: {
           id: ballboy.slot.id,
@@ -281,6 +281,14 @@ export const getBookedBallboyDetailHandler = factory.createHandlers(
 
       const detailedBallboy = {
         id: ballboy.id,
+        status:
+          ballboy.status === BookingStatus.CANCELLED ||
+          ballboy.booking.status === BookingStatus.CANCELLED
+            ? BookingStatus.CANCELLED
+            : ballboy.booking.status,
+        ballboyStatus: ballboy.status,
+        cancelledAt: ballboy.cancelledAt,
+        cancellationReason: ballboy.cancellationReason,
         staff: ballboy.slot.staff,
         slot: {
           ...ballboy.slot,
@@ -363,6 +371,10 @@ export const cancelBallboyBookingHandler = factory.createHandlers(
           )
         }
 
+        if (ballboyBooking.status === BookingStatus.CANCELLED) {
+          throw new BadRequestException('Ballboy booking is already cancelled')
+        }
+
         // 3. Release the ballboy slot
         await tx.slot.update({
           where: { id: ballboyBooking.slotId },
@@ -371,9 +383,14 @@ export const cancelBallboyBookingHandler = factory.createHandlers(
           },
         })
 
-        // 4. Delete the ballboy booking
-        await tx.bookingBallboy.delete({
+        // 4. Keep the row for history, but mark the ballboy add-on as cancelled
+        const cancelledBallboyBooking = await tx.bookingBallboy.update({
           where: { id: ballboyBookingId },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: reason || 'Cancelled by admin',
+          },
         })
 
         // 5. Update the main booking total price (subtract ballboy price)
@@ -402,7 +419,7 @@ export const cancelBallboyBookingHandler = factory.createHandlers(
         }
 
         return {
-          ballboyBooking,
+          ballboyBooking: cancelledBallboyBooking,
           updatedBooking,
           releasedSlot: ballboyBooking.slot,
         }

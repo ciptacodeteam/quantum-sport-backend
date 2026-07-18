@@ -544,18 +544,22 @@ model BookingInventory {
 }
 
 model BookingBallboy {
-  id          String   @id @default(cuid())
-  bookingId   String
-  slotId      String // BALLBOY slot
-  courtSlotId String?
-  price       Int      @default(0) @db.Integer
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  id                 String        @id @default(cuid())
+  bookingId          String
+  slotId             String // BALLBOY slot
+  courtSlotId        String?
+  price              Int           @default(0) @db.Integer
+  status             BookingStatus @default(CONFIRMED)
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
 
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   slot      Slot    @relation("BallboyServiceSlot", fields: [slotId], references: [id])
   courtSlot Slot?   @relation("BallboyCourtSlot", fields: [courtSlotId], references: [id])
 
+  @@index([status])
   @@index([slotId])
   @@index([courtSlotId])
   @@map("booking_ballboys")

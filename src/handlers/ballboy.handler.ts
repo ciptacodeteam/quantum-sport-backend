@@ -50,13 +50,11 @@ export const getAvailableBallboyHandler = factory.createHandlers(
 					isAvailable: true,
 					bookingBallboys: {
 						none: {
-							booking: {
-								status: {
-									not: BookingStatus.CANCELLED,
-								},
+							status: {
+								not: BookingStatus.CANCELLED,
 							},
 						},
-					}, // ensure not already booked (excluding cancelled bookings)
+					}, // ensure not already booked (excluding cancelled ballboy bookings)
 				},
 				include: {
 					staff: {
@@ -88,4 +86,3 @@ export const getAvailableBallboyHandler = factory.createHandlers(
 		}
 	},
 )
-

@@ -706,10 +706,8 @@ export async function updateStaffPricing(p: UpdateStaffPricingPayload) {
           },
           bookingBallboys: {
             where: {
-              booking: {
-                status: {
-                  not: BookingStatus.CANCELLED,
-                },
+              status: {
+                not: BookingStatus.CANCELLED,
               },
             },
             select: { id: true },
@@ -856,10 +854,8 @@ export async function overrideStaffHourPrice({
           },
           bookingBallboys: {
             where: {
-              booking: {
-                status: {
-                  not: BookingStatus.CANCELLED,
-                },
+              status: {
+                not: BookingStatus.CANCELLED,
               },
             },
             select: { id: true },

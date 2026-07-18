@@ -607,10 +607,8 @@ export const adminCheckoutHandler = factory.createHandlers(
             include: {
               bookingBallboys: {
                 where: {
-                  booking: {
-                    status: {
-                      not: BookingStatus.CANCELLED,
-                    },
+                  status: {
+                    not: BookingStatus.CANCELLED,
                   },
                 },
                 select: { id: true },

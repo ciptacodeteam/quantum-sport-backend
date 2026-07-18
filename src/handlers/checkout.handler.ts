@@ -489,10 +489,8 @@ export const applyPromoCodeHandler = factory.createHandlers(
             include: {
               bookingBallboys: {
                 where: {
-                  booking: {
-                    status: {
-                      not: BookingStatus.CANCELLED,
-                    },
+                  status: {
+                    not: BookingStatus.CANCELLED,
                   },
                 },
                 select: { id: true },
@@ -1002,10 +1000,8 @@ export const checkoutHandler = factory.createHandlers(
             include: {
               bookingBallboys: {
                 where: {
-                  booking: {
-                    status: {
-                      not: BookingStatus.CANCELLED,
-                    },
+                  status: {
+                    not: BookingStatus.CANCELLED,
                   },
                 },
                 select: { id: true },
