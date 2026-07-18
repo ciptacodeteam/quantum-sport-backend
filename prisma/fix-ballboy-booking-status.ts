@@ -12,6 +12,24 @@ async function main() {
     CREATE INDEX IF NOT EXISTS booking_ballboys_status_idx
       ON booking_ballboys (status);
   `)
+
+  const updated = await db.$executeRawUnsafe(`
+    UPDATE booking_ballboys bb
+    SET
+      status = 'CANCELLED',
+      "cancelledAt" = COALESCE(bb."cancelledAt", b."cancelledAt", NOW()),
+      "cancellationReason" = COALESCE(
+        bb."cancellationReason",
+        b."cancellationReason",
+        'Cancelled booking legacy data'
+      )
+    FROM bookings b
+    WHERE b.id = bb."bookingId"
+      AND b.status = 'CANCELLED'
+      AND bb.status <> 'CANCELLED';
+  `)
+
+  console.log(`Marked ${updated} legacy ballboy booking records as cancelled.`)
 }
 
 main()
