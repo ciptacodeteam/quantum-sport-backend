@@ -80,7 +80,11 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
               ? [
                   {
                     ballboys: {
-                      some: {},
+                      some: {
+                        slot: {
+                          isAvailable: false,
+                        },
+                      },
                     },
                   },
                 ]
@@ -162,6 +166,11 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
             },
           },
           ballboys: {
+            where: {
+              slot: {
+                isAvailable: false,
+              },
+            },
             include: {
               courtSlot: {
                 select: {
@@ -270,7 +279,11 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
               ? [
                   {
                     ballboys: {
-                      some: {},
+                      some: {
+                        slot: {
+                          isAvailable: false,
+                        },
+                      },
                     },
                   },
                 ]
@@ -363,6 +376,11 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
             },
           },
           ballboys: {
+            where: {
+              slot: {
+                isAvailable: false,
+              },
+            },
             include: {
               courtSlot: {
                 select: {
@@ -604,6 +622,11 @@ export const getBookingTransactionDetailHandler = factory.createHandlers(
             },
           },
           ballboys: {
+            where: {
+              slot: {
+                isAvailable: false,
+              },
+            },
             include: {
               slot: {
                 select: {
@@ -957,6 +980,11 @@ export const exportBookingTransactionsToExcelHandler = factory.createHandlers(
             },
           },
           ballboys: {
+            where: {
+              slot: {
+                isAvailable: false,
+              },
+            },
             include: {
               slot: {
                 select: {
@@ -1254,6 +1282,11 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
             },
           },
           ballboys: {
+            where: {
+              slot: {
+                isAvailable: false,
+              },
+            },
             include: {
               slot: {
                 select: {

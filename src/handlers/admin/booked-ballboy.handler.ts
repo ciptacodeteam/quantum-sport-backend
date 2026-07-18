@@ -34,9 +34,80 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
         defaultOrderBy: { createdAt: 'desc' },
         searchableFields: [],
       })
+      const { where: queryWhere, ...findManyOptions } = queryOptions
+      const search = query.search?.trim()
+      const where = {
+        AND: [
+          queryWhere,
+          {
+            booking: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+          },
+          search
+            ? {
+                OR: [
+                  {
+                    booking: {
+                      user: {
+                        name: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    },
+                  },
+                  {
+                    booking: {
+                      user: {
+                        email: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    },
+                  },
+                  {
+                    booking: {
+                      user: {
+                        phone: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    },
+                  },
+                  {
+                    slot: {
+                      staff: {
+                        name: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    },
+                  },
+                  {
+                    booking: {
+                      invoice: {
+                        number: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    },
+                  },
+                ],
+              }
+            : undefined,
+        ].filter(Boolean),
+      }
 
       const bookedBallboys = await db.bookingBallboy.findMany({
-        ...queryOptions,
+        ...findManyOptions,
+        where,
         include: {
           slot: {
             include: {
