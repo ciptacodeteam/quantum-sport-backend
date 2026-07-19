@@ -14,6 +14,7 @@ import {
 import { requireAuth } from '@/middlewares/auth'
 import { notificationService } from '@/services/notification.service'
 import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
+import { getCourtCoachBundleDiscountByCourtSlot } from '@/services/booking-bundle-discount.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
@@ -380,7 +381,13 @@ export const applyPromoCodeHandler = factory.createHandlers(
           id: string
           startAt: Date
           endAt: Date
+          price: number
+          discountPrice: number
           court?: { sport: CourtSport } | null
+        }> = []
+        let selectedCoachSlots: Array<{
+          startAt: Date
+          endAt: Date
         }> = []
 
         if (courtSlots && courtSlots.length > 0) {
@@ -461,6 +468,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
             )
           }
+          selectedCoachSlots = coachSlotData
 
           try {
             await assertCoachSlotsDoNotConflict(tx, coachSlotData)
@@ -479,6 +487,25 @@ export const applyPromoCodeHandler = factory.createHandlers(
               )
             }
             totalPrice += slot.price
+          }
+        }
+
+        if (selectedCourtSlots.length > 0 && selectedCoachSlots.length > 0) {
+          const bundleDiscountByCourtSlot =
+            getCourtCoachBundleDiscountByCourtSlot(
+              selectedCourtSlots,
+              selectedCoachSlots,
+            )
+
+          for (const slot of selectedCourtSlots) {
+            const rawDiscount = bundleDiscountByCourtSlot.get(slot.id) ?? 0
+            if (rawDiscount <= 0) continue
+
+            const paidCourtPrice =
+              slot.discountPrice && slot.discountPrice > 0
+                ? slot.discountPrice
+                : slot.price
+            totalPrice -= Math.min(rawDiscount, paidCourtPrice)
           }
         }
 
@@ -760,6 +787,10 @@ export const checkoutHandler = factory.createHandlers(
           endAt: Date
           court?: { sport: CourtSport } | null
         }> = []
+        let selectedCoachSlots: Array<{
+          startAt: Date
+          endAt: Date
+        }> = []
         let activeMembership:
           | (MembershipUser & { membership: Membership })
           | null = null
@@ -927,6 +958,7 @@ export const checkoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
             )
           }
+          selectedCoachSlots = coachSlotData
           if (selectedCourtSport) {
             const allowedCoachTypes =
               selectedCourtSport === CourtSport.PADEL
@@ -993,6 +1025,41 @@ export const checkoutHandler = factory.createHandlers(
               isAvailable: false,
             },
           })
+        }
+
+        if (
+          !activeMembership &&
+          selectedCourtSlots.length > 0 &&
+          selectedCoachSlots.length > 0
+        ) {
+          const bundleDiscountByCourtSlot =
+            getCourtCoachBundleDiscountByCourtSlot(
+              selectedCourtSlots,
+              selectedCoachSlots,
+            )
+
+          for (const slot of selectedCourtSlots) {
+            const rawDiscount = bundleDiscountByCourtSlot.get(slot.id) ?? 0
+            if (rawDiscount <= 0) continue
+
+            const bookingDetail = await tx.bookingDetail.findFirst({
+              where: { bookingId: booking.id, slotId: slot.id },
+              select: { id: true, discountPrice: true },
+            })
+            if (!bookingDetail || bookingDetail.discountPrice <= 0) continue
+
+            const discount = Math.min(rawDiscount, bookingDetail.discountPrice)
+            await tx.bookingDetail.update({
+              where: { id: bookingDetail.id },
+              data: {
+                discountPrice: {
+                  decrement: discount,
+                },
+              },
+            })
+            totalPrice -= discount
+            courtDiscountPrice -= discount
+          }
         }
 
         // Process ballboy slots

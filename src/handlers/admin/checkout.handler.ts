@@ -6,6 +6,7 @@ import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { generateInvoiceNumber, formatPhone } from '@/lib/utils'
 import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
+import { getCourtCoachBundleDiscountByCourtSlot } from '@/services/booking-bundle-discount.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
 import { zValidator } from '@hono/zod-validator'
 import {
@@ -382,6 +383,10 @@ export const adminCheckoutHandler = factory.createHandlers(
           endAt: Date
           court?: { sport: CourtSport } | null
         }> = []
+        let selectedCoachSlots: Array<{
+          startAt: Date
+          endAt: Date
+        }> = []
         const bookedItems = {
           courtSlots: [] as string[],
           coachSlots: [] as string[],
@@ -526,6 +531,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
             )
           }
+          selectedCoachSlots = slotData
           if (courtSportForMembership) {
             const allowedCoachTypes =
               courtSportForMembership === CourtSport.PADEL
@@ -597,6 +603,41 @@ export const adminCheckoutHandler = factory.createHandlers(
               isAvailable: false,
             },
           })
+        }
+
+        if (
+          !activeMembership &&
+          selectedCourtSlots.length > 0 &&
+          selectedCoachSlots.length > 0
+        ) {
+          const bundleDiscountByCourtSlot =
+            getCourtCoachBundleDiscountByCourtSlot(
+              selectedCourtSlots,
+              selectedCoachSlots,
+            )
+
+          for (const slot of selectedCourtSlots) {
+            const rawDiscount = bundleDiscountByCourtSlot.get(slot.id) ?? 0
+            if (rawDiscount <= 0) continue
+
+            const bookingDetail = await tx.bookingDetail.findFirst({
+              where: { bookingId: booking.id, slotId: slot.id },
+              select: { id: true, discountPrice: true },
+            })
+            if (!bookingDetail || bookingDetail.discountPrice <= 0) continue
+
+            const discount = Math.min(rawDiscount, bookingDetail.discountPrice)
+            await tx.bookingDetail.update({
+              where: { id: bookingDetail.id },
+              data: {
+                discountPrice: {
+                  decrement: discount,
+                },
+              },
+            })
+            totalPrice -= discount
+            courtDiscountPrice -= discount
+          }
         }
 
         // Ballboys
