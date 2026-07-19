@@ -411,6 +411,20 @@ export const expireInvoiceHandler = factory.createHandlers(
               data: { isAvailable: true },
             })
           }
+
+          await tx.bookingBallboy.updateMany({
+            where: {
+              bookingId: invoice.booking.id,
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: 'Payment expired (user timeout)',
+              cancelledAt: now,
+            },
+          })
         }
 
         // Update payment status to EXPIRED if exists
@@ -644,6 +658,20 @@ export const cancelUserBookingHandler = factory.createHandlers(
             },
           })
         }
+
+        await tx.bookingBallboy.updateMany({
+          where: {
+            bookingId: booking.id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: reason || 'Cancelled by user',
+          },
+        })
 
         // 7. Restore inventory quantities
         for (const bookingInventory of booking.inventories.filter(

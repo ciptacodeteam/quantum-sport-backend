@@ -879,6 +879,20 @@ export const rejectBookingTransactionHandler = factory.createHandlers(
           })
         }
 
+        await tx.bookingBallboy.updateMany({
+          where: {
+            bookingId: id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: 'Rejected by admin',
+          },
+        })
+
         // Restore inventory quantities
         for (const bookingInventory of booking.inventories.filter(
           (inventory) => !inventory.returnedAt,

@@ -815,6 +815,20 @@ export const cancelBookingHandler = factory.createHandlers(
           })
         }
 
+        await tx.bookingBallboy.updateMany({
+          where: {
+            bookingId,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: reason || 'Cancelled by admin',
+          },
+        })
+
         // 7. Restore inventory quantities
         for (const bookingInventory of booking.inventories.filter(
           (inventory) => !inventory.returnedAt,

@@ -265,6 +265,19 @@ async function handlePaymentWebhookV3(c: any, webhook: XenditPaymentWebhook) {
           cancelledAt: new Date(),
         },
       })
+      await db.bookingBallboy.updateMany({
+        where: {
+          bookingId: invoice.bookingId,
+          status: {
+            not: BookingStatus.CANCELLED,
+          },
+        },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancellationReason: `Payment failed: ${data.failure_code || 'Unknown error'}`,
+          cancelledAt: new Date(),
+        },
+      })
       c.var.logger.info(
         `Booking cancelled due to payment failure: ${invoice.bookingId}`,
       )
@@ -550,6 +563,20 @@ async function handlePaymentSessionWebhook(
           })
         }
 
+        await tx.bookingBallboy.updateMany({
+          where: {
+            bookingId: booking.id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancellationReason: 'Payment session expired - no payment made',
+            cancelledAt: new Date(),
+          },
+        })
+
         // Restore inventory quantities
         for (const bookingInv of booking.inventories.filter(
           (inventory) => !inventory.returnedAt,
@@ -747,6 +774,19 @@ async function handleInvoiceWebhookV2(c: any, payload: XenditWebhookPayload) {
 
       await db.booking.update({
         where: { id: invoice.bookingId },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancellationReason: 'Payment expired',
+          cancelledAt: new Date(),
+        },
+      })
+      await db.bookingBallboy.updateMany({
+        where: {
+          bookingId: invoice.bookingId,
+          status: {
+            not: BookingStatus.CANCELLED,
+          },
+        },
         data: {
           status: BookingStatus.CANCELLED,
           cancellationReason: 'Payment expired',
@@ -1163,6 +1203,19 @@ export const xenditPaymentRequestWebhookHandler = factory.createHandlers(
           await db.booking.update({
             where: { id: invoice.bookingId },
             data: { status: BookingStatus.CANCELLED },
+          })
+          await db.bookingBallboy.updateMany({
+            where: {
+              bookingId: invoice.bookingId,
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: `Payment ${payload.data.status.toLowerCase()}`,
+              cancelledAt: new Date(),
+            },
           })
           c.var.logger.warn(`Booking cancelled: ${invoice.bookingId}`)
         }

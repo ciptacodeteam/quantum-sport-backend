@@ -107,6 +107,20 @@ export async function checkExpiredTransactions() {
               `Released ${allSlotIds.length} slots for booking ${payment.invoice.booking.id}`,
             )
           }
+
+          await tx.bookingBallboy.updateMany({
+            where: {
+              bookingId: payment.invoice.booking.id,
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: 'Payment expired',
+              cancelledAt: now,
+            },
+          })
         }
 
         // Update payment status to EXPIRED
@@ -246,6 +260,20 @@ export async function checkExpiredTransactions() {
             `Released ${allSlotIds.length} slots for expired hold booking ${booking.id}`,
           )
         }
+
+        await tx.bookingBallboy.updateMany({
+          where: {
+            bookingId: booking.id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancellationReason: 'Hold period expired',
+            cancelledAt: now,
+          },
+        })
 
         // Restore inventory quantities (they were decremented during checkout)
         const bookingInventories = await tx.bookingInventory.findMany({
