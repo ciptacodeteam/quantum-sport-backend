@@ -23,6 +23,7 @@
     "db:fix-membership-booking-usage": "bun prisma/fix-membership-booking-usage.ts",
     "db:fix-ballboy-slot-reuse": "bun prisma/fix-ballboy-slot-reuse.ts",
     "db:fix-ballboy-booking-status": "bun prisma/fix-ballboy-booking-status.ts",
+    "db:fix-coach-booking-status": "bun prisma/fix-coach-booking-status.ts",
     "db:fix-inventory-slot-booking": "bun prisma/fix-inventory-slot-booking.ts",
     "db:fix-booking-admin-note": "bun prisma/fix-booking-admin-note.ts",
     "db:fix-slots": "bun run scripts/fix-slots.ts",

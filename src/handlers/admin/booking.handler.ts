@@ -12,7 +12,12 @@ import {
 } from '@/lib/validation'
 import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
-import { BookingStatus, CourtSport, PaymentStatus } from '@prisma/client'
+import {
+  BookingStatus,
+  CoachType,
+  CourtSport,
+  PaymentStatus,
+} from '@prisma/client'
 import status from 'http-status'
 import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
@@ -64,6 +69,11 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
         }
       }
       if (query.courtSport) {
+        const coachTypes =
+          query.courtSport === CourtSport.PADEL
+            ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
+            : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
+
         where = {
           ...where,
           OR: [
@@ -72,6 +82,23 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
                 some: {
                   court: {
                     sport: query.courtSport,
+                  },
+                },
+              },
+            },
+            {
+              coaches: {
+                some: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
+                  slot: {
+                    isAvailable: false,
+                    staff: {
+                      coachType: {
+                        in: coachTypes,
+                      },
+                    },
                   },
                 },
               },
@@ -99,14 +126,22 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
         where = {
           ...where,
           coaches: {
-            some: {},
+            some: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
           },
         }
       } else if (query.coach === 'without') {
         where = {
           ...where,
           coaches: {
-            none: {},
+            none: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
           },
         }
       }
@@ -269,6 +304,11 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
       } as any
 
       if (query.courtSport) {
+        const coachTypes =
+          query.courtSport === CourtSport.PADEL
+            ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
+            : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
+
         where = {
           ...where,
           OR: [
@@ -277,6 +317,23 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                 some: {
                   court: {
                     sport: query.courtSport,
+                  },
+                },
+              },
+            },
+            {
+              coaches: {
+                some: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
+                  slot: {
+                    isAvailable: false,
+                    staff: {
+                      coachType: {
+                        in: coachTypes,
+                      },
+                    },
                   },
                 },
               },
@@ -345,6 +402,14 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
             },
           },
           coaches: {
+            where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+              slot: {
+                isAvailable: false,
+              },
+            },
             select: {
               id: true,
               bookingId: true,
@@ -352,6 +417,9 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
               bookingCoachTypeId: true,
               description: true,
               price: true,
+              status: true,
+              cancelledAt: true,
+              cancellationReason: true,
               createdAt: true,
               updatedAt: true,
               slot: {
@@ -868,6 +936,20 @@ export const rejectBookingTransactionHandler = factory.createHandlers(
             },
           })
         }
+
+        await tx.bookingCoach.updateMany({
+          where: {
+            bookingId: id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: 'Rejected by admin',
+          },
+        })
 
         // Release all ballboy slots
         for (const ballboy of booking.ballboys) {

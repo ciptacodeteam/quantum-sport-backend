@@ -696,6 +696,9 @@ export async function updateStaffPricing(p: UpdateStaffPricingPayload) {
           price: true,
           bookingCoaches: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               booking: {
                 status: {
                   not: BookingStatus.CANCELLED,
@@ -844,6 +847,9 @@ export async function overrideStaffHourPrice({
           id: true,
           bookingCoaches: {
             where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               booking: {
                 status: {
                   not: BookingStatus.CANCELLED,

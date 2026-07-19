@@ -96,6 +96,9 @@ export const getAvailableCoachesHandler = factory.createHandlers(
             : {}),
           bookingCoaches: {
             none: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
               booking: {
                 status: {
                   not: BookingStatus.CANCELLED,
@@ -122,10 +125,7 @@ export const getAvailableCoachesHandler = factory.createHandlers(
 
       const availableSlots = await filterCoachSlotsWithoutBookingConflicts<
         (typeof slots)[number]
-      >(
-        db,
-        slots,
-      )
+      >(db, slots)
 
       // Format the response
       const coaches = availableSlots.map((slot) => ({

@@ -502,6 +502,9 @@ export const adminCheckoutHandler = factory.createHandlers(
               },
               bookingCoaches: {
                 where: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
                   booking: {
                     status: {
                       not: BookingStatus.CANCELLED,

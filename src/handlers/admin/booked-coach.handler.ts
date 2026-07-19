@@ -98,6 +98,13 @@ export const getAllBookedCoachesHandler = factory.createHandlers(
 
       const formattedCoaches = bookedCoaches.map((coach) => ({
         id: coach.id,
+        status:
+          coach.status === BookingStatus.CANCELLED ||
+          coach.booking.status === BookingStatus.CANCELLED
+            ? BookingStatus.CANCELLED
+            : coach.booking.status,
+        cancelledAt: coach.cancelledAt,
+        cancellationReason: coach.cancellationReason,
         coachType: coach.bookingCoachType,
         staff: coach.slot.staff,
         description: coach.description,
@@ -184,6 +191,13 @@ export const getBookedCoachDetailHandler = factory.createHandlers(
 
       const detailedCoach = {
         id: coach.id,
+        status:
+          coach.status === BookingStatus.CANCELLED ||
+          coach.booking.status === BookingStatus.CANCELLED
+            ? BookingStatus.CANCELLED
+            : coach.booking.status,
+        cancelledAt: coach.cancelledAt,
+        cancellationReason: coach.cancellationReason,
         coachType: coach.bookingCoachType,
         staff: coach.slot.staff,
         description: coach.description,
@@ -269,6 +283,10 @@ export const cancelCoachBookingHandler = factory.createHandlers(
           )
         }
 
+        if (coachBooking.status === BookingStatus.CANCELLED) {
+          throw new BadRequestException('Coach booking is already cancelled')
+        }
+
         // 3. Release the coach slot
         await tx.slot.update({
           where: { id: coachBooking.slotId },
@@ -277,9 +295,14 @@ export const cancelCoachBookingHandler = factory.createHandlers(
           },
         })
 
-        // 4. Delete the coach booking
-        await tx.bookingCoach.delete({
+        // 4. Keep the row for history, but mark the coach add-on as cancelled
+        const cancelledCoachBooking = await tx.bookingCoach.update({
           where: { id: coachBookingId },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: reason || 'Cancelled by admin',
+          },
         })
 
         // 5. Update the main booking total price (subtract coach price)
@@ -308,7 +331,7 @@ export const cancelCoachBookingHandler = factory.createHandlers(
         }
 
         return {
-          coachBooking,
+          coachBooking: cancelledCoachBooking,
           updatedBooking,
           releasedSlot: coachBooking.slot,
         }

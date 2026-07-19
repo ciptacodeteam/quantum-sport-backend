@@ -441,6 +441,9 @@ export const applyPromoCodeHandler = factory.createHandlers(
             include: {
               bookingCoaches: {
                 where: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
                   booking: {
                     status: {
                       not: BookingStatus.CANCELLED,
@@ -904,6 +907,9 @@ export const checkoutHandler = factory.createHandlers(
               },
               bookingCoaches: {
                 where: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
                   booking: {
                     status: {
                       not: BookingStatus.CANCELLED,

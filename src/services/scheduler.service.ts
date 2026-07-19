@@ -121,6 +121,20 @@ export async function checkExpiredTransactions() {
               cancelledAt: now,
             },
           })
+
+          await tx.bookingCoach.updateMany({
+            where: {
+              bookingId: payment.invoice.booking.id,
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: 'Payment expired',
+              cancelledAt: now,
+            },
+          })
         }
 
         // Update payment status to EXPIRED
@@ -262,6 +276,20 @@ export async function checkExpiredTransactions() {
         }
 
         await tx.bookingBallboy.updateMany({
+          where: {
+            bookingId: booking.id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancellationReason: 'Hold period expired',
+            cancelledAt: now,
+          },
+        })
+
+        await tx.bookingCoach.updateMany({
           where: {
             bookingId: booking.id,
             status: {

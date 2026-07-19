@@ -49,6 +49,9 @@ async function getActiveBookedCoachSlots(db: any, slots: CoachSlotLike[]) {
 
   return db.bookingCoach.findMany({
     where: {
+      status: {
+        not: BookingStatus.CANCELLED,
+      },
       booking: {
         status: {
           not: BookingStatus.CANCELLED,
@@ -80,10 +83,9 @@ async function getActiveBookedCoachSlots(db: any, slots: CoachSlotLike[]) {
   })
 }
 
-export async function filterCoachSlotsWithoutBookingConflicts<T extends CoachSlotLike>(
-  db: any,
-  slots: T[],
-): Promise<T[]> {
+export async function filterCoachSlotsWithoutBookingConflicts<
+  T extends CoachSlotLike,
+>(db: any, slots: T[]): Promise<T[]> {
   const bookedCoachSlots = await getActiveBookedCoachSlots(db, slots)
 
   if (bookedCoachSlots.length === 0) {
@@ -118,7 +120,9 @@ export async function assertCoachSlotsDoNotConflict(
     )
 
     if (hasSelectedOverlap) {
-      throw new Error('Coach cannot be booked for overlapping padel and tennis schedules')
+      throw new Error(
+        'Coach cannot be booked for overlapping padel and tennis schedules',
+      )
     }
   }
 
@@ -133,6 +137,8 @@ export async function assertCoachSlotsDoNotConflict(
   )
 
   if (hasExistingOverlap) {
-    throw new Error('Coach is already booked in another padel or tennis schedule at this time')
+    throw new Error(
+      'Coach is already booked in another padel or tennis schedule at this time',
+    )
   }
 }

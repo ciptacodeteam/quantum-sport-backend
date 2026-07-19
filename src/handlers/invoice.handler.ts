@@ -412,6 +412,20 @@ export const expireInvoiceHandler = factory.createHandlers(
             })
           }
 
+          await tx.bookingCoach.updateMany({
+            where: {
+              bookingId: invoice.booking.id,
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancellationReason: 'Payment expired (user timeout)',
+              cancelledAt: now,
+            },
+          })
+
           await tx.bookingBallboy.updateMany({
             where: {
               bookingId: invoice.booking.id,
@@ -648,6 +662,20 @@ export const cancelUserBookingHandler = factory.createHandlers(
             },
           })
         }
+
+        await tx.bookingCoach.updateMany({
+          where: {
+            bookingId: booking.id,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: reason || 'Cancelled by user',
+          },
+        })
 
         // 6. Release all ballboy slots
         for (const ballboy of booking.ballboys) {

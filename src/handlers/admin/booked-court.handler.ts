@@ -805,6 +805,20 @@ export const cancelBookingHandler = factory.createHandlers(
           })
         }
 
+        await tx.bookingCoach.updateMany({
+          where: {
+            bookingId,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+          data: {
+            status: BookingStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: reason || 'Cancelled by admin',
+          },
+        })
+
         // 6. Release all ballboy slots
         for (const ballboy of booking.ballboys) {
           await tx.slot.update({
@@ -1047,6 +1061,9 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             include: {
               bookingCoaches: {
                 where: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
                   booking: {
                     status: {
                       not: BookingStatus.CANCELLED,
