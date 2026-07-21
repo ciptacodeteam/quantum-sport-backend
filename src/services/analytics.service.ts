@@ -670,6 +670,71 @@ export async function getBusinessAnalytics(startDate: Date, endDate: Date) {
     }),
   )
 
+  const courtBookingDetails = await db.bookingDetail.findMany({
+    where: {
+      courtId: { not: null },
+      booking: {
+        status: { not: BookingStatus.CANCELLED },
+      },
+      slot: {
+        startAt: { gte: startDate, lte: endDate },
+      },
+    },
+    select: {
+      courtId: true,
+      slot: {
+        select: {
+          startAt: true,
+          endAt: true,
+        },
+      },
+    },
+  })
+
+  const courtHoursMap = new Map<
+    string,
+    { bookedHours: number; bookingCount: number }
+  >()
+  for (const detail of courtBookingDetails) {
+    const courtId = detail.courtId!
+    const start = detail.slot.startAt
+    const end = detail.slot.endAt
+    const durationHours = Math.max(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60),
+      0,
+    )
+    const existing = courtHoursMap.get(courtId) || {
+      bookedHours: 0,
+      bookingCount: 0,
+    }
+    existing.bookedHours += durationHours
+    existing.bookingCount += 1
+    courtHoursMap.set(courtId, existing)
+  }
+
+  const allCourts = await db.court.findMany({
+    select: { id: true, name: true, sport: true },
+    orderBy: { name: 'asc' },
+  })
+
+  const courtHours = allCourts
+    .map((court) => {
+      const stats = courtHoursMap.get(court.id) || {
+        bookedHours: 0,
+        bookingCount: 0,
+      }
+      return {
+        court,
+        bookedHours: Math.round(stats.bookedHours * 10) / 10,
+        bookingCount: stats.bookingCount,
+      }
+    })
+    .sort((a, b) => b.bookedHours - a.bookedHours)
+
+  const totalBookedHours = Math.round(
+    courtHours.reduce((sum, item) => sum + item.bookedHours, 0) * 10,
+  ) / 10
+
   // Top coaches
   const topCoachesData: Record<string, number> = {}
   for (const bc of activeCoaches) {
@@ -702,7 +767,9 @@ export async function getBusinessAnalytics(startDate: Date, endDate: Date) {
         totalCourts > 0
           ? ((bookedCourts.length / totalCourts) * 100).toFixed(2) + '%'
           : '0%',
+      totalBookedHours,
       topCourts: topCourtDetails,
+      courtHours,
       topHours,
       topDays,
     },
