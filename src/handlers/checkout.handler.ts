@@ -16,6 +16,10 @@ import { notificationService } from '@/services/notification.service'
 import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
 import { getCourtCoachBundleDiscountByCourtSlot } from '@/services/booking-bundle-discount.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
+import {
+  claimSlotsAtomically,
+  releaseSlotsByIds,
+} from '@/services/slot-claim.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
 import {
@@ -728,6 +732,13 @@ export const checkoutHandler = factory.createHandlers(
           previousPromoCodeId = booking.promoCodeId
           previousPromoDiscountAmount = booking.promoDiscountAmount
 
+          // Release previously held slots before rebuilding this HOLD booking
+          await releaseSlotsByIds(tx, [
+            ...booking.details.map((detail) => detail.slotId),
+            ...booking.coaches.map((coach) => coach.slotId),
+            ...booking.ballboys.map((ballboy) => ballboy.slotId),
+          ])
+
           // Clear existing details
           await tx.bookingDetail.deleteMany({
             where: { bookingId: booking.id },
@@ -884,6 +895,16 @@ export const checkoutHandler = factory.createHandlers(
                 'One or more court slots are already booked',
               )
             }
+          }
+
+          await claimSlotsAtomically(tx, {
+            slotIds: courtSlots,
+            type: SlotType.COURT,
+            unavailableMessage:
+              'One or more court slots not found or unavailable',
+          })
+
+          for (const slot of courtSlotData) {
             const normalPrice = slot.price
             const discountedPrice =
               slot.discountPrice && slot.discountPrice > 0
@@ -911,15 +932,6 @@ export const checkoutHandler = factory.createHandlers(
               })
             }
           }
-          // Update slots to unavailable
-          await tx.slot.updateMany({
-            where: {
-              id: { in: courtSlots },
-            },
-            data: {
-              isAvailable: false,
-            },
-          })
         }
 
         // Process coach slots
@@ -993,6 +1005,16 @@ export const checkoutHandler = factory.createHandlers(
                 'One or more coach slots are already booked',
               )
             }
+          }
+
+          await claimSlotsAtomically(tx, {
+            slotIds: coachSlots,
+            type: SlotType.COACH,
+            unavailableMessage:
+              'One or more coach slots not found or unavailable',
+          })
+
+          for (const slot of coachSlotData) {
             totalPrice += slot.price
 
             // Get coach type for the staff
@@ -1016,15 +1038,6 @@ export const checkoutHandler = factory.createHandlers(
               price: slot.price,
             })
           }
-          // Update slots to unavailable
-          await tx.slot.updateMany({
-            where: {
-              id: { in: coachSlots },
-            },
-            data: {
-              isAvailable: false,
-            },
-          })
         }
 
         if (
@@ -1107,6 +1120,16 @@ export const checkoutHandler = factory.createHandlers(
                 'One or more ballboy slots are already booked',
               )
             }
+          }
+
+          await claimSlotsAtomically(tx, {
+            slotIds: ballboySlots,
+            type: SlotType.BALLBOY,
+            unavailableMessage:
+              'One or more ballboy slots not found or unavailable',
+          })
+
+          for (const slot of ballboySlotData) {
             totalPrice += slot.price
 
             await tx.bookingBallboy.create({
@@ -1123,15 +1146,6 @@ export const checkoutHandler = factory.createHandlers(
               price: slot.price,
             })
           }
-          // Update slots to unavailable
-          await tx.slot.updateMany({
-            where: {
-              id: { in: ballboySlots },
-            },
-            data: {
-              isAvailable: false,
-            },
-          })
         }
 
         // Process inventories
@@ -1598,6 +1612,7 @@ export const checkoutHandler = factory.createHandlers(
                 : // For other channels: Store payment request metadata
                   {
                     payment_request_id:
+                      xenditInvoiceResponse.id ||
                       xenditInvoiceResponse.payment_request_id,
                     reference_id: xenditInvoiceResponse.reference_id,
                     status: xenditInvoiceResponse.status,

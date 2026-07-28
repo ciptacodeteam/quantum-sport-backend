@@ -289,6 +289,12 @@ export const updateStaffHandler = factory.createHandlers(
         },
       })
 
+      if (!isActive) {
+        await db.authToken.deleteMany({
+          where: { staffId },
+        })
+      }
+
       if (updatedStaff.image) {
         const imageUrl = await getFileUrl(updatedStaff.image)
         updatedStaff.image = imageUrl

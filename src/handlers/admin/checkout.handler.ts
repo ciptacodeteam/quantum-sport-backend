@@ -8,6 +8,7 @@ import { generateInvoiceNumber, formatPhone } from '@/lib/utils'
 import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
 import { getCourtCoachBundleDiscountByCourtSlot } from '@/services/booking-bundle-discount.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
+import { claimSlotsAtomically } from '@/services/slot-claim.service'
 import { zValidator } from '@hono/zod-validator'
 import {
   BookingStatus,
@@ -448,7 +449,16 @@ export const adminCheckoutHandler = factory.createHandlers(
                 'One or more court slots are already booked',
               )
             }
+          }
 
+          await claimSlotsAtomically(tx, {
+            slotIds: courtSlots,
+            type: SlotType.COURT,
+            unavailableMessage:
+              'One or more court slots not found or unavailable',
+          })
+
+          for (const slot of slotData) {
             const normalPrice = slot.price
             const discountedPrice =
               slot.discountPrice && slot.discountPrice > 0
@@ -477,15 +487,6 @@ export const adminCheckoutHandler = factory.createHandlers(
             })
             bookedItems.courtSlots.push(slot.id)
           }
-          // Update slots to unavailable
-          await tx.slot.updateMany({
-            where: {
-              id: { in: courtSlots },
-            },
-            data: {
-              isAvailable: false,
-            },
-          })
         }
 
         // Coaches
@@ -575,6 +576,16 @@ export const adminCheckoutHandler = factory.createHandlers(
                 'One or more coach slots are already booked',
               )
             }
+          }
+
+          await claimSlotsAtomically(tx, {
+            slotIds: coachSlots,
+            type: SlotType.COACH,
+            unavailableMessage:
+              'One or more coach slots not found or unavailable',
+          })
+
+          for (const slot of slotData) {
             totalPrice += slot.price
             await tx.bookingCoach.create({
               data: {
@@ -594,15 +605,6 @@ export const adminCheckoutHandler = factory.createHandlers(
           c.var.logger.info(
             `Total coach slots booked: ${bookedItems.coachSlots.length}. Total coach price: ${slotData.reduce((sum, s) => sum + s.price, 0)}`,
           )
-          // Update slots to unavailable
-          await tx.slot.updateMany({
-            where: {
-              id: { in: coachSlots },
-            },
-            data: {
-              isAvailable: false,
-            },
-          })
         }
 
         if (
@@ -682,6 +684,16 @@ export const adminCheckoutHandler = factory.createHandlers(
                 'One or more ballboy slots are already booked',
               )
             }
+          }
+
+          await claimSlotsAtomically(tx, {
+            slotIds: ballboySlots,
+            type: SlotType.BALLBOY,
+            unavailableMessage:
+              'One or more ballboy slots not found or unavailable',
+          })
+
+          for (const slot of slotData) {
             totalPrice += slot.price
             await tx.bookingBallboy.create({
               data: {
@@ -693,15 +705,6 @@ export const adminCheckoutHandler = factory.createHandlers(
             })
             bookedItems.ballboySlots.push(slot.id)
           }
-          // Update slots to unavailable
-          await tx.slot.updateMany({
-            where: {
-              id: { in: ballboySlots },
-            },
-            data: {
-              isAvailable: false,
-            },
-          })
         }
 
         // Inventories

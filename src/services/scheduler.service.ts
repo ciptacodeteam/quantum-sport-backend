@@ -3,8 +3,20 @@ import { db } from '@/lib/prisma'
 import { BookingStatus, PaymentStatus } from '@prisma/client'
 import { log } from '@/lib/logger'
 import { getRedisConnection } from '@/lib/redis'
+import {
+  cancelHoldBookingAndReleaseResources,
+  cancelHoldClassBookingAndRestoreCapacity,
+} from '@/services/booking-cancel.service'
+import { discardUnpaidMembership } from '@/services/membership-activation.service'
+import {
+  finalizeSuccessfulPayment,
+  isGatewayPaymentCompleted,
+} from '@/services/payment-reconcile.service'
 
 let redisConnection = getRedisConnection()
+
+/** Grace period after dueDate before local expiry — reduces race with in-flight Xendit captures */
+const EXPIRY_GRACE_MS = 2 * 60 * 1000
 
 // Queue for scheduled tasks
 let schedulerQueue = new Queue('scheduler', {
@@ -29,29 +41,34 @@ function reconnectRedis() {
   }
 }
 
+const UNPAID_PAYMENT_STATUSES = [
+  PaymentStatus.PENDING,
+  PaymentStatus.AWAITING_CONFIRMATION,
+] as const
+
 /**
  * Check for expired payments and update their status
  * This runs every minute to check for:
- * - Invoices past their dueDate with PENDING status
- * - Payments past their dueDate with PENDING status
+ * - Payments past their dueDate still unpaid (PENDING / AWAITING_CONFIRMATION)
+ * - Related HOLD bookings / class bookings / unpaid memberships
  * - Bookings past their holdExpiresAt with HOLD status
+ *
+ * Finalized payments (EXPIRED / CANCELLED / PAID / REFUNDED) are never
+ * reprocessed, so slot release cannot undo a newer booking on the same slots.
  */
 export async function checkExpiredTransactions() {
   const now = new Date()
+  const expireBefore = new Date(now.getTime() - EXPIRY_GRACE_MS)
 
   try {
-    // Find expired payments
+    // Only unpaid payments — never reprocess EXPIRED/CANCELLED rows
     const expiredPayments = await db.payment.findMany({
       where: {
         status: {
-          in: [
-            PaymentStatus.PENDING,
-            PaymentStatus.CANCELLED,
-            PaymentStatus.EXPIRED,
-          ],
+          in: [...UNPAID_PAYMENT_STATUSES],
         },
         dueDate: {
-          lte: now,
+          lte: expireBefore,
         },
       },
       include: {
@@ -67,162 +84,93 @@ export async function checkExpiredTransactions() {
 
     log.info(`Found ${expiredPayments.length} expired payments to process`)
 
-    // Update expired payments and related records
+    let expiredPaymentCount = 0
+    let reconciledLatePaidCount = 0
+
     for (const payment of expiredPayments) {
+      // If Xendit already captured, reconcile instead of expiring
+      if (payment.invoice && (await isGatewayPaymentCompleted(payment))) {
+        const result = await db.$transaction(async (tx) =>
+          finalizeSuccessfulPayment(tx, {
+            invoiceId: payment.invoice!.id,
+            paidAt: now,
+            metaPatch: {
+              reconciled_by: 'scheduler_gateway_check',
+            },
+          }),
+        )
+        reconciledLatePaidCount += 1
+        log.info(
+          `Reconciled late gateway payment ${payment.id} → ${result.outcome}`,
+        )
+        continue
+      }
+
       await db.$transaction(async (tx) => {
-        // First, release slots if booking exists
-        if (payment.invoice?.booking) {
-          // Collect all slot IDs
-          const bookingDetails = await tx.bookingDetail.findMany({
-            where: { bookingId: payment.invoice.booking.id },
-            select: { slotId: true },
-          })
-          const courtSlotIds = bookingDetails.map((bd) => bd.slotId)
-
-          const coachDetails = await tx.bookingCoach.findMany({
-            where: { bookingId: payment.invoice.booking.id },
-            select: { slotId: true },
-          })
-          const coachSlotIds = coachDetails.map((bc) => bc.slotId)
-
-          const ballboyDetails = await tx.bookingBallboy.findMany({
-            where: { bookingId: payment.invoice.booking.id },
-            select: { slotId: true },
-          })
-          const ballboySlotIds = ballboyDetails.map((bb) => bb.slotId)
-
-          const allSlotIds = [
-            ...courtSlotIds,
-            ...coachSlotIds,
-            ...ballboySlotIds,
-          ]
-
-          // Release slots immediately BEFORE updating statuses
-          if (allSlotIds.length > 0) {
-            await tx.slot.updateMany({
-              where: { id: { in: allSlotIds } },
-              data: { isAvailable: true },
-            })
-            log.info(
-              `Released ${allSlotIds.length} slots for booking ${payment.invoice.booking.id}`,
-            )
-          }
-
-          await tx.bookingBallboy.updateMany({
-            where: {
-              bookingId: payment.invoice.booking.id,
-              status: {
-                not: BookingStatus.CANCELLED,
-              },
-            },
-            data: {
-              status: BookingStatus.CANCELLED,
-              cancellationReason: 'Payment expired',
-              cancelledAt: now,
-            },
-          })
-
-          await tx.bookingCoach.updateMany({
-            where: {
-              bookingId: payment.invoice.booking.id,
-              status: {
-                not: BookingStatus.CANCELLED,
-              },
-            },
-            data: {
-              status: BookingStatus.CANCELLED,
-              cancellationReason: 'Payment expired',
-              cancelledAt: now,
-            },
-          })
-        }
-
-        // Update payment status to EXPIRED
-        await tx.payment.update({
-          where: { id: payment.id },
+        // Claim this payment once — concurrent/repeated runs skip if already finalized
+        const claimedPayment = await tx.payment.updateMany({
+          where: {
+            id: payment.id,
+            status: { in: [...UNPAID_PAYMENT_STATUSES] },
+          },
           data: {
             status: PaymentStatus.EXPIRED,
           },
         })
 
-        // Update invoice status to EXPIRED
+        if (claimedPayment.count === 0) {
+          return
+        }
+
         if (payment.invoice) {
-          await tx.invoice.update({
-            where: { id: payment.invoice.id },
+          await tx.invoice.updateMany({
+            where: {
+              id: payment.invoice.id,
+              status: { in: [...UNPAID_PAYMENT_STATUSES] },
+            },
             data: {
               status: PaymentStatus.EXPIRED,
             },
           })
 
-          // Update booking status to CANCELLED if exists and restore inventory
           if (payment.invoice.booking) {
-            // Restore inventory quantities (they were decremented during checkout)
-            const bookingInventories = await tx.bookingInventory.findMany({
-              where: {
+            const { cancelled } = await cancelHoldBookingAndReleaseResources(
+              tx,
+              {
                 bookingId: payment.invoice.booking.id,
-                returnedAt: null,
+                reason: 'Payment expired',
+                now,
               },
-            })
-            for (const bookingInv of bookingInventories) {
-              await tx.inventory.update({
-                where: { id: bookingInv.inventoryId },
-                data: {
-                  quantity: { increment: bookingInv.quantity },
-                },
-              })
-              await tx.bookingInventory.update({
-                where: { id: bookingInv.id },
-                data: { returnedAt: now },
-              })
-              log.info(
-                `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} for expired payment ${payment.id}`,
+            )
+
+            if (!cancelled) {
+              log.warn(
+                `Skipped slot release for payment ${payment.id}: booking ${payment.invoice.booking.id} is not HOLD`,
               )
             }
-
-            await tx.booking.update({
-              where: { id: payment.invoice.booking.id },
-              data: {
-                status: BookingStatus.CANCELLED,
-                cancellationReason: 'Payment expired',
-                cancelledAt: now,
-              },
-            })
           }
 
-          // Update class booking status to CANCELLED if exists
           if (payment.invoice.classBooking) {
-            await tx.classBooking.update({
-              where: { id: payment.invoice.classBooking.id },
-              data: {
-                status: BookingStatus.CANCELLED,
-                cancellationReason: 'Payment expired',
-                cancelledAt: now,
-              },
-            })
-
-            // Restore class capacity
-            const classBooking = payment.invoice.classBooking
-            await tx.class.update({
-              where: { id: classBooking.classId },
-              data: {
-                remaining: {
-                  increment: 1,
-                },
-              },
+            await cancelHoldClassBookingAndRestoreCapacity(tx, {
+              classBookingId: payment.invoice.classBooking.id,
+              reason: 'Payment expired',
+              now,
             })
           }
 
-          // Delete membership user if payment expired (not yet activated)
+          // Delete membership user if payment expired (not yet paid)
           if (payment.invoice.membershipUser) {
-            await tx.membershipUser.delete({
-              where: { id: payment.invoice.membershipUser.id },
-            })
+            await discardUnpaidMembership(
+              tx,
+              payment.invoice.membershipUser.id,
+            )
             log.info(
               `Deleted unpaid membership ${payment.invoice.membershipUser.id}`,
             )
           }
         }
 
+        expiredPaymentCount += 1
         log.info(`Expired payment ${payment.id} and related records`)
       })
     }
@@ -232,7 +180,7 @@ export async function checkExpiredTransactions() {
       where: {
         status: BookingStatus.HOLD,
         holdExpiresAt: {
-          lte: now,
+          lte: expireBefore,
         },
       },
     })
@@ -241,114 +189,58 @@ export async function checkExpiredTransactions() {
       `Found ${expiredHoldBookings.length} expired hold bookings to process`,
     )
 
+    let expiredHoldCount = 0
+
     for (const booking of expiredHoldBookings) {
       await db.$transaction(async (tx) => {
-        // First, collect and release slots
-        const bookingDetails = await tx.bookingDetail.findMany({
-          where: { bookingId: booking.id },
-          select: { slotId: true },
+        const { cancelled } = await cancelHoldBookingAndReleaseResources(tx, {
+          bookingId: booking.id,
+          reason: 'Hold period expired',
+          now,
         })
-        const courtSlotIds = bookingDetails.map((bd) => bd.slotId)
 
-        const coachDetails = await tx.bookingCoach.findMany({
-          where: { bookingId: booking.id },
-          select: { slotId: true },
-        })
-        const coachSlotIds = coachDetails.map((bc) => bc.slotId)
-
-        const ballboyDetails = await tx.bookingBallboy.findMany({
-          where: { bookingId: booking.id },
-          select: { slotId: true },
-        })
-        const ballboySlotIds = ballboyDetails.map((bb) => bb.slotId)
-
-        const allSlotIds = [...courtSlotIds, ...coachSlotIds, ...ballboySlotIds]
-
-        // Release slots immediately BEFORE updating statuses
-        if (allSlotIds.length > 0) {
-          await tx.slot.updateMany({
-            where: { id: { in: allSlotIds } },
-            data: { isAvailable: true },
-          })
-          log.info(
-            `Released ${allSlotIds.length} slots for expired hold booking ${booking.id}`,
-          )
+        if (!cancelled) {
+          return
         }
 
-        await tx.bookingBallboy.updateMany({
-          where: {
-            bookingId: booking.id,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-          },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancellationReason: 'Hold period expired',
-            cancelledAt: now,
-          },
-        })
-
-        await tx.bookingCoach.updateMany({
-          where: {
-            bookingId: booking.id,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-          },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancellationReason: 'Hold period expired',
-            cancelledAt: now,
-          },
-        })
-
-        // Restore inventory quantities (they were decremented during checkout)
-        const bookingInventories = await tx.bookingInventory.findMany({
-          where: { bookingId: booking.id, returnedAt: null },
-        })
-        for (const bookingInv of bookingInventories) {
-          await tx.inventory.update({
-            where: { id: bookingInv.inventoryId },
-            data: {
-              quantity: { increment: bookingInv.quantity },
-            },
-          })
-          await tx.bookingInventory.update({
-            where: { id: bookingInv.id },
-            data: { returnedAt: now },
-          })
-          log.info(
-            `Restored inventory ${bookingInv.inventoryId} by ${bookingInv.quantity} for expired hold booking ${booking.id}`,
-          )
-        }
-
-        // Update booking status to CANCELLED
-        await tx.booking.update({
-          where: { id: booking.id },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancellationReason: 'Hold period expired',
-            cancelledAt: now,
-          },
-        })
-
-        // Update related invoice status if exists
+        // Expire related unpaid invoice + payment if still unpaid
         const invoice = await tx.invoice.findFirst({
           where: { bookingId: booking.id },
+          include: { payment: true },
         })
-        if (invoice && invoice.status === PaymentStatus.PENDING) {
-          await tx.invoice.update({
-            where: { id: invoice.id },
+        if (
+          invoice &&
+          (UNPAID_PAYMENT_STATUSES as readonly PaymentStatus[]).includes(
+            invoice.status,
+          )
+        ) {
+          await tx.invoice.updateMany({
+            where: {
+              id: invoice.id,
+              status: { in: [...UNPAID_PAYMENT_STATUSES] },
+            },
             data: { status: PaymentStatus.EXPIRED },
           })
+
+          if (invoice.paymentId) {
+            await tx.payment.updateMany({
+              where: {
+                id: invoice.paymentId,
+                status: { in: [...UNPAID_PAYMENT_STATUSES] },
+              },
+              data: { status: PaymentStatus.EXPIRED },
+            })
+          }
         }
+
+        expiredHoldCount += 1
       })
     }
 
     return {
-      expiredPayments: expiredPayments.length,
-      expiredHoldBookings: expiredHoldBookings.length,
+      expiredPayments: expiredPaymentCount,
+      expiredHoldBookings: expiredHoldCount,
+      reconciledLatePaid: reconciledLatePaidCount,
     }
   } catch (error) {
     log.error(`Error checking expired transactions: ${error}`)

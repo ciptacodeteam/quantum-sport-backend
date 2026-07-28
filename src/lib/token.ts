@@ -1,7 +1,7 @@
 import { env } from '@/env'
 import dayjs from 'dayjs'
-import { log } from './logger'
 import { sign, verify } from 'hono/jwt'
+import { log } from './logger'
 
 export async function generateJwtToken(payloadData: Record<string, any>) {
   try {
@@ -14,10 +14,7 @@ export async function generateJwtToken(payloadData: Record<string, any>) {
       exp: now.add(Number(env.jwt.expires), 'minutes').unix(),
       data: payloadData,
     }
-    log.debug(`Generating JWT token with payload: ${JSON.stringify(payload)}`)
-    const token = await sign(payload, secret, 'HS256')
-    log.debug(`Generated JWT token: ${token}`)
-    return token
+    return await sign(payload, secret, 'HS256')
   } catch (err) {
     log.fatal(`Error generating JWT token: ${err}`)
     throw err
@@ -36,12 +33,7 @@ export async function generateRefreshToken(payloadData: Record<string, any>) {
       type: 'refresh',
       data: payloadData,
     }
-    log.debug(
-      `Generating refresh token with payload: ${JSON.stringify(payload)}`,
-    )
-    const token = await sign(payload, secret, 'HS256')
-    log.debug(`Generated refresh token: ${token}`)
-    return token
+    return await sign(payload, secret, 'HS256')
   } catch (err) {
     log.fatal(`Error generating refresh token: ${err}`)
     throw err
@@ -51,13 +43,11 @@ export async function generateRefreshToken(payloadData: Record<string, any>) {
 export async function validateToken(token: string) {
   try {
     const secret = env.jwt.secret
-    log.debug(`Validating JWT token: ${token}`)
     const payload = await verify(token, secret, 'HS256')
     if (payload && payload.type === 'refresh') {
-      log.error(`Invalid JWT token: token is a refresh token`)
+      log.error('Invalid JWT token: token is a refresh token')
       return null
     }
-    log.debug(`Validated JWT token with payload: ${JSON.stringify(payload)}`)
     return payload
   } catch (err) {
     log.error(`Invalid JWT token: ${err}`)
@@ -68,11 +58,7 @@ export async function validateToken(token: string) {
 export async function validateRefreshToken(token: string) {
   try {
     const secret = env.jwt.refreshSecret
-    log.debug(`Validating refresh token: ${token}`)
     const payload = await verify(token, secret, 'HS256')
-    log.debug(
-      `Validated refresh token with payload: ${JSON.stringify(payload)}`,
-    )
     if (payload && payload.type === 'refresh') {
       return payload
     }

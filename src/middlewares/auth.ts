@@ -1,26 +1,27 @@
 import { ForbiddenException, UnauthorizedException } from '@/exceptions'
+import { resolveAccessTokenFromRequest } from '@/lib/auth-cookies'
+import { db } from '@/lib/prisma'
 import { validateToken } from '@/lib/token'
+import {
+  assertStaffActive,
+  assertUserNotBanned,
+} from '@/services/account-status.service'
 import { AdminTokenPayload, UserTokenPayload } from '@/types'
 import { Role } from '@prisma/client'
 import { MiddlewareHandler } from 'hono'
 
 export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
-  const authorization = c.req.header('Authorization')
-    ? c.req.header('Authorization')
-    : null
+  const token = resolveAccessTokenFromRequest(c)
 
-  if (!authorization || !authorization.startsWith('Bearer ')) {
+  if (!token) {
     c.set('user', null)
     c.set('admin', null)
     return next()
   }
 
-  const token = authorization.replace('Bearer ', '')
-
-  c.var.logger.debug(`Global auth middleware - token: ${token}`)
+  c.var.logger.debug('Global auth middleware - validating access token')
 
   if (c.req.url.includes('/auth/refresh-token')) {
-    console.log('🚀 ~ Skipping token validation for refresh-token endpoint')
     return next()
   }
 
@@ -52,9 +53,25 @@ export const globalAuthMiddleware: MiddlewareHandler = async (c, next) => {
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   const user = c.get('user')
 
-  if (!user) {
+  if (!user?.id) {
     throw new UnauthorizedException()
   }
+
+  const dbUser = await db.user.findUnique({
+    where: { id: user.id },
+    select: {
+      id: true,
+      banned: true,
+      banReason: true,
+      banExpires: true,
+    },
+  })
+
+  if (!dbUser) {
+    throw new UnauthorizedException()
+  }
+
+  await assertUserNotBanned(dbUser)
 
   return next()
 }
@@ -62,9 +79,23 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
   const admin = c.get('admin')
 
-  if (!admin || !admin.role) {
+  if (!admin?.id || !admin.role) {
     throw new UnauthorizedException()
   }
+
+  const dbStaff = await db.staff.findUnique({
+    where: { id: admin.id },
+    select: {
+      id: true,
+      isActive: true,
+    },
+  })
+
+  if (!dbStaff) {
+    throw new UnauthorizedException()
+  }
+
+  await assertStaffActive(dbStaff)
 
   return next()
 }

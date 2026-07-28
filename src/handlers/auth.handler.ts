@@ -38,13 +38,18 @@ import { requireAuth } from '@/middlewares/auth'
 import { queueSendTemplatedEmail } from '@/services/email.service'
 import { validateOtp } from '@/services/otp.service'
 import { sendPhoneOtp } from '@/services/phone.service'
+import { assertUserNotBanned } from '@/services/account-status.service'
 import { getFileUrl } from '@/services/upload.service'
 import { AppRouteHandler, UserTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
 import { AuthTokenType, PhoneVerificationType, UserSource } from '@prisma/client'
 import crypto from 'crypto'
 import dayjs from 'dayjs'
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import {
+  clearUserAuthCookies,
+  setUserAccessTokenCookie,
+} from '@/lib/auth-cookies'
+import { getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
 export const checkAccountHandler = factory.createHandlers(
@@ -123,6 +128,8 @@ export const loginHandler = factory.createHandlers(
         )
       }
 
+      await assertUserNotBanned(existingUser)
+
       // Here you would typically create a session or JWT token for the user
       const token = await generateJwtToken({
         id: existingUser.id,
@@ -150,6 +157,8 @@ export const loginHandler = factory.createHandlers(
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
+
+      setUserAccessTokenCookie(c, token)
 
       return c.json(
         ok(
@@ -262,6 +271,8 @@ export const registerHandler = factory.createHandlers(
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
+      setUserAccessTokenCookie(c, token)
+
       return c.json(
         ok(
           {
@@ -281,15 +292,8 @@ export const registerHandler = factory.createHandlers(
 export const logoutHandler = factory.createHandlers(async (c) => {
   try {
     const user = c.get('user')
-    const token = getCookie(c, 'token')
 
-    if (!token) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
-      return c.json(ok(null, 'Logout successful'))
-    }
-
-    if (user && user.id) {
+    if (user?.id) {
       await db.authToken.deleteMany({
         where: {
           userId: user.id,
@@ -297,8 +301,7 @@ export const logoutHandler = factory.createHandlers(async (c) => {
       })
     }
 
-    deleteCookie(c, 'token')
-    deleteCookie(c, 'refreshToken')
+    clearUserAuthCookies(c)
 
     return c.json(ok(null, 'Logout successful'))
   } catch (err) {
@@ -325,8 +328,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
+      clearUserAuthCookies(c)
 
       throw new UnauthorizedException()
     }
@@ -334,8 +336,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
     const validRefreshToken = await validateRefreshToken(refreshToken)
 
     if (!validRefreshToken) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
+      clearUserAuthCookies(c)
 
       throw new UnauthorizedException()
     }
@@ -350,14 +351,23 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
     }
 
     if (dayjs().isAfter(authToken.refreshExpiresAt)) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
+      clearUserAuthCookies(c)
 
       await db.authToken.deleteMany({
         where: { userId: authToken.user.id },
       })
 
       throw new UnauthorizedException()
+    }
+
+    try {
+      await assertUserNotBanned(authToken.user)
+    } catch (banErr) {
+      clearUserAuthCookies(c)
+      await db.authToken.deleteMany({
+        where: { userId: authToken.user.id },
+      })
+      throw banErr
     }
 
     const newToken = await generateJwtToken({
@@ -380,8 +390,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
       },
     })
 
-    deleteCookie(c, 'token')
-    deleteCookie(c, 'refreshToken')
+    clearUserAuthCookies(c)
 
     setCookie(c, 'refreshToken', newRefreshToken, {
       httpOnly: true,
@@ -389,6 +398,8 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
       sameSite: 'Lax',
       expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
     })
+
+    setUserAccessTokenCookie(c, newToken)
 
     return c.json(
       ok(
@@ -573,6 +584,8 @@ export const loginWithEmailHandler = factory.createHandlers(
         )
       }
 
+      await assertUserNotBanned(existingUser)
+
       // Create a session or JWT token for the user
       const token = await generateJwtToken({
         id: existingUser.id,
@@ -600,6 +613,8 @@ export const loginWithEmailHandler = factory.createHandlers(
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
+
+      setUserAccessTokenCookie(c, token)
 
       return c.json(
         ok(
@@ -647,27 +662,10 @@ export const getProfileHandler: AppRouteHandler = async (c) => {
       throw new UnauthorizedException()
     }
 
-    if (existingUser.banExpires && dayjs().isAfter(existingUser.banExpires)) {
-      // Lift the ban if the ban period has expired
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          banned: false,
-          banExpires: null,
-          banReason: null,
-        },
-      })
-    }
-
-    if (existingUser.banned) {
-      return c.json(
-        err(
-          `Your account has been banned. Reason: ${existingUser.banReason}`,
-          status.FORBIDDEN,
-        ),
-        status.FORBIDDEN,
-      )
-    }
+    const banState = await assertUserNotBanned(existingUser)
+    existingUser.banned = banState.banned
+    existingUser.banReason = banState.banReason
+    existingUser.banExpires = banState.banExpires
 
     if (existingUser.image) {
       existingUser.image = await getFileUrl(existingUser.image)

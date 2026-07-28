@@ -668,6 +668,10 @@ export const banUserHandler = factory.createHandlers(
         },
       })
 
+      await db.authToken.deleteMany({
+        where: { userId: id },
+      })
+
       return c.json(
         ok(
           updatedUser,

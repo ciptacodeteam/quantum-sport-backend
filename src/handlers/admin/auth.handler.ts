@@ -22,11 +22,16 @@ import {
   UpdateAdminProfileSchema,
 } from '@/lib/validation'
 import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
+import { assertStaffActive } from '@/services/account-status.service'
 import { AdminTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
-import dayjs from 'dayjs'
 import { AuthTokenType, Role } from '@prisma/client'
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import dayjs from 'dayjs'
+import {
+  clearAdminAuthCookies,
+  setAdminAccessTokenCookie,
+} from '@/lib/auth-cookies'
+import { getCookie, setCookie } from 'hono/cookie'
 import status from 'http-status'
 
 export const registerAdminHandler = factory.createHandlers(
@@ -94,6 +99,8 @@ export const registerAdminHandler = factory.createHandlers(
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
+      setAdminAccessTokenCookie(c, token)
+
       return c.json(
         ok(
           {
@@ -148,6 +155,14 @@ export const loginAdminHandler = factory.createHandlers(
         )
       }
 
+      if (!user.isActive) {
+        c.var.logger.warn(`Login blocked for inactive staff: ${email}`)
+        return c.json(
+          err('Your staff account is inactive', status.FORBIDDEN),
+          status.FORBIDDEN,
+        )
+      }
+
       const token = await generateJwtToken({
         id: user.id,
         name: user.name,
@@ -180,6 +195,8 @@ export const loginAdminHandler = factory.createHandlers(
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
 
+      setAdminAccessTokenCookie(c, token)
+
       return c.json(
         ok(
           {
@@ -199,15 +216,8 @@ export const loginAdminHandler = factory.createHandlers(
 export const logoutAdminHandler = factory.createHandlers(async (c) => {
   try {
     const admin = c.get('admin')
-    const token = getCookie(c, 'token')
 
-    if (!token) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
-      return c.json(ok(null, 'Logout successful'))
-    }
-
-    if (admin && admin.id) {
+    if (admin?.id) {
       await db.authToken.deleteMany({
         where: {
           staffId: admin.id,
@@ -215,8 +225,7 @@ export const logoutAdminHandler = factory.createHandlers(async (c) => {
       })
     }
 
-    deleteCookie(c, 'token')
-    deleteCookie(c, 'refreshToken')
+    clearAdminAuthCookies(c)
 
     return c.json(ok(null, 'Logout successful'))
   } catch (err) {
@@ -251,6 +260,8 @@ export const getAdminProfileHandler = factory.createHandlers(async (c) => {
     if (!adminData) {
       throw new UnauthorizedException()
     }
+
+    await assertStaffActive(adminData)
 
     if (adminData.image) {
       const imageUrl = await getFileUrl(adminData.image)
@@ -392,8 +403,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     const refreshToken = getCookie(c, 'refreshToken')
 
     if (!refreshToken) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
+      clearAdminAuthCookies(c)
 
       throw new UnauthorizedException()
     }
@@ -401,8 +411,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     const validRefreshToken = await validateRefreshToken(refreshToken)
 
     if (!validRefreshToken) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
+      clearAdminAuthCookies(c)
 
       throw new UnauthorizedException()
     }
@@ -420,8 +429,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     const isInvalidTokenType = authToken.type !== AuthTokenType.STAFF
 
     if (isTokenExpired || isInvalidTokenType) {
-      deleteCookie(c, 'token')
-      deleteCookie(c, 'refreshToken')
+      clearAdminAuthCookies(c)
 
       await db.authToken.deleteMany({
         where: { staffId: authToken.staff.id },
@@ -431,6 +439,16 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
     }
 
     const admin = authToken.staff
+
+    try {
+      await assertStaffActive(admin)
+    } catch (inactiveErr) {
+      clearAdminAuthCookies(c)
+      await db.authToken.deleteMany({
+        where: { staffId: admin.id },
+      })
+      throw inactiveErr
+    }
 
     const newToken = await generateJwtToken({
       id: admin.id,
@@ -462,6 +480,8 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
       sameSite: 'Lax',
       expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
     })
+
+    setAdminAccessTokenCookie(c, newToken)
 
     return c.json(
       ok(

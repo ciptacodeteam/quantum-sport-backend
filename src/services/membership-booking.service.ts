@@ -5,7 +5,16 @@ type MembershipBookingUsage = {
 
 type MembershipBookingTransaction = {
   membershipUser: {
-    findUnique: (args: unknown) => Promise<{
+    findUnique: (args: {
+      where: { id: string }
+      include: {
+        membership: {
+          select: {
+            sessions: true
+          }
+        }
+      }
+    }) => Promise<{
       id: string
       remainingSessions: number
       endDate: Date
@@ -13,7 +22,13 @@ type MembershipBookingTransaction = {
         sessions: number
       }
     } | null>
-    update: (args: unknown) => Promise<unknown>
+    update: (args: {
+      where: { id: string }
+      data: {
+        remainingSessions: number
+        isExpired: boolean
+      }
+    }) => Promise<unknown>
   }
 }
 

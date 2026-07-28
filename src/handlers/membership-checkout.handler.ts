@@ -7,6 +7,7 @@ import { ok } from '@/lib/response'
 import { generateInvoiceNumber } from '@/lib/utils'
 import { requireAuth } from '@/middlewares/auth'
 import { xenditService } from '@/services/xendit.service'
+import { AWAITING_PAYMENT_SUSPENSION_REASON } from '@/services/membership-activation.service'
 import { zValidator } from '@hono/zod-validator'
 import { PaymentStatus } from '@prisma/client'
 import dayjs from 'dayjs'
@@ -85,7 +86,7 @@ export const membershipCheckoutHandler = factory.createHandlers(
         // Generate invoice number
         const invoiceNumber = await generateInvoiceNumber()
 
-        // Create MembershipUser record
+        // Create MembershipUser as suspended until payment succeeds (B4)
         const startDate = dayjs().toDate()
         const endDate = dayjs().add(membership.duration, 'days').toDate()
 
@@ -98,7 +99,8 @@ export const membershipCheckoutHandler = factory.createHandlers(
             remainingSessions: membership.sessions,
             remainingDuration: membership.duration,
             isExpired: false,
-            isSuspended: false,
+            isSuspended: true,
+            suspensionReason: AWAITING_PAYMENT_SUSPENSION_REASON,
           },
         })
 

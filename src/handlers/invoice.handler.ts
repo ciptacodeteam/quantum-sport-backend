@@ -111,7 +111,10 @@ export const getInvoiceDetailHandler = factory.createHandlers(
       const { id } = c.req.valid('param') as { id: string }
 
       const invoice: any = await db.invoice.findFirst({
-        where: { number: id, userId: user.id },
+        where: {
+          userId: user.id,
+          OR: [{ number: id }, { id }],
+        },
         include: {
           user: { select: { id: true, name: true, email: true, phone: true } },
           booking: {
