@@ -55,11 +55,23 @@ export class GenerateOTPResponse {
   ) {}
 
   static fromJson(json: any): GenerateOTPResponse {
+    if (!json?.data?.id || !json?.data?.otp) {
+      throw new Error('Invalid Fazpass request OTP response')
+    }
+
     return new GenerateOTPResponse(
       json.status,
       json.message,
       json.code,
-      json.data,
+      new OTPData(
+        json.data.id,
+        json.data.otp,
+        json.data.otp_length,
+        json.data.prefix,
+        json.data.channel,
+        json.data.provider,
+        json.data.purpose,
+      ),
     )
   }
 
@@ -108,6 +120,10 @@ export class SendOTPResponse {
   ) {}
 
   static fromJson(json: any): SendOTPResponse {
+    if (!json?.data?.id) {
+      throw new Error('Invalid Fazpass send OTP response')
+    }
+
     return new SendOTPResponse(
       json.status,
       json.message,

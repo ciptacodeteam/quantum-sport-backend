@@ -440,8 +440,9 @@ export const forgotPasswordHandler = factory.createHandlers(
       let requestId = Math.random().toString(36).substring(2, 30)
 
       if (env.nodeEnv === 'production') {
-        code = await generateOtp(OTP_LENGTH)
-        requestId = await sendPhoneOtp(formattedPhone, code)
+        const otpResult = await sendPhoneOtp(formattedPhone)
+        code = otpResult.code
+        requestId = otpResult.requestId
 
         if (!requestId) {
           c.var.logger.error(

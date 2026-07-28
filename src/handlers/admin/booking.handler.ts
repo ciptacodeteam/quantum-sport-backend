@@ -14,7 +14,6 @@ import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import {
   BookingStatus,
-  CoachType,
   CourtSport,
   PaymentStatus,
 } from '@prisma/client'
@@ -25,6 +24,16 @@ import { z } from 'zod'
 
 import { exportDataToExcel } from '@/services/analytics.service'
 import { restoreMembershipSessionsForCancelledBooking } from '@/services/membership-booking.service'
+
+const courtSportBookingWhere = (courtSport: CourtSport) => ({
+  details: {
+    some: {
+      court: {
+        sport: courtSport,
+      },
+    },
+  },
+})
 
 // GET /admin/bookings
 // Get all booking transactions
@@ -69,57 +78,9 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
         }
       }
       if (query.courtSport) {
-        const coachTypes =
-          query.courtSport === CourtSport.PADEL
-            ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
-            : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
-
         where = {
           ...where,
-          OR: [
-            {
-              details: {
-                some: {
-                  court: {
-                    sport: query.courtSport,
-                  },
-                },
-              },
-            },
-            {
-              coaches: {
-                some: {
-                  status: {
-                    not: BookingStatus.CANCELLED,
-                  },
-                  slot: {
-                    isAvailable: false,
-                    staff: {
-                      coachType: {
-                        in: coachTypes,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            ...(query.courtSport === CourtSport.TENNIS
-              ? [
-                  {
-                    ballboys: {
-                      some: {
-                        status: {
-                          not: BookingStatus.CANCELLED,
-                        },
-                        slot: {
-                          isAvailable: false,
-                        },
-                      },
-                    },
-                  },
-                ]
-              : []),
-          ],
+          ...courtSportBookingWhere(query.courtSport),
         }
       }
       if (query.coach === 'with') {
@@ -304,57 +265,9 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
       } as any
 
       if (query.courtSport) {
-        const coachTypes =
-          query.courtSport === CourtSport.PADEL
-            ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
-            : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
-
         where = {
           ...where,
-          OR: [
-            {
-              details: {
-                some: {
-                  court: {
-                    sport: query.courtSport,
-                  },
-                },
-              },
-            },
-            {
-              coaches: {
-                some: {
-                  status: {
-                    not: BookingStatus.CANCELLED,
-                  },
-                  slot: {
-                    isAvailable: false,
-                    staff: {
-                      coachType: {
-                        in: coachTypes,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            ...(query.courtSport === CourtSport.TENNIS
-              ? [
-                  {
-                    ballboys: {
-                      some: {
-                        status: {
-                          not: BookingStatus.CANCELLED,
-                        },
-                        slot: {
-                          isAvailable: false,
-                        },
-                      },
-                    },
-                  },
-                ]
-              : []),
-          ],
+          ...courtSportBookingWhere(query.courtSport),
         }
       }
 

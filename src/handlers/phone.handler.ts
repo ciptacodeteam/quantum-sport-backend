@@ -1,11 +1,11 @@
-import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
+import { DEFAULT_OTP_CODE } from '@/constants'
 import { env } from '@/env'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
 import { hashPassword } from '@/lib/password'
-import { formatPhone, generateOtp } from '@/lib/utils'
+import { formatPhone } from '@/lib/utils'
 import {
   phoneSchema,
   PhoneSchema,
@@ -105,8 +105,9 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
       let requestId = Math.random().toString(36).substring(2, 30)
 
       if (env.nodeEnv === 'production') {
-        code = await generateOtp(OTP_LENGTH)
-        requestId = await sendPhoneOtp(formattedPhone, code)
+        const otpResult = await sendPhoneOtp(formattedPhone)
+        code = otpResult.code
+        requestId = otpResult.requestId
 
         if (!requestId) {
           c.var.logger.error(
