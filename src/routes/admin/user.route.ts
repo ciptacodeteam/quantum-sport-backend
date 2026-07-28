@@ -10,18 +10,38 @@ import {
   verifyUserPhoneManuallyHandler,
 } from '@/handlers/admin/user.handler'
 import { createRouter } from '@/lib/create-app'
+import { requireAdmin, requireAnyAdminRole } from '@/middlewares/auth'
+
+const requireCustomerReadAccess = requireAnyAdminRole([
+  'ADMIN',
+  'ADMIN_VIEWER',
+  'CASHIER',
+])
+const requireCustomerSupportAccess = requireAnyAdminRole(['ADMIN', 'CASHIER'])
 
 const adminUserRoute = createRouter()
   .basePath('/customers')
-  .get('/', ...getAllUsersHandler)
-  .get('/search', ...searchCustomersHandler)
-  .get('/:id', ...getUserDetailHandler)
-  .get('/:id/membership', ...getCustomerMembershipDetailsHandler)
-  .put('/:id', ...updateUserHandler)
-  .post('/:id/verify-phone', ...verifyUserPhoneManuallyHandler)
-  .post('/:id/send-reset-password', ...sendResetPasswordLinkHandler)
+  .get('/', requireCustomerReadAccess, ...getAllUsersHandler)
+  .get('/search', requireCustomerReadAccess, ...searchCustomersHandler)
+  .get('/:id', requireCustomerReadAccess, ...getUserDetailHandler)
+  .get(
+    '/:id/membership',
+    requireCustomerReadAccess,
+    ...getCustomerMembershipDetailsHandler,
+  )
+  .put('/:id', requireCustomerSupportAccess, ...updateUserHandler)
+  .post(
+    '/:id/verify-phone',
+    requireCustomerSupportAccess,
+    ...verifyUserPhoneManuallyHandler,
+  )
+  .post(
+    '/:id/send-reset-password',
+    requireCustomerSupportAccess,
+    ...sendResetPasswordLinkHandler,
+  )
   // .post('/:id/send-change-phone', ...sendChangePhoneLinkHandler) # salah
-  .put('/:id/ban', ...banUserHandler)
-  .post('/:id/unban', ...unbanUserHandler)
+  .put('/:id/ban', requireAdmin, ...banUserHandler)
+  .post('/:id/unban', requireAdmin, ...unbanUserHandler)
 
 export default adminUserRoute

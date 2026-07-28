@@ -135,6 +135,23 @@ export const requireAdminOrViewer: MiddlewareHandler = async (c, next) => {
   return next()
 }
 
+export const requireAnyAdminRole = (roles: Role[]) => {
+  const middleware: MiddlewareHandler = async (c, next) => {
+    const admin = c.get('admin')
+
+    if (!admin) {
+      throw new UnauthorizedException()
+    }
+
+    if (!roles.includes(admin.role)) {
+      throw new ForbiddenException()
+    }
+
+    return next()
+  }
+  return middleware
+}
+
 // Only allow ADMIN (blocks ADMIN_VIEWER from write operations)
 export const requireAdminWriteAccess: MiddlewareHandler = async (c, next) => {
   const admin = c.get('admin')
