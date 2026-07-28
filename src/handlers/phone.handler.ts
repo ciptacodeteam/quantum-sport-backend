@@ -106,7 +106,8 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
 
       if (env.nodeEnv === 'production') {
         const otpResult = await sendPhoneOtp(formattedPhone)
-        code = otpResult.code
+        // Fazpass returns a masked OTP — store placeholder only; verify via Fazpass API
+        code = 'MASKED'
         requestId = otpResult.requestId
 
         if (!requestId) {
@@ -117,6 +118,8 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
         }
       }
 
+      const expiresAt = dayjs().add(10, 'minute').toDate()
+
       await db.phoneVerification.upsert({
         where: { phone: formattedPhone },
         update: {
@@ -124,7 +127,8 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
           code,
           isUsed: false,
           type: PhoneVerificationType.VERIFY_PHONE,
-          expiresAt: dayjs().add(5, 'minute').toDate(),
+          expiresAt,
+          createdAt: new Date(),
         },
         create: {
           requestId,
@@ -132,7 +136,7 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
           code,
           isUsed: false,
           type: PhoneVerificationType.VERIFY_PHONE,
-          expiresAt: dayjs().add(5, 'minute').toDate(),
+          expiresAt,
         },
       })
 
@@ -163,10 +167,11 @@ export const verifyPhoneVerificationOtpHandler = factory.createHandlers(
         `Verifying phone OTP for ${phoneNumber}, requestId: ${requestId}`,
       )
 
-      const verificationRecord = await db.phoneVerification.findUnique({
+      const verificationRecord = await db.phoneVerification.findFirst({
         where: {
           requestId,
           phone: phoneNumber,
+          isUsed: false,
         },
       })
 
@@ -175,10 +180,15 @@ export const verifyPhoneVerificationOtpHandler = factory.createHandlers(
           `No verification record found for phone ${phoneNumber} with requestId ${requestId}`,
         )
         return c.json(
-          err('Invalid requestId or phone number', status.BAD_REQUEST),
+          err(
+            'Permintaan OTP tidak valid. Silakan kirim ulang OTP.',
+            status.BAD_REQUEST,
+          ),
           status.BAD_REQUEST,
         )
       }
+
+      const normalizedCode = String(code).trim()
 
       if (verificationRecord.isUsed) {
         c.var.logger.error(
@@ -186,18 +196,7 @@ export const verifyPhoneVerificationOtpHandler = factory.createHandlers(
         )
 
         return c.json(
-          err('OTP code has already been used', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
-
-      if (verificationRecord.code !== code) {
-        c.var.logger.error(
-          `Invalid OTP code for phone ${phoneNumber}, requestId: ${requestId}`,
-        )
-
-        return c.json(
-          err('Invalid OTP code', status.BAD_REQUEST),
+          err('Kode OTP sudah digunakan', status.BAD_REQUEST),
           status.BAD_REQUEST,
         )
       }
@@ -208,29 +207,38 @@ export const verifyPhoneVerificationOtpHandler = factory.createHandlers(
         )
 
         return c.json(
-          err('OTP code has expired', status.BAD_REQUEST),
+          err('Kode OTP sudah kadaluarsa. Silakan kirim ulang.', status.BAD_REQUEST),
           status.BAD_REQUEST,
         )
       }
 
       if (env.nodeEnv === 'production') {
-        const success = await verifyPhoneOtp(requestId, code)
+        // Fazpass request API masks the OTP; verify with provider, not local DB code
+        const result = await verifyPhoneOtp(requestId, normalizedCode)
 
-        if (!success) {
+        if (!result.success) {
           c.var.logger.error(
-            `Failed to verify OTP with external service for phone ${phoneNumber}, requestId: ${requestId}`,
+            `Failed to verify OTP with Fazpass for phone ${phoneNumber}, requestId: ${requestId}, message: ${result.message}`,
           )
 
           return c.json(
-            err('Failed to verify OTP', status.BAD_REQUEST),
+            err(result.message, status.BAD_REQUEST),
             status.BAD_REQUEST,
           )
         }
+      } else if (verificationRecord.code !== normalizedCode) {
+        c.var.logger.error(
+          `Invalid OTP code for phone ${phoneNumber}, requestId: ${requestId}`,
+        )
+
+        return c.json(
+          err('Kode OTP salah', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
       }
 
       await db.phoneVerification.update({
         where: {
-          requestId,
           phone: phoneNumber,
         },
         data: {

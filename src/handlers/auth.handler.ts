@@ -1,4 +1,4 @@
-import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
+import { DEFAULT_OTP_CODE } from '@/constants'
 import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -441,7 +441,8 @@ export const forgotPasswordHandler = factory.createHandlers(
 
       if (env.nodeEnv === 'production') {
         const otpResult = await sendPhoneOtp(formattedPhone)
-        code = otpResult.code
+        // Fazpass returns a masked OTP — store placeholder only; verify via Fazpass API
+        code = 'MASKED'
         requestId = otpResult.requestId
 
         if (!requestId) {
@@ -452,6 +453,8 @@ export const forgotPasswordHandler = factory.createHandlers(
         }
       }
 
+      const expiresAt = dayjs().add(10, 'minute').toDate()
+
       await db.phoneVerification.upsert({
         where: { phone: formattedPhone },
         update: {
@@ -459,7 +462,8 @@ export const forgotPasswordHandler = factory.createHandlers(
           code,
           isUsed: false,
           type: PhoneVerificationType.FORGOT_PASSWORD,
-          expiresAt: dayjs().add(5, 'minute').toDate(),
+          expiresAt,
+          createdAt: new Date(),
         },
         create: {
           requestId,
@@ -467,7 +471,7 @@ export const forgotPasswordHandler = factory.createHandlers(
           code,
           isUsed: false,
           type: PhoneVerificationType.FORGOT_PASSWORD,
-          expiresAt: dayjs().add(5, 'minute').toDate(),
+          expiresAt,
         },
       })
 

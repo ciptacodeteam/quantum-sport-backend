@@ -116,7 +116,7 @@ export async function sendPhoneOtp(
 export async function verifyPhoneOtp(
   requestId: string,
   otp: string,
-): Promise<boolean> {
+): Promise<{ success: boolean; message: string }> {
   try {
     const payload = new VerifyOTPPayload(requestId, otp).toJson()
 
@@ -126,13 +126,76 @@ export async function verifyPhoneOtp(
       },
     })
 
-    log.info('OTP Verification Response:', response.data)
+    log.info(
+      {
+        requestId,
+        providerStatus: response.data?.status,
+        providerMessage: response.data?.message,
+        providerCode: response.data?.code,
+      },
+      'Fazpass OTP verification response',
+    )
 
     const responseData = VerifyOTPResponse.fromJson(response.data)
+    const providerMessage =
+      typeof responseData.message === 'string' ? responseData.message : ''
 
-    return responseData.status
+    return {
+      success: responseData.status === true,
+      message: mapFazpassVerifyMessage(providerMessage),
+    }
   } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const providerMessage = error.response?.data?.message
+      log.error(
+        {
+          requestId,
+          httpStatus: error.response?.status,
+          providerResponse: error.response?.data,
+        },
+        'Error verifying OTP via Fazpass',
+      )
+      return {
+        success: false,
+        message: mapFazpassVerifyMessage(
+          typeof providerMessage === 'string'
+            ? providerMessage
+            : 'Gagal memverifikasi OTP',
+        ),
+      }
+    }
+
     log.error(`Error verifying OTP: ${error}`)
     throw error
   }
+}
+
+function mapFazpassVerifyMessage(message: string): string {
+  const normalized = message.toLowerCase()
+
+  if (
+    normalized.includes('kadaluarsa') ||
+    normalized.includes('expired') ||
+    normalized.includes('expire')
+  ) {
+    return 'Kode OTP sudah kadaluarsa. Silakan kirim ulang.'
+  }
+
+  if (
+    normalized.includes('sudah diverifikasi') ||
+    normalized.includes('has been verified') ||
+    normalized.includes('already')
+  ) {
+    return 'Kode OTP sudah digunakan'
+  }
+
+  if (
+    normalized.includes('invalid') ||
+    normalized.includes('tidak ditemukan') ||
+    normalized.includes('salah')
+  ) {
+    return 'Kode OTP salah'
+  }
+
+  return message || 'Gagal memverifikasi OTP'
 }

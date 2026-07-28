@@ -1,4 +1,4 @@
-import { DEFAULT_OTP_CODE, OTP_LENGTH } from '@/constants'
+import { DEFAULT_OTP_CODE } from '@/constants'
 import { env } from '@/env'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -11,7 +11,7 @@ import {
   verifyVerificationOtpSchema,
   VerifyVerificationOtpSchema,
 } from '@/lib/validation'
-import { sendPhoneOtp } from '@/services/phone.service'
+import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
 import { queueSendTemplatedEmail } from '@/services/email.service'
 import { requireAuth } from '@/middlewares/auth'
 import { zValidator } from '@hono/zod-validator'
@@ -110,10 +110,12 @@ export const sendVerificationOtpHandler = factory.createHandlers(
 
         let code = DEFAULT_OTP_CODE
         let requestId = Math.random().toString(36).substring(2, 30)
+        const expiresAt = dayjs().add(10, 'minute').toDate()
 
         if (env.nodeEnv === 'production') {
           const otpResult = await sendPhoneOtp(formattedPhone)
-          code = otpResult.code
+          // Fazpass returns a masked OTP — store placeholder only; verify via Fazpass API
+          code = 'MASKED'
           requestId = otpResult.requestId
 
           if (!requestId) {
@@ -128,7 +130,8 @@ export const sendVerificationOtpHandler = factory.createHandlers(
             code,
             isUsed: false,
             type: PhoneVerificationType.VERIFY_PHONE,
-            expiresAt: dayjs().add(5, 'minute').toDate(),
+            expiresAt,
+            createdAt: new Date(),
           },
           create: {
             requestId,
@@ -136,7 +139,7 @@ export const sendVerificationOtpHandler = factory.createHandlers(
             code,
             isUsed: false,
             type: PhoneVerificationType.VERIFY_PHONE,
-            expiresAt: dayjs().add(5, 'minute').toDate(),
+            expiresAt,
           },
         })
 
@@ -149,7 +152,7 @@ export const sendVerificationOtpHandler = factory.createHandlers(
             {
               phone: formattedPhone,
               requestId,
-              expiresAt: dayjs().add(5, 'minute').toDate(),
+              expiresAt,
             },
             'OTP sent to phone successfully',
           ),
@@ -287,34 +290,54 @@ export const verifyVerificationOtpHandler = factory.createHandlers(
 
       // Phone verification
       if (type === 'phone') {
+        const normalizedCode = String(code).trim()
         const verification = await db.phoneVerification.findFirst({
           where: { requestId, isUsed: false },
         })
 
         if (!verification) {
           return c.json(
-            err('Invalid verification request', status.BAD_REQUEST),
+            err(
+              'Permintaan OTP tidak valid. Silakan kirim ulang OTP.',
+              status.BAD_REQUEST,
+            ),
             status.BAD_REQUEST,
           )
         }
 
         if (verification.isUsed) {
           return c.json(
-            err('OTP code has already been used', status.BAD_REQUEST),
+            err('Kode OTP sudah digunakan', status.BAD_REQUEST),
             status.BAD_REQUEST,
           )
         }
 
         if (dayjs().isAfter(dayjs(verification.expiresAt))) {
           return c.json(
-            err('OTP code has expired', status.BAD_REQUEST),
+            err('Kode OTP sudah kadaluarsa. Silakan kirim ulang.', status.BAD_REQUEST),
             status.BAD_REQUEST,
           )
         }
 
-        if (verification.code !== code) {
+        if (env.nodeEnv === 'production') {
+          // Fazpass request API masks the OTP; verify with provider, not local DB code
+          const result = await verifyPhoneOtp(requestId, normalizedCode)
+
+          if (!result.success) {
+            c.var.logger.error(
+              `Failed to verify OTP with Fazpass for requestId ${requestId}, message: ${result.message}`,
+            )
+            return c.json(
+              err(result.message, status.BAD_REQUEST),
+              status.BAD_REQUEST,
+            )
+          }
+        } else if (verification.code !== normalizedCode) {
+          c.var.logger.error(
+            `Invalid OTP code for requestId ${requestId}. expectedLength=${verification.code.length}, receivedLength=${normalizedCode.length}`,
+          )
           return c.json(
-            err('Invalid OTP code', status.BAD_REQUEST),
+            err('Kode OTP salah', status.BAD_REQUEST),
             status.BAD_REQUEST,
           )
         }
