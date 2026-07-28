@@ -22,7 +22,7 @@ export const authTokenCookieSchema = z.object({
 
 export const verifyOtpSchema = z.object({
   phone: z.string().min(10).max(15),
-  code: z.string().length(4),
+  code: z.string().length(6),
   requestId: z.string(),
 })
 
@@ -37,7 +37,7 @@ export type LoginSchema = z.infer<typeof loginSchema>
 
 export const registerSchema = phoneSchema.extend({
   name: z.string().min(3).max(100),
-  code: z.string().length(4),
+  code: z.string().length(6),
   requestId: z.string(),
   password: z.string().min(6).max(100),
 })
@@ -806,7 +806,7 @@ export type SendVerificationOtpSchema = z.infer<
 export const verifyVerificationOtpSchema = z.object({
   type: z.enum(['phone', 'email']),
   requestId: z.string().min(1, 'Request ID is required'),
-  code: z.string().min(4, 'OTP code is required'),
+  code: z.string().length(6, 'OTP code must be 6 digits'),
 })
 
 export type VerifyVerificationOtpSchema = z.infer<
