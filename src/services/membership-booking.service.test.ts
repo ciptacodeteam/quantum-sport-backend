@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { restoreMembershipSessionsForCancelledBooking } from './membership-booking.service'
+import {
+  calculateMembershipSessionsForCourtSlots,
+  restoreMembershipSessionsForCancelledBooking,
+} from './membership-booking.service'
 
 function createTx(
   membershipUser: {
@@ -82,5 +85,33 @@ describe('restoreMembershipSessionsForCancelledBooking', () => {
     expect(restored).toBe(0)
     expect(tx.membershipUser.findUnique).not.toHaveBeenCalled()
     expect(tx.membershipUser.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('calculateMembershipSessionsForCourtSlots', () => {
+  it('uses one membership session per booked court hour', () => {
+    const sessions = calculateMembershipSessionsForCourtSlots([
+      {
+        startAt: new Date('2026-07-28T09:00:00.000Z'),
+        endAt: new Date('2026-07-28T11:00:00.000Z'),
+      },
+      {
+        startAt: new Date('2026-07-28T12:00:00.000Z'),
+        endAt: new Date('2026-07-28T13:00:00.000Z'),
+      },
+    ])
+
+    expect(sessions).toBe(3)
+  })
+
+  it('rounds partial court hours up to the next membership session', () => {
+    const sessions = calculateMembershipSessionsForCourtSlots([
+      {
+        startAt: new Date('2026-07-28T09:00:00.000Z'),
+        endAt: new Date('2026-07-28T10:30:00.000Z'),
+      },
+    ])
+
+    expect(sessions).toBe(2)
   })
 })

@@ -16,6 +16,7 @@ import { notificationService } from '@/services/notification.service'
 import { assertCoachSlotsDoNotConflict } from '@/services/coach-booking-conflict.service'
 import { getCourtCoachBundleDiscountByCourtSlot } from '@/services/booking-bundle-discount.service'
 import { getInventoryAvailabilityMap } from '@/services/inventory-availability.service'
+import { calculateMembershipSessionsForCourtSlots } from '@/services/membership-booking.service'
 import {
   claimSlotsAtomically,
   releaseSlotsByIds,
@@ -802,6 +803,7 @@ export const checkoutHandler = factory.createHandlers(
           startAt: Date
           endAt: Date
         }> = []
+        let membershipSessionsToUse = 0
         let activeMembership:
           | (MembershipUser & { membership: Membership })
           | null = null
@@ -856,8 +858,10 @@ export const checkoutHandler = factory.createHandlers(
             )
           }
           selectedCourtSport = courtSports[0] ?? null
+          membershipSessionsToUse =
+            calculateMembershipSessionsForCourtSlots(courtSlotData)
 
-          if (useMembership && selectedCourtSport) {
+          if (useMembership && selectedCourtSport && membershipSessionsToUse > 0) {
             const membershipCandidates = await tx.membershipUser.findMany({
               where: {
                 userId: user.id,
@@ -865,7 +869,7 @@ export const checkoutHandler = factory.createHandlers(
                 isSuspended: false,
                 startDate: { lte: new Date() },
                 endDate: { gt: new Date() },
-                remainingSessions: { gte: courtSlotData.length },
+                remainingSessions: { gte: membershipSessionsToUse },
                 membership: {
                   sport: selectedCourtSport,
                 },
@@ -1305,10 +1309,10 @@ export const checkoutHandler = factory.createHandlers(
           }
         }
 
-        if (activeMembership && courtSlots && courtSlots.length > 0) {
+        if (activeMembership && membershipSessionsToUse > 0) {
           const newRemainingSessions = Math.max(
             0,
-            activeMembership.remainingSessions - courtSlots.length,
+            activeMembership.remainingSessions - membershipSessionsToUse,
           )
 
           await tx.membershipUser.update({
@@ -1320,7 +1324,7 @@ export const checkoutHandler = factory.createHandlers(
           })
 
           c.var.logger.info(
-            `Deducted ${courtSlots.length} slots from membership ${activeMembership.id}. ` +
+            `Deducted ${membershipSessionsToUse} hours from membership ${activeMembership.id}. ` +
               `Remaining: ${newRemainingSessions} sessions`,
           )
         }
@@ -1404,7 +1408,7 @@ export const checkoutHandler = factory.createHandlers(
             promoDiscountAmount,
             membershipUserId: activeMembership?.id,
             membershipSessionsUsed: activeMembership
-              ? (courtSlots?.length ?? 0)
+              ? membershipSessionsToUse
               : 0,
           },
         })

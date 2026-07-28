@@ -25,15 +25,36 @@ import { z } from 'zod'
 import { exportDataToExcel } from '@/services/analytics.service'
 import { restoreMembershipSessionsForCancelledBooking } from '@/services/membership-booking.service'
 
-const courtSportBookingWhere = (courtSport: CourtSport) => ({
-  details: {
-    some: {
-      court: {
-        sport: courtSport,
+const courtSportBookingWhere = (courtSport: CourtSport) => {
+  const courtBookingWhere = {
+    details: {
+      some: {
+        court: {
+          sport: courtSport,
+        },
       },
     },
-  },
-})
+  }
+
+  if (courtSport !== CourtSport.TENNIS) {
+    return courtBookingWhere
+  }
+
+  return {
+    OR: [
+      courtBookingWhere,
+      {
+        ballboys: {
+          some: {
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+          },
+        },
+      },
+    ],
+  }
+}
 
 // GET /admin/bookings
 // Get all booking transactions

@@ -3,6 +3,11 @@ type MembershipBookingUsage = {
   membershipSessionsUsed?: number | null
 }
 
+type MembershipCourtSlot = {
+  startAt: Date
+  endAt: Date
+}
+
 type MembershipBookingTransaction = {
   membershipUser: {
     findUnique: (args: {
@@ -30,6 +35,22 @@ type MembershipBookingTransaction = {
       }
     }) => Promise<unknown>
   }
+}
+
+export function calculateMembershipSessionsForCourtSlots(
+  courtSlots: MembershipCourtSlot[],
+) {
+  const totalMinutes = courtSlots.reduce((total, slot) => {
+    const durationMs = slot.endAt.getTime() - slot.startAt.getTime()
+
+    return total + Math.max(0, durationMs / 60_000)
+  }, 0)
+
+  if (totalMinutes === 0) {
+    return 0
+  }
+
+  return Math.ceil(totalMinutes / 60)
 }
 
 export async function restoreMembershipSessionsForCancelledBooking(
