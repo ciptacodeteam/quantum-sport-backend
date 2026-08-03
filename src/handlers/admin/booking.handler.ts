@@ -36,13 +36,26 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
     },
   }
 
+  const coachBookingWhere = {
+    coaches: {
+      some: {
+        status: {
+          not: BookingStatus.CANCELLED,
+        },
+      },
+    },
+  }
+
   if (courtSport !== CourtSport.TENNIS) {
-    return courtBookingWhere
+    return {
+      OR: [courtBookingWhere, coachBookingWhere],
+    }
   }
 
   return {
     OR: [
       courtBookingWhere,
+      coachBookingWhere,
       {
         ballboys: {
           some: {
@@ -1251,15 +1264,49 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
       const bookings = await db.booking.findMany({
         where: {
           status: BookingStatus.CONFIRMED,
-          details: {
-            some: {
-              slot: {
-                startAt: {
-                  gte: dayjs().subtract(2, 'hours').toDate(), // Include slots that started up to 2 hours ago
+          OR: [
+            {
+              details: {
+                some: {
+                  slot: {
+                    startAt: {
+                      gte: dayjs().subtract(2, 'hours').toDate(), // Include slots that started up to 2 hours ago
+                    },
+                  },
                 },
               },
             },
-          },
+            {
+              coaches: {
+                some: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
+                  slot: {
+                    isAvailable: false,
+                    startAt: {
+                      gte: dayjs().subtract(2, 'hours').toDate(),
+                    },
+                  },
+                },
+              },
+            },
+            {
+              ballboys: {
+                some: {
+                  status: {
+                    not: BookingStatus.CANCELLED,
+                  },
+                  slot: {
+                    isAvailable: false,
+                    startAt: {
+                      gte: dayjs().subtract(2, 'hours').toDate(),
+                    },
+                  },
+                },
+              },
+            },
+          ],
         },
         include: {
           user: {
@@ -1301,6 +1348,14 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
             },
           },
           coaches: {
+            where: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+              slot: {
+                isAvailable: false,
+              },
+            },
             include: {
               slot: {
                 select: {
@@ -1388,28 +1443,40 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
       // Filter and transform bookings to include the nearest slot time
       const bookingsWithSchedule = bookings
         .map((booking) => {
-          // Find the earliest slot time from all details
-          const earliestSlot = booking.details.reduce(
-            (earliest, detail) => {
-              const slotStart = dayjs(detail.slot.startAt)
-              return !earliest || slotStart.isBefore(dayjs(earliest))
-                ? detail.slot.startAt
-                : earliest
+          const scheduleSlots = [
+            ...booking.details.map((detail) => ({
+              startAt: detail.slot.startAt,
+              endAt: detail.slot.endAt,
+            })),
+            ...booking.coaches.map((coach) => ({
+              startAt: coach.slot.startAt,
+              endAt: coach.slot.endAt,
+            })),
+            ...booking.ballboys.map((ballboy) => ({
+              startAt: ballboy.slot.startAt,
+              endAt: ballboy.slot.endAt,
+            })),
+          ]
+
+          const nearestSlot = scheduleSlots.reduce(
+            (nearest, slot) => {
+              const slotStart = dayjs(slot.startAt)
+              return !nearest || slotStart.isBefore(dayjs(nearest.startAt))
+                ? slot
+                : nearest
             },
-            null as Date | null,
+            null as { startAt: Date; endAt: Date } | null,
           )
 
-          if (!earliestSlot) return null
+          if (!nearestSlot) return null
 
           // Determine if booking is ongoing, upcoming, or completed
-          const slotStart = dayjs(earliestSlot)
-          const slotEnd = booking.details.find(
-            (d) => d.slot.startAt.getTime() === earliestSlot.getTime(),
-          )?.slot.endAt
+          const slotStart = dayjs(nearestSlot.startAt)
+          const slotEnd = nearestSlot.endAt
 
           const scheduleStatus = slotStart.isAfter(now)
             ? 'upcoming'
-            : slotEnd && dayjs(slotEnd).isAfter(now)
+            : dayjs(slotEnd).isAfter(now)
               ? 'ongoing'
               : 'completed'
 
@@ -1434,8 +1501,8 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
             user: booking.user,
             cashier: booking.cashier,
             schedule: {
-              startAt: earliestSlot,
-              endAt: slotEnd || earliestSlot,
+              startAt: nearestSlot.startAt,
+              endAt: nearestSlot.endAt,
               status: scheduleStatus,
               minutesFromNow,
               timeDisplay,
@@ -1449,18 +1516,18 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
               price: detail.price,
             })),
             coaches: booking.coaches.map((coach) => ({
-              staffId: coach.slot.staff?.id,
-              staffName: coach.slot.staff?.name,
-              staffImage: coach.slot.staff?.image,
+              coachId: coach.slot.staff?.id,
+              coachName: coach.slot.staff?.name ?? 'Coach',
+              coachImage: coach.slot.staff?.image,
               coachType: coach.bookingCoachType.name,
               slotStart: coach.slot.startAt,
               slotEnd: coach.slot.endAt,
               price: coach.price,
             })),
             ballboys: booking.ballboys.map((ballboy) => ({
-              staffId: ballboy.slot.staff?.id,
-              staffName: ballboy.slot.staff?.name,
-              staffImage: ballboy.slot.staff?.image,
+              ballboyId: ballboy.slot.staff?.id,
+              ballboyName: ballboy.slot.staff?.name ?? 'Ballboy',
+              ballboyImage: ballboy.slot.staff?.image,
               slotStart: ballboy.slot.startAt,
               slotEnd: ballboy.slot.endAt,
               price: ballboy.price,
