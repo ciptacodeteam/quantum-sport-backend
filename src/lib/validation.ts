@@ -245,6 +245,46 @@ export const updateSlotPricingSchema = z.object({
 
 export type UpdateSlotPricingSchema = z.infer<typeof updateSlotPricingSchema>
 
+export const bulkUpdateCourtSlotPricingSchema = z
+  .object({
+    fromDate: z
+      .string()
+      .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+        message: 'Invalid date format, expected YYYY-MM-DD',
+      }),
+    toDate: z
+      .string()
+      .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+        message: 'Invalid date format, expected YYYY-MM-DD',
+      }),
+    days: z.array(z.number().min(1).max(7)).min(1),
+    startHour: z.number().min(0).max(23),
+    endHour: z.number().min(1).max(24),
+    price: z.number().min(0),
+    discountPrice: z.number().min(0).optional(),
+  })
+  .refine(
+    (data) =>
+      dayjs(data.toDate).isSame(dayjs(data.fromDate)) ||
+      dayjs(data.toDate).isAfter(dayjs(data.fromDate)),
+    {
+      message: 'toDate must be the same as or after fromDate',
+      path: ['toDate'],
+    },
+  )
+  .refine((data) => data.endHour > data.startHour, {
+    message: 'endHour must be greater than startHour',
+    path: ['endHour'],
+  })
+  .refine((data) => (data.discountPrice ?? 0) <= data.price, {
+    message: 'discountPrice cannot exceed price',
+    path: ['discountPrice'],
+  })
+
+export type BulkUpdateCourtSlotPricingSchema = z.infer<
+  typeof bulkUpdateCourtSlotPricingSchema
+>
+
 export const createCourtSchema = z.object({
   name: z.string().min(3).max(100),
   description: z.string().max(500).optional(),

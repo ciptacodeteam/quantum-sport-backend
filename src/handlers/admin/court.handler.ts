@@ -9,6 +9,8 @@ import { ok } from '@/lib/response'
 import {
   AvailableCourtSlotsQuerySchema,
   availableCourtSlotsQuerySchema,
+  BulkUpdateCourtSlotPricingSchema,
+  bulkUpdateCourtSlotPricingSchema,
   CreateCourtSchema,
   createCourtSchema,
   IdSchema,
@@ -23,7 +25,10 @@ import {
   updateSlotPricingSchema,
 } from '@/lib/validation'
 import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
-import { updateSlotPricing } from '@/services/costing.service'
+import {
+  bulkUpdateCourtSlotPricing,
+  updateSlotPricing,
+} from '@/services/costing.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { BookingStatus, SlotType } from '@prisma/client'
@@ -518,6 +523,39 @@ export const updateSlotPricingHandler = factory.createHandlers(
       )
     } catch (error) {
       c.var.logger.fatal(`Error in updateSlotPricingHandler: ${error}`)
+      throw error
+    }
+  },
+)
+
+export const bulkUpdateCourtSlotPricingHandler = factory.createHandlers(
+  zValidator('param', idSchema, validateHook),
+  zValidator('json', bulkUpdateCourtSlotPricingSchema, validateHook),
+  async (c) => {
+    try {
+      const { id: courtId } = c.req.valid('param') as IdSchema
+      const payload = c.req.valid('json') as BulkUpdateCourtSlotPricingSchema
+
+      const court = await db.court.findUnique({
+        where: { id: courtId },
+        select: { id: true },
+      })
+
+      if (!court) {
+        throw new NotFoundException('Court item not found')
+      }
+
+      const result = await bulkUpdateCourtSlotPricing({
+        courtId,
+        ...payload,
+      })
+
+      return c.json(
+        ok(result, 'Bulk court slot pricing updated successfully'),
+        status.OK,
+      )
+    } catch (error) {
+      c.var.logger.fatal(`Error in bulkUpdateCourtSlotPricingHandler: ${error}`)
       throw error
     }
   },

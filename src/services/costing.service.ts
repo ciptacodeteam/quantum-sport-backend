@@ -555,6 +555,108 @@ export async function updateSlotPricing({
   }
 }
 
+type BulkUpdateCourtSlotPricingPayload = {
+  courtId: string
+  fromDate: string
+  toDate: string
+  days: number[]
+  startHour: number
+  endHour: number
+  price: number
+  discountPrice?: number
+}
+
+export async function bulkUpdateCourtSlotPricing({
+  courtId,
+  fromDate,
+  toDate,
+  days,
+  startHour,
+  endHour,
+  price,
+  discountPrice = 0,
+}: BulkUpdateCourtSlotPricingPayload) {
+  try {
+    const rangeStart = dayjs(fromDate).startOf('day')
+    const rangeEnd = dayjs(toDate).endOf('day')
+    const selectedDays = new Set(days)
+
+    const slots = await db.slot.findMany({
+      where: {
+        type: SlotType.COURT,
+        courtId,
+        startAt: {
+          gte: rangeStart.toDate(),
+          lte: rangeEnd.toDate(),
+        },
+      },
+      include: {
+        bookingDetails: {
+          where: {
+            booking: {
+              status: {
+                not: BookingStatus.CANCELLED,
+              },
+            },
+          },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    })
+
+    const matchedSlots = slots.filter((slot) => {
+      const start = dayjs(slot.startAt)
+      const hour = start.hour()
+      return (
+        selectedDays.has(dayNumber(start)) &&
+        hour >= startHour &&
+        hour < endHour
+      )
+    })
+
+    const updatableSlots = matchedSlots.filter(
+      (slot) => slot.bookingDetails.length === 0,
+    )
+    const updatableSlotIds = updatableSlots.map((slot) => slot.id)
+    const updatableStartTimes = updatableSlots.map((slot) => slot.startAt)
+
+    await db.$transaction(async (tx) => {
+      if (updatableSlotIds.length) {
+        await tx.slot.updateMany({
+          where: { id: { in: updatableSlotIds } },
+          data: { price, discountPrice },
+        })
+      }
+
+      if (updatableStartTimes.length) {
+        await tx.courtCostSchedule.updateMany({
+          where: {
+            courtId,
+            startAt: { in: updatableStartTimes },
+          },
+          data: { price, discountPrice },
+        })
+      }
+    })
+
+    const result = {
+      matchedCount: matchedSlots.length,
+      updatedCount: updatableSlots.length,
+      skippedBookedCount: matchedSlots.length - updatableSlots.length,
+    }
+
+    log.info(
+      `Bulk updated court ${courtId} slot pricing: ${JSON.stringify(result)}`,
+    )
+
+    return result
+  } catch (error) {
+    log.fatal(`Error bulk updating court slot pricing: ${error}`)
+    throw error
+  }
+}
+
 type SetStaffPricingRangePayload = {
   staffId: string
   type: Extract<SlotType, 'COACH' | 'BALLBOY'>

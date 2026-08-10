@@ -14,12 +14,11 @@ import {
   UpdateUserSchema,
   updateUserSchema,
 } from '@/lib/validation'
-import { deleteFile, uploadFile } from '@/services/upload.service'
-import { queueEmail } from '@/services/email-queue.service'
 import {
   buildPasswordResetLink,
   createPasswordResetToken,
 } from '@/services/password-reset.service'
+import { deleteFile, uploadFile } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
 import status from 'http-status'
@@ -93,7 +92,7 @@ function normalizePhoneSearch(query: string): string[] {
     }
   }
 
-  return [...new Set(patterns.filter(p => p.length > 0))] // Remove duplicates and empty strings
+  return [...new Set(patterns.filter((p) => p.length > 0))] // Remove duplicates and empty strings
 }
 
 // GET /admin/customers/search
@@ -158,7 +157,7 @@ export const searchCustomersHandler = factory.createHandlers(
       })
 
       // Group memberships by userId and get the first one (earliest endDate)
-      const membershipMap = new Map<string, typeof activeMemberships[0]>()
+      const membershipMap = new Map<string, (typeof activeMemberships)[0]>()
       for (const membership of activeMemberships) {
         if (!membershipMap.has(membership.userId)) {
           membershipMap.set(membership.userId, membership)
@@ -455,6 +454,8 @@ export const sendResetPasswordLinkHandler = factory.createHandlers(
       // Priority 1: Send to email if available and verified
       if (user.email && user.emailVerified) {
         try {
+          const { queueEmail } = await import('@/services/email-queue.service')
+
           await queueEmail({
             to: user.email,
             subject: 'Reset Your Password',
@@ -534,7 +535,10 @@ export const verifyUserPhoneManuallyHandler = factory.createHandlers(
       }
 
       if (user.phoneVerified) {
-        return c.json(ok(user, 'WhatsApp number is already verified'), status.OK)
+        return c.json(
+          ok(user, 'WhatsApp number is already verified'),
+          status.OK,
+        )
       }
 
       const updatedUser = await db.user.update({
@@ -790,7 +794,9 @@ export const getCustomerMembershipDetailsHandler = factory.createHandlers(
         status.OK,
       )
     } catch (error) {
-      c.var.logger.fatal(`Error in getCustomerMembershipDetailsHandler: ${error}`)
+      c.var.logger.fatal(
+        `Error in getCustomerMembershipDetailsHandler: ${error}`,
+      )
       throw error
     }
   },
