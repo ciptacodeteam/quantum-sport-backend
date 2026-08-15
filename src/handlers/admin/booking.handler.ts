@@ -14,6 +14,7 @@ import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import {
   BookingStatus,
+  CoachType,
   CourtSport,
   PaymentStatus,
 } from '@prisma/client'
@@ -26,6 +27,10 @@ import { exportDataToExcel } from '@/services/analytics.service'
 import { restoreMembershipSessionsForCancelledBooking } from '@/services/membership-booking.service'
 
 const courtSportBookingWhere = (courtSport: CourtSport) => {
+  const allowedCoachTypes =
+    courtSport === CourtSport.PADEL
+      ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
+      : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
   const courtBookingWhere = {
     details: {
       some: {
@@ -41,6 +46,13 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
       some: {
         status: {
           not: BookingStatus.CANCELLED,
+        },
+        slot: {
+          staff: {
+            coachType: {
+              in: allowedCoachTypes,
+            },
+          },
         },
       },
     },
