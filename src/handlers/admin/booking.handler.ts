@@ -45,10 +45,19 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
       },
     },
   }
+  const inventoryBookingWhere = {
+    inventories: {
+      some: {
+        inventory: {
+          sport: courtSport,
+        },
+      },
+    },
+  }
 
   if (courtSport !== CourtSport.TENNIS) {
     return {
-      OR: [courtBookingWhere, coachBookingWhere],
+      OR: [courtBookingWhere, coachBookingWhere, inventoryBookingWhere],
     }
   }
 
@@ -65,6 +74,7 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
           },
         },
       },
+      inventoryBookingWhere,
     ],
   }
 }
@@ -457,6 +467,15 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                   isActive: true,
                 },
               },
+              slot: {
+                select: {
+                  id: true,
+                  startAt: true,
+                  endAt: true,
+                  price: true,
+                  isAvailable: true,
+                },
+              },
             },
           },
           invoice: {
@@ -504,6 +523,19 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
             ballboy.slot.staff.image = await getFileUrl(
               ballboy.slot.staff.image,
             )
+          }
+        }
+
+        for (const inventory of booking.inventories) {
+          if (inventory.slot?.startAt) {
+            inventory.slot.startAt = dayjs(inventory.slot.startAt).format(
+              'YYYY-MM-DD HH:mm:ss',
+            ) as any
+          }
+          if (inventory.slot?.endAt) {
+            inventory.slot.endAt = dayjs(inventory.slot.endAt).format(
+              'YYYY-MM-DD HH:mm:ss',
+            ) as any
           }
         }
       }

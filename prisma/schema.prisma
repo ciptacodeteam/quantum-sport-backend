@@ -54,6 +54,7 @@ enum SlotType {
   COURT
   COACH
   BALLBOY
+  INVENTORY
 }
 
 enum CoachType {
