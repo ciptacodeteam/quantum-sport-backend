@@ -143,19 +143,11 @@ export async function getInventoryAvailability(
 
   const availability = await Promise.all(
     inventories.map(async (inventory: any) => {
-      if (inventory.quantity <= 0) {
-        return {
-          id: inventory.id,
-          name: inventory.name,
-          description: inventory.description,
-          image: inventory.image ? await getFileUrl(inventory.image) : null,
-          sport: inventory.sport,
-          price: inventory.price,
-          totalQuantity: 0,
-          availableQuantity: 0,
-        }
-      }
-
+      // `inventory.quantity` is stock currently on hand because checkout still
+      // decrements it. Add all unreturned rentals back to recover the physical
+      // capacity, then subtract only rentals overlapping the requested range.
+      // This also distinguishes a genuinely zero-stock item (no active rentals)
+      // from a racket whose last unit is merely rented in another time slot.
       const totalQuantity =
         inventory.quantity + (activeBookedByInventoryId.get(inventory.id) ?? 0)
       const unavailableQuantity =
