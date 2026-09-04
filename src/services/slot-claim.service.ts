@@ -12,10 +12,12 @@ export async function claimSlotsAtomically(
   {
     slotIds,
     type,
+    startsAfter,
     unavailableMessage = 'One or more slots not found or unavailable',
   }: {
     slotIds: string[]
     type: SlotType
+    startsAfter?: Date
     unavailableMessage?: string
   },
 ): Promise<void> {
@@ -29,6 +31,7 @@ export async function claimSlotsAtomically(
       id: { in: uniqueSlotIds },
       type,
       isAvailable: true,
+      ...(startsAfter ? { startAt: { gt: startsAfter } } : {}),
     },
     data: {
       isAvailable: false,

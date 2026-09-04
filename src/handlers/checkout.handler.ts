@@ -705,6 +705,10 @@ export const checkoutHandler = factory.createHandlers(
         )
       }
 
+      // Use one cutoff for the entire transaction. Client-side filtering is only
+      // a UX aid; checkout must reject stale carts and direct API requests too.
+      const checkoutStartedAt = new Date()
+
       const result = await db.$transaction(async (tx) => {
         // Find or create booking
         let booking
@@ -846,6 +850,15 @@ export const checkoutHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          if (
+            courtSlotData.some(
+              (slot) => slot.startAt.getTime() <= checkoutStartedAt.getTime(),
+            )
+          ) {
+            throw new BadRequestException(
+              'One or more court slots have already started',
+            )
+          }
           selectedCourtSlots = courtSlotData
           const courtSports = Array.from(
             new Set(
@@ -904,6 +917,7 @@ export const checkoutHandler = factory.createHandlers(
           await claimSlotsAtomically(tx, {
             slotIds: courtSlots,
             type: SlotType.COURT,
+            startsAfter: checkoutStartedAt,
             unavailableMessage:
               'One or more court slots not found or unavailable',
           })
@@ -974,6 +988,15 @@ export const checkoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
             )
           }
+          if (
+            coachSlotData.some(
+              (slot) => slot.startAt.getTime() <= checkoutStartedAt.getTime(),
+            )
+          ) {
+            throw new BadRequestException(
+              'One or more coach slots have already started',
+            )
+          }
           selectedCoachSlots = coachSlotData
           if (selectedCourtSport) {
             const allowedCoachTypes =
@@ -1014,6 +1037,7 @@ export const checkoutHandler = factory.createHandlers(
           await claimSlotsAtomically(tx, {
             slotIds: coachSlots,
             type: SlotType.COACH,
+            startsAfter: checkoutStartedAt,
             unavailableMessage:
               'One or more coach slots not found or unavailable',
           })
@@ -1105,6 +1129,15 @@ export const checkoutHandler = factory.createHandlers(
               'One or more ballboy slots not found or unavailable',
             )
           }
+          if (
+            ballboySlotData.some(
+              (slot) => slot.startAt.getTime() <= checkoutStartedAt.getTime(),
+            )
+          ) {
+            throw new BadRequestException(
+              'One or more ballboy slots have already started',
+            )
+          }
 
           validateBallboysForTennisCourts(
             ballboySelections,
@@ -1129,6 +1162,7 @@ export const checkoutHandler = factory.createHandlers(
           await claimSlotsAtomically(tx, {
             slotIds: ballboySlots,
             type: SlotType.BALLBOY,
+            startsAfter: checkoutStartedAt,
             unavailableMessage:
               'One or more ballboy slots not found or unavailable',
           })
