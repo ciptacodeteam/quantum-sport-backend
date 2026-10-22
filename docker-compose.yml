@@ -74,6 +74,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 8000
+      DISABLE_SCHEDULER: 'true'
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-quantum_sport}
       REDIS_URL: redis://redis:6379
     ports:
