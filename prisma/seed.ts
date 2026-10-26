@@ -79,6 +79,15 @@ async function seedStaff() {
 
   const staff = [
     {
+      name: 'Super Admin',
+      email: 'superadmin@quantum.com',
+      phone: '+6281100000009',
+      password: hashedPassword,
+      role: 'SUPER_ADMIN' as const,
+      isActive: true,
+      joinedAt: dayjs().subtract(2, 'years').toDate(),
+    },
+    {
       name: 'Admin User',
       email: 'admin@quantum.com',
       phone: '+6281100000001',
@@ -1483,8 +1492,25 @@ async function seedNotifications(users: any[]) {
 async function main() {
   console.info('🌱 Starting comprehensive database seeding\n')
 
-  await db.branch.upsert({ where: { id: 'cemara' }, update: {}, create: { id: 'cemara', name: 'Black Padel Cemara', address: 'Jl. Cemara No. 51, Medan' } })
-  await db.branch.upsert({ where: { id: 's-parman' }, update: {}, create: { id: 's-parman', name: 'Black Padel S. Parman', address: 'Jl. S. Parman No.269-283, Medan', sequence: 1 } })
+  await db.branch.upsert({
+    where: { id: 'cemara' },
+    update: {},
+    create: {
+      id: 'cemara',
+      name: 'Black Padel Cemara',
+      address: 'Jl. Cemara No. 51, Medan',
+    },
+  })
+  await db.branch.upsert({
+    where: { id: 's-parman' },
+    update: {},
+    create: {
+      id: 's-parman',
+      name: 'Black Padel S. Parman',
+      address: 'Jl. S. Parman No.269-283, Medan',
+      sequence: 1,
+    },
+  })
   const users = await seedUsers()
   const staff = await seedStaff()
   const courts = await seedCourts()
@@ -1503,8 +1529,16 @@ async function main() {
     coachTypes,
   )
   await seedMemberships(users, paymentMethods)
-  for (const membership of await db.membership.findMany({ select: { id: true } })) {
-    await db.membershipBranch.createMany({ data: ['cemara', 's-parman'].map((branchId) => ({ membershipId: membership.id, branchId })), skipDuplicates: true })
+  for (const membership of await db.membership.findMany({
+    select: { id: true },
+  })) {
+    await db.membershipBranch.createMany({
+      data: ['cemara', 's-parman'].map((branchId) => ({
+        membershipId: membership.id,
+        branchId,
+      })),
+      skipDuplicates: true,
+    })
   }
   await seedClasses(users, paymentMethods)
   await seedClubs(users)
