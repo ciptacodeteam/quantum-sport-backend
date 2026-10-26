@@ -6,6 +6,7 @@ import {
 } from '@prisma/client'
 import { log } from '@/lib/logger'
 import { activateMembershipAfterPayment } from '@/services/membership-activation.service'
+import { midtransService, isPaidStatus } from '@/services/midtrans.service'
 import { xenditService } from '@/services/xendit.service'
 
 type Tx = Prisma.TransactionClient
@@ -702,6 +703,24 @@ export async function isGatewayPaymentCompleted(payment: {
   externalRef: string | null
   meta: unknown
 }): Promise<boolean> {
+  const meta = asMeta(payment.meta)
+  if (meta.gateway === 'midtrans') {
+    const orderId = meta.order_id
+    if (typeof orderId !== 'string' || !orderId) return false
+    try {
+      const remote = await midtransService.getStatus(orderId)
+      const paid = isPaidStatus(
+        String(remote?.transaction_status || ''),
+        String(remote?.fraud_status || ''),
+      )
+      if (paid) log.info(`Midtrans order ${orderId} is already paid`)
+      return paid
+    } catch (error) {
+      log.warn(`Failed checking Midtrans status for ${orderId}: ${error}`)
+      return false
+    }
+  }
+
   const paymentRequestId = extractGatewayPaymentRequestId(payment)
   if (!paymentRequestId) {
     return false

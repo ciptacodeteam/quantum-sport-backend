@@ -27,6 +27,11 @@ export const env = {
     apiKey: process.env.XENDIT_API_KEY ?? '',
     callbackToken: process.env.XENDIT_CALLBACK_TOKEN ?? '',
   },
+  midtrans: {
+    merchantId: process.env.MIDTRANS_MERCHANT_ID ?? '',
+    serverKey: process.env.MIDTRANS_SERVER_KEY ?? '',
+    clientKey: process.env.MIDTRANS_CLIENT_KEY ?? '',
+  },
   webhookBaseUrl: req('WEBHOOK_BASE_URL', 'http://localhost:8787/webhooks'),
   ngrokToken: process.env.NGROK_AUTHTOKEN ?? '',
   fazpassGatewayKey: process.env.FAZPASS_GATEWAY_KEY ?? '',

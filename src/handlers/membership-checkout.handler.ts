@@ -6,7 +6,7 @@ import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { generateInvoiceNumber } from '@/lib/utils'
 import { requireAuth } from '@/middlewares/auth'
-import { xenditService } from '@/services/xendit.service'
+import { midtransService } from '@/services/midtrans.service'
 import { AWAITING_PAYMENT_SUSPENSION_REASON } from '@/services/membership-activation.service'
 import { zValidator } from '@hono/zod-validator'
 import { PaymentStatus } from '@prisma/client'
@@ -19,13 +19,9 @@ const membershipCheckoutSchema = z.object({
   paymentMethodId: z.string(),
   cardPayment: z
     .object({
+      tokenId: z.string().min(1).optional(),
       savedCardId: z.string().optional(),
       cvv: z.string().optional(),
-      cardNumber: z.string().optional(),
-      cardholderName: z.string().optional(),
-      expiryMonth: z.number().optional(),
-      expiryYear: z.number().optional(),
-      newCardCvv: z.string().optional(),
       saveCard: z.boolean().optional(),
     })
     .optional(),
@@ -119,106 +115,42 @@ export const membershipCheckoutHandler = factory.createHandlers(
           },
         })
 
-        // --- Xendit Payment Request v3 Integration ---
         let xenditInvoiceResponse: any = null
-        let xenditError: any = null
         if (paymentMethod.channel) {
-          if (!env.xendit.apiKey) {
+          if (!env.midtrans.serverKey) {
             throw new BadRequestException(
               'Payment gateway unavailable. Please try again later (missing API key).',
             )
           }
           try {
-            const channelCode = (paymentMethod as any).channel || ''
-            let channelProperties: Record<string, any> = {}
+            const channelCode = paymentMethod.channel || ''
             const userDetails = await tx.user.findUnique({
               where: { id: user.id },
               select: { name: true, email: true, phone: true },
             })
-
-            if (channelCode === 'MANDIRI_VIRTUAL_ACCOUNT') {
-              channelProperties = {
-                expires_at: dayjs().add(24, 'hours').toISOString(),
-                display_name: userDetails?.name || 'Customer',
-              }
-            } else if (channelCode.includes('VIRTUAL_ACCOUNT')) {
-              // Other VA channels (BCA, BNI, BRI, etc.) also require display_name
-              channelProperties = {
-                expires_at: dayjs().add(24, 'hours').toISOString(),
-                display_name: userDetails?.name || 'Customer',
-              }
-            } else if (channelCode === 'QRIS' || channelCode === 'QR') {
-              channelProperties = {
-                expires_at: dayjs().add(1, 'hour').toISOString(),
-              }
-            } else if (
-              channelCode.includes('EWALLET') ||
-              ['DANA', 'OVO', 'LINKAJA', 'SHOPEEPAY'].includes(channelCode)
-            ) {
-              channelProperties = {
-                success_return_url: `${env.frontEndUrl}/payment/success?invoice_id=${invoice.id}`,
-                failure_return_url: `${env.frontEndUrl}/payment/failed?invoice_id=${invoice.id}`,
-              }
-            } else {
-              channelProperties = {
-                expires_at: dayjs().add(1, 'hour').toISOString(),
-              }
-            }
-
+            const expiryMinutes =
+              channelCode === 'CARDS'
+                ? undefined
+                : channelCode.includes('VIRTUAL_ACCOUNT')
+                  ? 24 * 60
+                  : 60
             c.var.logger.info(
-              `Creating Xendit payment request channel=${channelCode} amount=${finalTotal}`,
+              `Creating Midtrans charge channel=${channelCode} amount=${finalTotal}`,
             )
-            xenditInvoiceResponse = await xenditService.createPaymentRequestV3({
-              referenceId: invoiceNumber,
-              requestAmount: finalTotal,
-              country: 'ID',
-              currency: 'IDR',
-              captureMethod: 'AUTOMATIC',
+            xenditInvoiceResponse = await midtransService.charge({
+              orderId: invoiceNumber,
+              amount: finalTotal,
               channelCode,
-              channelProperties,
+              expiryMinutes,
+              tokenId: validated.cardPayment?.tokenId,
+              customer: userDetails ?? undefined,
               description: `Payment for membership ${membership.name}`,
-              metadata: {
-                membershipUserId: membershipUser.id,
-                userId: user.id,
-                invoiceNumber: invoice.number,
-                membershipId: membership.id,
-              },
             })
           } catch (errX: any) {
             const errMsg = errX?.message || 'Payment gateway error'
-            xenditError = {
-              message: errMsg,
-              code:
-                errMsg.includes('IP allowlist') || errMsg.includes('allowlist')
-                  ? 'XENDIT_IP_NOT_ALLOWLIST'
-                  : errMsg.includes('channel_properties')
-                    ? 'XENDIT_CHANNEL_PROPERTIES_INVALID'
-                    : errMsg.includes('below the minimum limit') ||
-                        errMsg.includes('minimum amount')
-                      ? 'XENDIT_AMOUNT_TOO_LOW'
-                      : 'XENDIT_ERROR',
-            }
-            c.var.logger.error(
-              `Xendit error: ${xenditError.code} - ${xenditError.message}`,
-            )
-          }
-          if (!xenditInvoiceResponse) {
-            // Provide user-friendly error messages based on error code
-            let userMessage = xenditError?.message || 'Payment gateway error'
-            if (xenditError?.code === 'XENDIT_AMOUNT_TOO_LOW') {
-              userMessage = `Payment amount (Rp ${finalTotal.toLocaleString('id-ID')}) is below the minimum limit required by the payment method. Please choose a different payment method.`
-            } else if (xenditError?.code === 'XENDIT_IP_NOT_ALLOWLIST') {
-              userMessage =
-                'Payment gateway configuration error. Please contact support.'
-            } else if (
-              xenditError?.code === 'XENDIT_CHANNEL_PROPERTIES_INVALID'
-            ) {
-              userMessage =
-                'Payment method configuration error. Please try a different payment method or contact support.'
-            }
-
+            c.var.logger.error(`Midtrans error: ${errMsg}`)
             throw new BadRequestException(
-              `Unable to initialize payment. ${userMessage}`,
+              `Unable to initialize payment. ${errMsg}`,
             )
           }
         }
@@ -231,11 +163,13 @@ export const membershipCheckoutHandler = factory.createHandlers(
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
             dueDate: dayjs().add(24, 'hours').toDate(),
-            externalRef: xenditInvoiceResponse?.id || null,
-            // Store as JSON object to Prisma Json column (not string)
+            externalRef: xenditInvoiceResponse?.transaction_id || null,
             meta: xenditInvoiceResponse
               ? {
-                  payment_request_id: xenditInvoiceResponse.id,
+                  gateway: 'midtrans',
+                  payment_request_id: xenditInvoiceResponse.transaction_id,
+                  transaction_id: xenditInvoiceResponse.transaction_id,
+                  order_id: xenditInvoiceResponse.order_id,
                   reference_id: xenditInvoiceResponse.reference_id,
                   status: xenditInvoiceResponse.status,
                   channel_code: xenditInvoiceResponse.channel_code,
@@ -244,6 +178,7 @@ export const membershipCheckoutHandler = factory.createHandlers(
                   request_amount: xenditInvoiceResponse.request_amount,
                   currency: xenditInvoiceResponse.currency,
                   created: xenditInvoiceResponse.created,
+                  redirect_url: xenditInvoiceResponse.redirect_url,
                 }
               : undefined,
           },

@@ -80,10 +80,11 @@ if [ -n "$PUBLIC_URL" ]; then
     echo -e "${GREEN}✅ Ngrok tunnel established!${NC}"
     echo -e "${GREEN}🌐 Public URL: $PUBLIC_URL${NC}"
     echo -e "${GREEN}📊 Ngrok Dashboard: http://localhost:4040${NC}"
-    echo -e "${GREEN}🎯 Webhook URL: $PUBLIC_URL/webhooks/xendit${NC}"
+    echo -e "${GREEN}🎯 Xendit webhook URL: $PUBLIC_URL/webhooks/xendit${NC}"
+    echo -e "${GREEN}🎯 Midtrans webhook URL: $PUBLIC_URL/webhooks/midtrans${NC}"
     echo ""
-    echo -e "${BLUE}📋 Copy this webhook URL to your Xendit dashboard:${NC}"
-    echo -e "${YELLOW}$PUBLIC_URL/webhooks/xendit${NC}"
+    echo -e "${BLUE}📋 Copy this webhook URL to the Midtrans sandbox notification setting:${NC}"
+    echo -e "${YELLOW}$PUBLIC_URL/webhooks/midtrans${NC}"
     echo ""
     
     # Save the URL to a file that can be read by other containers

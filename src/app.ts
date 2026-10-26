@@ -58,6 +58,7 @@ import paymentMethodRoute from './routes/payment-method.route'
 import membershipRoute from './routes/membership.route'
 import xenditWebhookRoute from './routes/xendit-webhook.route'
 import xenditTestRoute from './routes/xendit-test.route'
+import midtransRoute from './routes/midtrans.route'
 import ballboyRoute from './routes/ballboy.route'
 import tournamentRoute from './routes/tournament.route'
 import passwordResetRoute from './routes/password-reset.route'
@@ -104,6 +105,7 @@ const routes = [
   creditCardRoute,
   xenditWebhookRoute,
   xenditTestRoute,
+  midtransRoute,
   passwordResetRoute,
 ]
 

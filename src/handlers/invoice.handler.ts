@@ -229,7 +229,6 @@ export const getInvoiceDetailHandler = factory.createHandlers(
         }
       }
 
-      // Build payment instructions if pending/awaiting
       let paymentInstructions: any = null
       if (
         invoice.payment &&
@@ -237,6 +236,43 @@ export const getInvoiceDetailHandler = factory.createHandlers(
           invoice.payment.status,
         )
       ) {
+        const channelCode = String(storedMeta?.channel_code || '')
+        const channelProps = storedMeta?.channel_properties || {}
+        if (storedMeta?.gateway === 'midtrans') {
+          if (
+            channelCode.includes('VIRTUAL_ACCOUNT') ||
+            channelProps.bill_key ||
+            channelProps.virtual_account_number
+          ) {
+            paymentInstructions = {
+              type: 'VIRTUAL_ACCOUNT',
+              bankCode: channelProps.bank || null,
+              accountNumber:
+                channelProps.virtual_account_number ||
+                channelProps.bill_key ||
+                channelProps.account_number ||
+                null,
+              accountName: channelProps.biller_code
+                ? `Kode perusahaan ${channelProps.biller_code}`
+                : null,
+              billerCode: channelProps.biller_code || null,
+              billKey: channelProps.bill_key || null,
+              expiresAt: invoice.payment.dueDate || channelProps.expires_at || null,
+            }
+          } else if (channelCode.includes('QR') || channelProps.qr_string) {
+            paymentInstructions = {
+              type: 'QRIS',
+              qrString: channelProps.qr_string || null,
+              expiresAt: invoice.payment.dueDate || channelProps.expires_at || null,
+            }
+          } else if (storedMeta.redirect_url) {
+            paymentInstructions = {
+              type: 'REDIRECT',
+              url: storedMeta.redirect_url,
+              expiresAt: invoice.payment.dueDate || null,
+            }
+          }
+        } else {
         // Attempt to fetch live payment request details from Xendit v3
         let paymentRequest: any = null
         if (invoice.payment.externalRef) {
@@ -276,6 +312,7 @@ export const getInvoiceDetailHandler = factory.createHandlers(
             url: storedMeta.invoiceUrl,
             expiresAt: invoice.payment.dueDate || null,
           }
+        }
         }
       }
 

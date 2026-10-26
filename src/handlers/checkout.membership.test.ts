@@ -1,13 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   db: { paymentMethod: { findUnique: vi.fn() }, $transaction: vi.fn() },
-  gateway: { createPaymentRequestV3: vi.fn(), createPaymentSession: vi.fn() },
+  gateway: { charge: vi.fn(), cancel: vi.fn() },
   notify: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({ db: mocks.db }))
 vi.mock('@/env', () => ({
   env: {
     xendit: { apiKey: 'test-only' },
+    midtrans: { serverKey: 'SB-Mid-server-test', clientKey: 'SB-Mid-client-test', merchantId: 'M' },
     frontEndUrl: 'http://localhost:3000',
   },
 }))
@@ -18,6 +19,7 @@ vi.mock('@/middlewares/auth', () => ({ requireAuth: vi.fn() }))
 vi.mock('@/lib/utils', () => ({
   generateInvoiceNumber: async () => 'INV-UNIT-TEST',
 }))
+vi.mock('@/services/midtrans.service', () => ({ midtransService: mocks.gateway }))
 vi.mock('@/services/xendit.service', () => ({ xenditService: mocks.gateway }))
 vi.mock('@/services/notification.service', () => ({
   notificationService: { createBookingAdminNotification: mocks.notify },
@@ -97,9 +99,11 @@ beforeEach(() => {
     fees: 1000,
     percentage: '0',
   })
-  mocks.gateway.createPaymentRequestV3.mockResolvedValue({
+  mocks.gateway.charge.mockResolvedValue({
     id: 'payment-request',
+    transaction_id: 'payment-request',
     status: 'PENDING',
+    actions: [],
   })
 })
 async function checkout(body: object) {
@@ -141,8 +145,7 @@ it('confirms a membership-covered booking without a payment method, fees or gate
     data: { status: 'CONFIRMED', holdExpiresAt: null },
   })
   expect(tx.payment.create).not.toHaveBeenCalled()
-  expect(mocks.gateway.createPaymentRequestV3).not.toHaveBeenCalled()
-  expect(mocks.gateway.createPaymentSession).not.toHaveBeenCalled()
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
   expect(
     tx.membershipUser.updateMany.mock.calls.filter(
       ([arg]: any) => arg.data.remainingSessions?.decrement,
@@ -156,7 +159,7 @@ it('still skips gateway fees when a stale selected payment method was supplied',
     paymentMethodId: 'qris',
   })
   expect(response.data.total).toBe(0)
-  expect(mocks.gateway.createPaymentRequestV3).not.toHaveBeenCalled()
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
 })
 it('requires payment if the membership is no longer eligible on the server', async () => {
   tx.membershipUser.findMany.mockResolvedValue([])
@@ -164,7 +167,7 @@ it('requires payment if the membership is no longer eligible on the server', asy
     checkout({ courtSlots: ['court-slot'], useMembership: true }),
   ).rejects.toThrow('Pilih metode pembayaran')
   expect(tx.invoice.create).not.toHaveBeenCalled()
-  expect(mocks.gateway.createPaymentRequestV3).not.toHaveBeenCalled()
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
 })
 it('rejects a membership balance lost to a concurrent checkout', async () => {
   tx.membershipUser.updateMany.mockResolvedValue({ count: 0 })
@@ -184,8 +187,8 @@ it('keeps paid add-ons in the regular payment flow', async () => {
     paymentStatus: 'PENDING',
     total: 21110,
   })
-  expect(mocks.gateway.createPaymentRequestV3).toHaveBeenCalledWith(
-    expect.objectContaining({ requestAmount: 21110 }),
+  expect(mocks.gateway.charge).toHaveBeenCalledWith(
+    expect.objectContaining({ amount: 21110 }),
   )
   expect(tx.payment.create).toHaveBeenCalledOnce()
   const invoiceData = tx.invoice.create.mock.calls[0][0].data

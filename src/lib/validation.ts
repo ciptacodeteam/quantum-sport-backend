@@ -915,6 +915,7 @@ export const creditCardPaymentSchema = z.object({
   // Backend creates payment session, frontend uses card_session.js to collect card
   // No card data is sent to backend anymore!
   saveCard: z.boolean().optional(), // Whether to save card for future use (PAY_AND_SAVE session type)
+  tokenId: z.string().min(1).optional(), // Midtrans card token from midtrans-new-3ds.min.js
 
   // --- Legacy: Saved card flow (kept for backward compatibility) ---
   // TODO: Will be deprecated once frontend implements new save card flow via webhooks

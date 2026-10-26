@@ -11,6 +11,13 @@ vi.mock('@/services/xendit.service', () => ({
     }),
   },
 }))
+vi.mock('@/services/midtrans.service', () => ({
+  midtransService: {
+    charge: vi.fn(() => {
+      throw new Error('Gateway must not be used')
+    }),
+  },
+}))
 const run = url ? describe : describe.skip
 run('branch booking HTTP integration', () => {
   const raw = new PrismaClient({ datasourceUrl: url })

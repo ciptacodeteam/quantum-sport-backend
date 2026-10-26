@@ -22,6 +22,7 @@ import {
   claimSlotsAtomically,
   releaseSlotsByIds,
 } from '@/services/slot-claim.service'
+import { midtransService } from '@/services/midtrans.service'
 import { xenditService } from '@/services/xendit.service'
 import { zValidator } from '@hono/zod-validator'
 import {
@@ -235,102 +236,6 @@ function validateBallboysForTennisCourts(
  * Note: Backend does NOT handle card tokens or details anymore!
  * Card saving is handled via webhook after successful payment.
  */
-async function handleCreditCardPayment(
-  tx: any,
-  paymentMethodId: string,
-  invoiceNumber: string,
-  bookingId: string,
-  userId: string,
-  finalTotal: number,
-  cardPaymentData?: any,
-) {
-  // Check if payment method is credit card
-  const paymentMethod = await tx.paymentMethod.findUnique({
-    where: { id: paymentMethodId },
-  })
-
-  if (!paymentMethod || paymentMethod.channel !== 'CARDS') {
-    return null
-  }
-
-  // Get user details for customer object (required by Xendit)
-  const userDetails = await tx.user.findUnique({
-    where: { id: userId },
-    select: { name: true, email: true, phone: true },
-  })
-
-  if (!userDetails) {
-    throw new BadRequestException('User not found')
-  }
-
-  try {
-    // TODO: Handle saved card flow via payment_token_id
-    // For now, savedCardId is not supported - will be implemented after webhook integration
-    if (cardPaymentData?.savedCardId) {
-      throw new BadRequestException(
-        'Saved card flow is not yet implemented. Please use a new card for now.',
-      )
-    }
-
-    // Determine session type based on saveCard flag
-    const shouldSaveCard = Boolean(cardPaymentData?.saveCard)
-    const sessionType: 'PAY' | 'PAY_AND_SAVE' = shouldSaveCard
-      ? 'PAY_AND_SAVE'
-      : 'PAY'
-
-    // Parse customer name
-    const fullName = String(userDetails.name || 'Customer').trim()
-    const nameParts = fullName.split(/\s+/).filter(Boolean)
-    const givenNames = nameParts[0] || 'Customer'
-    const surname =
-      nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined
-
-    // Generate unique customer reference ID (to handle multiple transactions by same user)
-    const customerReferenceId = `${userId}-${Date.now()}`
-
-    // Create payment session (Xendit will handle card collection via card_session.js)
-    const paymentSession = await xenditService.createPaymentSession({
-      sessionType,
-      mode: 'CARDS_SESSION_JS',
-      referenceId: invoiceNumber,
-      amount: finalTotal,
-      currency: 'IDR',
-      country: 'ID',
-      description: `Payment for booking ${bookingId}`,
-      metadata: {
-        bookingId,
-        userId,
-        invoiceNumber,
-        paymentType: 'cards_3ds',
-      },
-      customer: {
-        reference_id: customerReferenceId,
-        type: 'INDIVIDUAL',
-        individual_detail: {
-          given_names: givenNames,
-          ...(surname && { surname }),
-        },
-        email: userDetails.email || undefined,
-        mobileNumber: userDetails.phone || undefined,
-      },
-      cardsSessionJs: {
-        successReturnUrl: `${env.frontEndUrl}/invoice/${invoiceNumber}`,
-        failureReturnUrl: `${env.frontEndUrl}/payment/failed?invoice_id=${invoiceNumber}`,
-      },
-    })
-
-    if (!paymentSession) {
-      throw new BadRequestException('Unable to create payment session')
-    }
-
-    // Return payment session - frontend will use payment_session_id with card_session.js
-    return paymentSession
-  } catch (error) {
-    console.error('Credit card payment session error:', error)
-    throw error
-  }
-}
-
 export const applyPromoCodeHandler = factory.createHandlers(
   requireAuth,
   zValidator('json', applyPromoCodeSchema, validateHook),
@@ -1517,125 +1422,41 @@ export const checkoutHandler = factory.createHandlers(
         }
         */
 
-        // --- NEW v3 /payment_requests (mandatory for external payment) ---
         let xenditInvoiceResponse: any = null
-        let xenditError: any = null
         if (paymentMethod.channel) {
-          if (!env.xendit.apiKey) {
+          if (!env.midtrans.serverKey) {
             throw new BadRequestException(
               'Payment gateway unavailable. Please try again later (missing API key).',
             )
           }
+          if (validated.cardPayment?.savedCardId) {
+            throw new BadRequestException(
+              'Saved card flow is not yet implemented. Please use a new card for now.',
+            )
+          }
           try {
-            const channelCode = (paymentMethod as any).channel || ''
-            let channelProperties: Record<string, any> = {}
+            const channelCode = paymentMethod.channel || ''
             const userDetails = await tx.user.findUnique({
               where: { id: user.id },
               select: { name: true, email: true, phone: true },
             })
-
-            // Handle credit card payment with 3DS
-            if (channelCode === 'CARDS') {
-              xenditInvoiceResponse = await handleCreditCardPayment(
-                tx,
-                paymentMethodId,
-                invoiceNumber,
-                booking.id,
-                user.id,
-                finalTotal,
-                validated.cardPayment,
-              )
-            } else if (channelCode === 'MANDIRI_VIRTUAL_ACCOUNT') {
-              channelProperties = {
-                expires_at: dayjs().add(15, 'minutes').toISOString(),
-                display_name: userDetails?.name || 'Customer',
-              }
-            } else if (channelCode.includes('VIRTUAL_ACCOUNT')) {
-              // Other VA channels (BCA, BNI, BRI, etc.) also require display_name
-              channelProperties = {
-                expires_at: dayjs().add(15, 'minutes').toISOString(),
-                display_name: userDetails?.name || 'Customer',
-              }
-            } else if (channelCode === 'QRIS' || channelCode === 'QR') {
-              channelProperties = {
-                expires_at: dayjs().add(15, 'minutes').toISOString(),
-              }
-            } else if (
-              channelCode.includes('EWALLET') ||
-              ['DANA', 'OVO', 'LINKAJA', 'SHOPEEPAY'].includes(channelCode)
-            ) {
-              channelProperties = {
-                success_return_url: `${env.frontEndUrl}/payment/success?invoice_id=${invoice.id}`,
-                failure_return_url: `${env.frontEndUrl}/payment/failed?invoice_id=${invoice.id}`,
-              }
-            } else {
-              channelProperties = {
-                expires_at: dayjs().add(15, 'minutes').toISOString(),
-              }
-            }
-
-            // Skip payment request creation for credit card (already handled above)
-            if (channelCode !== 'CARDS') {
-              c.var.logger.info(
-                `Creating Xendit payment request channel=${channelCode} amount=${finalTotal}`,
-              )
-              xenditInvoiceResponse =
-                await xenditService.createPaymentRequestV3({
-                  referenceId: invoiceNumber,
-                  requestAmount: finalTotal,
-                  country: 'ID',
-                  currency: 'IDR',
-                  captureMethod: 'AUTOMATIC',
-                  channelCode,
-                  channelProperties,
-                  description: `Payment for booking ${booking.id}`,
-                  metadata: {
-                    bookingId: booking.id,
-                    userId: user.id,
-                    invoiceNumber: invoice.number,
-                  },
-                })
-            }
+            c.var.logger.info(
+              `Creating Midtrans charge channel=${channelCode} amount=${finalTotal}`,
+            )
+            xenditInvoiceResponse = await midtransService.charge({
+              orderId: invoiceNumber,
+              amount: finalTotal,
+              channelCode,
+              expiryMinutes: channelCode === 'CARDS' ? undefined : 15,
+              tokenId: validated.cardPayment?.tokenId,
+              customer: userDetails ?? undefined,
+              description: `Payment for booking ${booking.id}`,
+            })
           } catch (errX: any) {
             const errMsg = errX?.message || 'Payment gateway error'
-            xenditError = {
-              message: errMsg,
-              code:
-                errMsg.includes('IP allowlist') || errMsg.includes('allowlist')
-                  ? 'XENDIT_IP_NOT_ALLOWLIST'
-                  : errMsg.includes('channel_properties')
-                    ? 'XENDIT_CHANNEL_PROPERTIES_INVALID'
-                    : errMsg.includes('below the minimum limit') ||
-                        errMsg.includes('minimum amount')
-                      ? 'XENDIT_AMOUNT_TOO_LOW'
-                      : errMsg.includes('tokenize') || errMsg.includes('card')
-                        ? 'XENDIT_CARD_ERROR'
-                        : 'XENDIT_ERROR',
-            }
-            c.var.logger.error(
-              `Xendit error: ${xenditError.code} - ${xenditError.message}`,
-            )
-          }
-          if (!xenditInvoiceResponse) {
-            // Provide user-friendly error messages based on error code
-            let userMessage = xenditError?.message || 'Payment gateway error'
-            if (xenditError?.code === 'XENDIT_AMOUNT_TOO_LOW') {
-              userMessage = `Payment amount (Rp ${finalTotal.toLocaleString('id-ID')}) is below the minimum limit required by the payment method. Please add more items or choose a different payment method.`
-            } else if (xenditError?.code === 'XENDIT_IP_NOT_ALLOWLIST') {
-              userMessage =
-                'Payment gateway configuration error. Please contact support.'
-            } else if (
-              xenditError?.code === 'XENDIT_CHANNEL_PROPERTIES_INVALID'
-            ) {
-              userMessage =
-                'Payment method configuration error. Please try a different payment method or contact support.'
-            } else if (xenditError?.code === 'XENDIT_CARD_ERROR') {
-              userMessage =
-                'Card processing failed. Please check your card details and try again. If the problem persists, contact support.'
-            }
-
+            c.var.logger.error(`Midtrans error: ${errMsg}`)
             throw new BadRequestException(
-              `Unable to initialize payment. ${userMessage}`,
+              `Unable to initialize payment. ${errMsg}`,
             )
           }
         }
@@ -1648,39 +1469,23 @@ export const checkoutHandler = factory.createHandlers(
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
             dueDate: dayjs().add(15, 'minutes').toDate(),
-            externalRef:
-              xenditInvoiceResponse?.id ||
-              xenditInvoiceResponse?.payment_session_id ||
-              null,
-            // Store payment session or payment request metadata
+            externalRef: xenditInvoiceResponse?.transaction_id || null,
             meta: xenditInvoiceResponse
-              ? // For CARDS: Store payment session metadata
-                xenditInvoiceResponse.payment_session_id
-                ? {
-                    payment_session_id:
-                      xenditInvoiceResponse.payment_session_id,
-                    reference_id: xenditInvoiceResponse.reference_id,
-                    session_type: xenditInvoiceResponse.session_type,
-                    status: xenditInvoiceResponse.status,
-                    amount: xenditInvoiceResponse.amount,
-                    currency: xenditInvoiceResponse.currency,
-                    created: xenditInvoiceResponse.created,
-                  }
-                : // For other channels: Store payment request metadata
-                  {
-                    payment_request_id:
-                      xenditInvoiceResponse.id ||
-                      xenditInvoiceResponse.payment_request_id,
-                    reference_id: xenditInvoiceResponse.reference_id,
-                    status: xenditInvoiceResponse.status,
-                    channel_code: xenditInvoiceResponse.channel_code,
-                    channel_properties:
-                      xenditInvoiceResponse.channel_properties,
-                    actions: xenditInvoiceResponse.actions,
-                    request_amount: xenditInvoiceResponse.request_amount,
-                    currency: xenditInvoiceResponse.currency,
-                    created: xenditInvoiceResponse.created,
-                  }
+              ? {
+                  gateway: 'midtrans',
+                  payment_request_id: xenditInvoiceResponse.transaction_id,
+                  transaction_id: xenditInvoiceResponse.transaction_id,
+                  order_id: xenditInvoiceResponse.order_id,
+                  reference_id: xenditInvoiceResponse.reference_id,
+                  status: xenditInvoiceResponse.status,
+                  channel_code: xenditInvoiceResponse.channel_code,
+                  channel_properties: xenditInvoiceResponse.channel_properties,
+                  actions: xenditInvoiceResponse.actions,
+                  request_amount: xenditInvoiceResponse.request_amount,
+                  currency: xenditInvoiceResponse.currency,
+                  created: xenditInvoiceResponse.created,
+                  redirect_url: xenditInvoiceResponse.redirect_url,
+                }
               : undefined,
           },
         })
@@ -1820,7 +1625,37 @@ export const cancelPaymentSessionHandler = factory.createHandlers(
         `User ${user.id} is cancelling payment session: ${sessionId}`,
       )
 
-      // Call Xendit API to cancel the payment session
+      const payment = await db.payment.findFirst({
+        where: {
+          OR: [
+            { externalRef: sessionId },
+            { meta: { path: ['order_id'], equals: sessionId } },
+            { meta: { path: ['transaction_id'], equals: sessionId } },
+          ],
+        },
+        include: { invoice: { select: { userId: true } } },
+      })
+      const meta = payment?.meta as { gateway?: string; order_id?: string } | null
+      if (meta?.gateway === 'midtrans' && meta.order_id) {
+        if (payment?.invoice && payment.invoice.userId !== user.id) {
+          throw new NotFoundException(
+            'Payment session not found or cannot be cancelled',
+          )
+        }
+        await midtransService.cancel(meta.order_id)
+        return c.json(
+          ok(
+            {
+              sessionId: meta.order_id,
+              status: 'cancel',
+              message: 'Payment cancelled successfully',
+            },
+            'Payment cancelled',
+          ),
+          status.OK,
+        )
+      }
+
       const cancelledSession =
         await xenditService.cancelPaymentSession(sessionId)
 

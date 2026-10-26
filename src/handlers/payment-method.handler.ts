@@ -8,7 +8,15 @@ export const getCustomerPaymentMethodsHandler = factory.createHandlers(
   async (c) => {
     try {
       const paymentMethods = await db.paymentMethod.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          OR: [
+            { channel: 'CARDS' },
+            { channel: 'QRIS' },
+            { channel: 'QR' },
+            { channel: { endsWith: 'VIRTUAL_ACCOUNT' } },
+          ],
+        },
         orderBy: { sequence: 'asc' },
       })
 
