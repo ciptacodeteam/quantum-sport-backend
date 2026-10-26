@@ -99,7 +99,7 @@ export const emailTemplates = {
         <p>You can now:</p>
         <ul>
           <li>Book courts and sessions</li>
-          <li>Join clubs and tournaments</li>
+          <li>Explore value packs and coaching sessions</li>
           <li>Connect with other sports enthusiasts</li>
         </ul>
         <p style="margin: 30px 0;">

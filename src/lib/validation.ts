@@ -465,62 +465,6 @@ export const updateClassSchema = createClassSchema.partial()
 
 export type UpdateClassSchema = z.infer<typeof updateClassSchema>
 
-// Club schema
-export const createClubSchema = z.object({
-  name: z.string().min(3).max(100),
-  logo: z.file().optional(),
-  description: z.string().min(3).optional(),
-  rules: z.string().min(3).optional(),
-  visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
-  // For admin flows: explicitly choose a leader
-  // For user flows: this will typically be omitted and set from the authenticated user
-  leaderId: z.string().optional(),
-  // Allow toggling active state (mainly for admin)
-  isActive: z.coerce.boolean().optional(),
-})
-
-export type CreateClubSchema = z.infer<typeof createClubSchema>
-
-export const updateClubSchema = createClubSchema.partial()
-
-export type UpdateClubSchema = z.infer<typeof updateClubSchema>
-
-// Tournament schema
-export const createTournamentSchema = z.object({
-  name: z.string().min(3).max(100),
-  description: z.string().max(500).optional(),
-  rules: z.string().optional(),
-  rulesHtml: z.string().optional(),
-  image: z.file().optional(),
-  startDate: z
-    .string()
-    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
-      message: 'Invalid date format, expected YYYY-MM-DD',
-    }),
-  endDate: z
-    .string()
-    .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
-      message: 'Invalid date format, expected YYYY-MM-DD',
-    }),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, {
-    message: 'Invalid time format, expected HH:mm',
-  }),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, {
-    message: 'Invalid time format, expected HH:mm',
-  }),
-  maxTeams: z.coerce.number().min(2),
-  teamSize: z.coerce.number().min(1),
-  entryFee: z.coerce.number().min(0),
-  location: z.string().min(3).max(200),
-  isActive: z.coerce.boolean(),
-})
-
-export type CreateTournamentSchema = z.infer<typeof createTournamentSchema>
-
-export const updateTournamentSchema = createTournamentSchema.partial()
-
-export type UpdateTournamentSchema = z.infer<typeof updateTournamentSchema>
-
 // Membership schema
 export const createMembershipSchema = z.object({
   name: z.string().min(3).max(100),

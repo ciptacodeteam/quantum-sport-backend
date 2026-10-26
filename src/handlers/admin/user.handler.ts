@@ -314,27 +314,6 @@ export const getUserDetailHandler = factory.createHandlers(
             take: 10,
             orderBy: { issuedAt: 'desc' },
           },
-          clubsLed: {
-            select: {
-              id: true,
-              name: true,
-              isActive: true,
-              createdAt: true,
-            },
-          },
-          clubMember: {
-            select: {
-              id: true,
-              joinedAt: true,
-              isActive: true,
-              club: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
         },
       })
 

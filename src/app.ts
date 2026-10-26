@@ -37,7 +37,6 @@ import adminMembershipTransactionRoute from './routes/admin/membership-transacti
 import adminPaymentMethodRoute from './routes/admin/payment-method.route'
 import adminStaffRoute from './routes/admin/staff.route'
 import adminStaffCostRoute from './routes/admin/staff-cost.route'
-import adminTournamentRoute from './routes/admin/tournament.route'
 import adminUserRoute from './routes/admin/user.route'
 import adminCheckoutRoute from './routes/admin/checkout.route'
 import adminInvoiceRoute from './routes/admin/invoice.route'
@@ -59,10 +58,7 @@ import membershipRoute from './routes/membership.route'
 import xenditWebhookRoute from './routes/xendit-webhook.route'
 import xenditTestRoute from './routes/xendit-test.route'
 import ballboyRoute from './routes/ballboy.route'
-import tournamentRoute from './routes/tournament.route'
 import passwordResetRoute from './routes/password-reset.route'
-import clubRoute from './routes/club.route'
-import adminClubRoute from './routes/admin/club.route'
 import notificationRoute from './routes/notification.route'
 import adminNotificationRoute from './routes/admin/notification.route'
 import creditCardRoute from './routes/credit-card.route'
@@ -99,8 +95,6 @@ const routes = [
   paymentMethodRoute,
   checkoutRoute,
   notificationRoute,
-  tournamentRoute,
-  clubRoute,
   creditCardRoute,
   xenditWebhookRoute,
   xenditTestRoute,
@@ -136,8 +130,6 @@ const adminRoutes = [
   adminMembershipRoute,
   adminMembershipTransactionRoute,
   adminPaymentMethodRoute,
-  adminTournamentRoute,
-  adminClubRoute,
   adminUserRoute,
   adminCheckoutRoute,
   adminInvoiceRoute,

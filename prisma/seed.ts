@@ -359,14 +359,6 @@ async function seedBanners() {
       isActive: false,
       sequence: 4,
     },
-    {
-      image: 'https://picsum.photos/1200/400?random=5',
-      link: '/tournaments',
-      isActive: true,
-      startAt: dayjs().add(1, 'day').toDate(),
-      endAt: dayjs().add(60, 'days').toDate(),
-      sequence: 5,
-    },
   ]
 
   for (const bannerData of banners) {
@@ -1083,7 +1075,7 @@ async function seedMemberships(users: any[], paymentMethods: any[]) {
       remainingDuration: 70,
       isExpired: false,
       isSuspended: true,
-      suspensionReason: 'Violation of club rules',
+      suspensionReason: 'Violation of venue rules',
       suspensionEndDate: dayjs().add(7, 'days').toDate(),
     },
   })
@@ -1251,179 +1243,6 @@ async function seedClasses(users: any[], paymentMethods: any[]) {
   console.info(`✅ Created 1 class booking`)
 }
 
-// ==================== CLUBS ====================
-async function seedClubs(users: any[]) {
-  console.info('🏆 Seeding clubs...')
-
-  const clubs = [
-    {
-      name: 'Elite Tennis Club',
-      description: 'Premier tennis club for professionals',
-      rules: 'Respect all members, book in advance',
-      visibility: 'PUBLIC' as const,
-      leaderId: users[0].id,
-      isActive: true,
-    },
-    {
-      name: 'VIP Badminton Circle',
-      description: 'Exclusive badminton club',
-      rules: 'Professional conduct required',
-      visibility: 'PRIVATE' as const,
-      leaderId: users[1].id,
-      isActive: true,
-    },
-    {
-      name: 'Community Sports Hub',
-      description: 'Open to all skill levels',
-      rules: 'Open to all, respect diversity',
-      visibility: 'PUBLIC' as const,
-      leaderId: users[2].id,
-      isActive: true,
-    },
-    {
-      name: 'Weekend Warriors',
-      description: 'Casual weekend players',
-      visibility: 'PUBLIC' as const,
-      leaderId: users[3].id,
-      isActive: true,
-    },
-    {
-      name: 'Inactive Club',
-      description: 'No longer active',
-      visibility: 'PUBLIC' as const,
-      leaderId: users[0].id,
-      isActive: false,
-    },
-  ]
-
-  const createdClubs: any[] = []
-  for (const clubData of clubs) {
-    const club = await db.club.upsert({
-      where: { name: clubData.name },
-      update: {},
-      create: clubData,
-    })
-    createdClubs.push(club)
-    console.info(`✅ Club: ${club.name}`)
-  }
-
-  // Club members
-  await db.clubMember.create({
-    data: { clubId: createdClubs[0].id, userId: users[2].id },
-  })
-  await db.clubMember.create({
-    data: { clubId: createdClubs[2].id, userId: users[1].id },
-  })
-
-  // Join requests
-  await db.clubJoinRequest.create({
-    data: {
-      clubId: createdClubs[1].id,
-      userId: users[3].id,
-      status: 'PENDING',
-    },
-  })
-  await db.clubJoinRequest.create({
-    data: {
-      clubId: createdClubs[0].id,
-      userId: users[4].id,
-      status: 'APPROVED',
-    },
-  })
-  await db.clubJoinRequest.create({
-    data: {
-      clubId: createdClubs[1].id,
-      userId: users[0].id,
-      status: 'REJECTED',
-    },
-  })
-
-  console.info(`✅ Created club members and join requests`)
-  return createdClubs
-}
-
-// ==================== TOURNAMENTS ====================
-async function seedTournaments() {
-  console.info('🏅 Seeding tournaments...')
-
-  const tournaments = [
-    {
-      name: 'Quantum Open 2025',
-      description: 'Annual championship tournament',
-      rules: {
-        format: 'Single elimination',
-        rules: ['Open to all skill levels', 'Professional conduct required'],
-      },
-      startDate: dayjs().add(30, 'days').toDate(),
-      endDate: dayjs().add(33, 'days').toDate(),
-      startTime: '08:00',
-      endTime: '18:00',
-      maxTeams: 32,
-      teamSize: 2,
-      entryFee: 500000,
-      location: 'Quantum Sports Center',
-      isActive: true,
-    },
-    {
-      name: 'Summer Singles Championship',
-      description: 'Individual competition',
-      startDate: dayjs().add(45, 'days').toDate(),
-      endDate: dayjs().add(47, 'days').toDate(),
-      startTime: '09:00',
-      endTime: '17:00',
-      maxTeams: 16,
-      teamSize: 1,
-      entryFee: 300000,
-      location: 'Main Court',
-      isActive: true,
-    },
-    {
-      name: 'Team Challenge Cup',
-      description: 'Team-based tournament',
-      startDate: dayjs().add(60, 'days').toDate(),
-      endDate: dayjs().add(62, 'days').toDate(),
-      startTime: '10:00',
-      endTime: '16:00',
-      maxTeams: 8,
-      teamSize: 4,
-      entryFee: 1000000,
-      location: 'All Courts',
-      isActive: true,
-    },
-    {
-      name: 'Youth Championship',
-      description: 'For players under 18',
-      startDate: dayjs().add(20, 'days').toDate(),
-      endDate: dayjs().add(21, 'days').toDate(),
-      startTime: '09:00',
-      endTime: '15:00',
-      maxTeams: 24,
-      teamSize: 1,
-      entryFee: 150000,
-      location: 'Youth Center',
-      isActive: true,
-    },
-    {
-      name: 'Past Tournament',
-      description: 'Already completed',
-      startDate: dayjs().subtract(10, 'days').toDate(),
-      endDate: dayjs().subtract(8, 'days').toDate(),
-      startTime: '08:00',
-      endTime: '18:00',
-      maxTeams: 16,
-      teamSize: 2,
-      entryFee: 400000,
-      location: 'Main Court',
-      isActive: false,
-    },
-  ]
-
-  for (const tournamentData of tournaments) {
-    await db.tournament.create({ data: tournamentData })
-    console.info(`✅ Tournament: ${tournamentData.name}`)
-  }
-}
-
 // ==================== NOTIFICATIONS ====================
 async function seedNotifications(users: any[]) {
   console.info('🔔 Seeding notifications...')
@@ -1450,8 +1269,8 @@ async function seedNotifications(users: any[]) {
       userId: null,
       audience: 'ALL' as const,
       type: 'ADMIN_PUSH' as const,
-      title: 'New Tournament Announced',
-      message: 'Quantum Open 2025 registration is now open!',
+      title: 'Explore Value Packs',
+      message: 'Find a value pack for your next court sessions.',
       isRead: false,
     },
     {
@@ -1507,8 +1326,6 @@ async function main() {
     await db.membershipBranch.createMany({ data: ['cemara', 's-parman'].map((branchId) => ({ membershipId: membership.id, branchId })), skipDuplicates: true })
   }
   await seedClasses(users, paymentMethods)
-  await seedClubs(users)
-  await seedTournaments()
   await seedNotifications(users)
 
   console.info('\n✅ Database seeding completed successfully!')
@@ -1518,7 +1335,7 @@ async function main() {
   console.info('   🎾 5 Courts (4 active, 1 inactive)')
   console.info('   🎯 5 Inventories')
   console.info('   💳 6 Payment Methods (including Cash)')
-  console.info('   🎨 5 Banners')
+  console.info('   🎨 4 Banners')
   console.info('   🤝 5 Partnerships')
   console.info('   🏋️ 5 Coach Types')
   console.info('   📅 Slots (courts, coaches, ballboys for 3 days)')
@@ -1527,8 +1344,6 @@ async function main() {
   )
   console.info('   💎 5 Memberships + 3 membership users')
   console.info('   📚 5 Classes + 1 class booking')
-  console.info('   🏆 5 Clubs + members + join requests')
-  console.info('   🏅 5 Tournaments')
   console.info('   🔔 5 Notifications')
   console.info('\n🔑 Login Credentials:')
   console.info('   Users: john.smith@example.com | Password123!')
