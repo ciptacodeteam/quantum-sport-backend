@@ -1,3 +1,4 @@
+import { consumeMembershipHours } from '@/services/membership-checkout.service'
 import { env } from '@/env'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -691,19 +692,13 @@ export const checkoutHandler = factory.createHandlers(
         )
       }
 
-      // Validate payment method
-      const paymentMethod = await db.paymentMethod.findUnique({
-        where: { id: paymentMethodId },
-      })
-      if (!paymentMethod) {
+      const paymentMethod = paymentMethodId
+        ? await db.paymentMethod.findUnique({ where: { id: paymentMethodId } })
+        : null
+      if (paymentMethodId && !paymentMethod)
         throw new NotFoundException('Payment method not found')
-      }
-      if (!paymentMethod.isActive) {
-        return c.json(
-          err('Payment method is not active', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
+      if (paymentMethod && !paymentMethod.isActive)
+        throw new BadRequestException('Payment method is not active')
 
       // Use one cutoff for the entire transaction. Client-side filtering is only
       // a UX aid; checkout must reject stale carts and direct API requests too.
@@ -874,7 +869,11 @@ export const checkoutHandler = factory.createHandlers(
           membershipSessionsToUse =
             calculateMembershipSessionsForCourtSlots(courtSlotData)
 
-          if (useMembership && selectedCourtSport && membershipSessionsToUse > 0) {
+          if (
+            useMembership &&
+            selectedCourtSport &&
+            membershipSessionsToUse > 0
+          ) {
             const membershipCandidates = await tx.membershipUser.findMany({
               where: {
                 userId: user.id,
@@ -883,6 +882,7 @@ export const checkoutHandler = factory.createHandlers(
                 startDate: { lte: new Date() },
                 endDate: { gt: new Date() },
                 remainingSessions: { gte: membershipSessionsToUse },
+                invoice: { status: PaymentStatus.PAID },
                 membership: {
                   sport: selectedCourtSport,
                 },
@@ -999,7 +999,7 @@ export const checkoutHandler = factory.createHandlers(
           }
           selectedCoachSlots = coachSlotData
           if (selectedCourtSport) {
-            const allowedCoachTypes =
+            const allowedCoachTypes: CoachType[] =
               selectedCourtSport === CourtSport.PADEL
                 ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
                 : [CoachType.TENNIS, CoachType.PADEL_TENNIS]
@@ -1344,22 +1344,10 @@ export const checkoutHandler = factory.createHandlers(
         }
 
         if (activeMembership && membershipSessionsToUse > 0) {
-          const newRemainingSessions = Math.max(
-            0,
-            activeMembership.remainingSessions - membershipSessionsToUse,
-          )
-
-          await tx.membershipUser.update({
-            where: { id: activeMembership.id },
-            data: {
-              remainingSessions: newRemainingSessions,
-              isExpired: newRemainingSessions === 0,
-            },
-          })
-
-          c.var.logger.info(
-            `Deducted ${membershipSessionsToUse} hours from membership ${activeMembership.id}. ` +
-              `Remaining: ${newRemainingSessions} sessions`,
+          await consumeMembershipHours(
+            tx,
+            activeMembership.id,
+            membershipSessionsToUse,
           )
         }
 
@@ -1412,13 +1400,22 @@ export const checkoutHandler = factory.createHandlers(
           appliedPromoCodeText = promo.code
         }
 
-        // Calculate processing fee (fixed fee + percentage fee + 11% VAT)
-        const percentageFee = Math.round(
-          totalPrice * (Number(paymentMethod.percentage) / 100),
-        )
-        const baseFee = paymentMethod.fees + percentageFee
-        const vat = Math.round(baseFee * 0.11) // 11% VAT on total fee
-        const processingFee = baseFee + vat
+        // Only a server-validated membership covering the entire order can bypass payment.
+        const coveredByMembership =
+          !!activeMembership && membershipSessionsToUse > 0 && totalPrice === 0
+        if (!coveredByMembership && !paymentMethod)
+          throw new BadRequestException(
+            'Pilih metode pembayaran. Pesanan masih memiliki biaya yang harus dibayar.',
+          )
+        const percentageFee = coveredByMembership
+          ? 0
+          : Math.round(
+              totalPrice * (Number(paymentMethod?.percentage ?? 0) / 100),
+            )
+        const baseFee = coveredByMembership
+          ? 0
+          : (paymentMethod?.fees ?? 0) + percentageFee
+        const processingFee = baseFee + Math.round(baseFee * 0.11)
         const finalTotal = totalPrice + processingFee
 
         if (processingFee > 0) {
@@ -1453,6 +1450,7 @@ export const checkoutHandler = factory.createHandlers(
         const invoiceNumber = await generateInvoiceNumber()
 
         // Create invoice
+        const issuedAt = new Date()
         const invoice = await tx.invoice.create({
           data: {
             userId: user.id,
@@ -1464,11 +1462,32 @@ export const checkoutHandler = factory.createHandlers(
             promoCodeId: appliedPromoCodeId,
             promoCodeText: appliedPromoCodeText,
             promoDiscountAmount,
-            status: PaymentStatus.PENDING,
-            dueDate: dayjs().add(15, 'minutes').toDate(), // Payment due in 15 minutes for booking hold
-            issuedAt: new Date(),
+            status: coveredByMembership
+              ? PaymentStatus.PAID
+              : PaymentStatus.PENDING,
+            paidAt: coveredByMembership ? issuedAt : null,
+            // dueDate is required even when membership settles the invoice immediately.
+            dueDate: coveredByMembership
+              ? issuedAt
+              : dayjs(issuedAt).add(15, 'minutes').toDate(),
+            issuedAt,
           },
         })
+
+        if (coveredByMembership) {
+          const confirmedBooking = await tx.booking.update({
+            where: { id: booking.id },
+            data: { status: BookingStatus.CONFIRMED, holdExpiresAt: null },
+          })
+          return {
+            booking: confirmedBooking,
+            invoice,
+            payment: null,
+            xenditPaymentRequest: null,
+          }
+        }
+        if (!paymentMethod)
+          throw new BadRequestException('Payment method is required')
 
         // --- OLD v2 Invoice (disabled, see below to re-enable) ---
         /*
@@ -1672,16 +1691,6 @@ export const checkoutHandler = factory.createHandlers(
           data: { paymentId: payment.id },
         })
 
-        // Admin notification about new booking (non-blocking)
-        try {
-          await notificationService.createBookingAdminNotification(
-            booking.id,
-            invoice.number,
-          )
-        } catch (e) {
-          c.var.logger.warn(`Failed to create booking admin notification: ${e}`)
-        }
-
         // Set hold expiry (15 minutes for all payment methods)
         const holdExpiresAt = dayjs().add(15, 'minutes').toDate()
 
@@ -1701,6 +1710,15 @@ export const checkoutHandler = factory.createHandlers(
           xenditPaymentRequest: xenditInvoiceResponse,
         }
       })
+
+      try {
+        await notificationService.createBookingAdminNotification(
+          result.booking.id,
+          result.invoice.number,
+        )
+      } catch (e) {
+        c.var.logger.warn(`Failed to create booking admin notification: ${e}`)
+      }
 
       // Extract payment session or payment actions for frontend
       let paymentSessionId: string | null = null
@@ -1742,7 +1760,10 @@ export const checkoutHandler = factory.createHandlers(
             total: result.invoice.total,
             promoDiscountAmount: result.invoice.promoDiscountAmount,
             status: result.booking.status,
-            paymentStatus: result.xenditPaymentRequest?.status || 'PENDING',
+            paymentStatus:
+              result.invoice.status === PaymentStatus.PAID
+                ? 'PAID'
+                : result.xenditPaymentRequest?.status || 'PENDING',
             // For credit cards: payment_session_id to use with card_session.js
             ...(paymentSessionId && { paymentSessionId }),
             // For other channels: payment actions (VA, QRIS, etc.)

@@ -217,7 +217,7 @@ async function seedCourts() {
   const createdCourts: any[] = []
   for (const courtData of courts) {
     const court = await db.court.upsert({
-      where: { name: courtData.name },
+      where: { branchId_name: { branchId: 'cemara', name: courtData.name } },
       update: {},
       create: courtData,
     })
@@ -272,7 +272,7 @@ async function seedInventories() {
   const createdInventories: any[] = []
   for (const invData of inventories) {
     const inventory = await db.inventory.upsert({
-      where: { name: invData.name },
+      where: { branchId_name: { branchId: 'cemara', name: invData.name } },
       update: {},
       create: invData,
     })
@@ -291,14 +291,14 @@ async function seedPaymentMethods() {
   const methods = [
     {
       name: 'BCA Virtual Account',
-      channel: 'VA',
+      channel: 'BCA_VIRTUAL_ACCOUNT',
       fees: 4000,
       percentage: 0,
       isActive: true,
     },
     {
       name: 'Mandiri Virtual Account',
-      channel: 'VA',
+      channel: 'MANDIRI_VIRTUAL_ACCOUNT',
       fees: 4000,
       percentage: 0,
       isActive: true,
@@ -1483,6 +1483,8 @@ async function seedNotifications(users: any[]) {
 async function main() {
   console.info('🌱 Starting comprehensive database seeding\n')
 
+  await db.branch.upsert({ where: { id: 'cemara' }, update: {}, create: { id: 'cemara', name: 'Black Padel Cemara', address: 'Jl. Cemara No. 51, Medan' } })
+  await db.branch.upsert({ where: { id: 's-parman' }, update: {}, create: { id: 's-parman', name: 'Black Padel S. Parman', address: 'Jl. S. Parman No.269-283, Medan', sequence: 1 } })
   const users = await seedUsers()
   const staff = await seedStaff()
   const courts = await seedCourts()
@@ -1501,6 +1503,9 @@ async function main() {
     coachTypes,
   )
   await seedMemberships(users, paymentMethods)
+  for (const membership of await db.membership.findMany({ select: { id: true } })) {
+    await db.membershipBranch.createMany({ data: ['cemara', 's-parman'].map((branchId) => ({ membershipId: membership.id, branchId })), skipDuplicates: true })
+  }
   await seedClasses(users, paymentMethods)
   await seedClubs(users)
   await seedTournaments()

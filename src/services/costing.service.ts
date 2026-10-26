@@ -1,7 +1,8 @@
+import type { Dayjs } from 'dayjs'
 import { log } from '@/lib/logger'
 import { db } from '@/lib/prisma'
 import { BookingStatus, SlotType } from '@prisma/client'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 
 type SetCourtPricingPayload = {
   courtId: string
@@ -34,7 +35,7 @@ function toUtcRange(dateISO: string, hour: number) {
   return { startAt: startAt.toDate(), endAt: endAt.toDate() }
 }
 
-function dayNumber(d: dayjs.Dayjs): number {
+function dayNumber(d: Dayjs): number {
   const jsDay = d.day() // 0 = Sunday, 6 = Saturday
   return jsDay === 0 ? 7 : jsDay // convert 0→7, so Monday=1..Sunday=7
 }
@@ -532,7 +533,7 @@ export async function updateSlotPricing({
       })
 
       // Also update CourtCostSchedule if it exists
-      if (slot.type === SlotType.COURT) {
+      if (slot.type === SlotType.COURT && slot.courtId) {
         const ccs = await tx.courtCostSchedule.findFirst({
           where: { courtId: slot.courtId, startAt: slot.startAt },
         })

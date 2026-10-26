@@ -1,3 +1,6 @@
+import branchRoute from './routes/branch.route'
+import adminBranchRoute from './routes/admin/branch.route'
+import { branchMiddleware } from './middlewares/branch'
 import dayjs from 'dayjs'
 import 'dayjs/locale/id.js' // Added  extension to fix module resolution in ES modules
 import duration from 'dayjs/plugin/duration.js'
@@ -78,6 +81,7 @@ app.use('/storage/*', serveStatic({ root: './src' }))
 
 // ADD NEW ROUTES HERE
 const routes = [
+  branchRoute,
   homeRoute,
   healthRoute,
   phoneVerificationRoute,
@@ -105,6 +109,7 @@ const routes = [
 
 // ADD NEW ADMIN ROUTES HERE
 const adminRoutes = [
+  adminBranchRoute,
   adminHomeRoute,
   adminAnalyticsRoute,
   adminAuthRoute,
@@ -166,8 +171,23 @@ app.use('/admin/*', async (c, next) => {
 
   // Apply authentication and write protection for all other admin routes
   await requireAdminAuth(c, async () => {
-    await blockAdminViewerWrites(c, next)
+    await blockAdminViewerWrites(c, async () => {
+      if (path.startsWith('/admin/branches')) return next()
+      await branchMiddleware(c, next)
+    })
   })
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
+    c.var.logger.info(
+      {
+        staffId: c.get('admin')?.id,
+        branchId: c.get('branchId'),
+        method: c.req.method,
+        path,
+        status: c.res.status,
+      },
+      'Admin branch operation',
+    )
+  }
 })
 
 adminRoutes.forEach((route) => {

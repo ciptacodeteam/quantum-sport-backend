@@ -94,7 +94,7 @@ export const getAllBookedBallboysHandler = factory.createHandlers(
               ],
             }
           : undefined,
-      ].filter(Boolean)
+      ].filter((filter): filter is Record<string, any> => Boolean(filter))
       const where = filters.length > 0 ? { AND: filters } : undefined
 
       const bookedBallboys = await db.bookingBallboy.findMany({

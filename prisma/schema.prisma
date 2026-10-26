@@ -15,6 +15,7 @@ datasource db {
 // Common Enums
 // ------------------------------
 enum Role {
+  SUPER_ADMIN
   ADMIN
   ADMIN_VIEWER
   BALLBOY
@@ -181,6 +182,8 @@ model EmailVerification {
 }
 
 model Staff {
+  branchId     String     @default("cemara")
+  branch       Branch     @relation(fields: [branchId], references: [id])
   id           String     @id @default(cuid())
   image        String?
   name         String
@@ -201,6 +204,7 @@ model Staff {
   coachTypeStaffPrice CoachTypeStaffPrice[]
   bookingCashier      Booking[]
 
+  @@index([branchId])
   @@index([isActive, role])
   @@map("staff")
 }
@@ -225,6 +229,8 @@ model AuthToken {
 // Catalogs / Content
 // ------------------------------
 model Banner {
+  branchId  String    @default("cemara")
+  branch    Branch    @relation(fields: [branchId], references: [id])
   id        String    @id @default(cuid())
   image     String
   link      String?
@@ -235,11 +241,14 @@ model Banner {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt
 
+  @@index([branchId])
   @@index([isActive, startAt, endAt, sequence])
   @@map("banners")
 }
 
 model Partnership {
+  branchId    String   @default("cemara")
+  branch      Branch   @relation(fields: [branchId], references: [id])
   id          String   @id @default(cuid())
   name        String
   description String?
@@ -249,10 +258,13 @@ model Partnership {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@unique([name])
+  @@index([branchId])
   @@map("partnerships")
 }
 
 model Court {
+  branchId    String     @default("cemara")
+  branch      Branch     @relation(fields: [branchId], references: [id])
   id          String     @id @default(cuid())
   name        String
   description String?
@@ -266,13 +278,16 @@ model Court {
   bookingDetail BookingDetail[]
   slot          Slot[]
 
-  @@unique([name])
+  @@unique([branchId, name])
+  @@index([branchId])
   @@index([sport])
   @@index([isActive])
   @@map("courts")
 }
 
 model Inventory {
+  branchId    String     @default("cemara")
+  branch      Branch     @relation(fields: [branchId], references: [id])
   id          String     @id @default(cuid())
   name        String
   description String?
@@ -286,16 +301,19 @@ model Inventory {
 
   bookingInventory BookingInventory[]
 
-  @@unique([name])
+  @@unique([branchId, name])
+  @@index([branchId])
   @@index([sport, isActive])
   @@index([isActive])
   @@map("inventories")
 }
 
 model PromoCode {
+  branchId        String          @default("cemara")
+  branch          Branch          @relation(fields: [branchId], references: [id])
   id              String          @id @default(cuid())
   name            String
-  code            String          @unique
+  code            String
   discountAmount  Int?            @db.Integer
   discountPercent Int?
   startAt         DateTime
@@ -309,6 +327,8 @@ model PromoCode {
   bookings Booking[]
   invoices Invoice[]
 
+  @@unique([code])
+  @@index([branchId])
   @@index([status, startAt, endAt])
   @@map("promo_codes")
 }
@@ -320,6 +340,8 @@ model PromoCode {
 // Non-overlap is enforced via unique constraints per resource.
 
 model Slot {
+  branchId      String   @default("cemara")
+  branch        Branch   @relation(fields: [branchId], references: [id])
   id            String   @id @default(cuid())
   type          SlotType
   // Resource pointers (exactly one must be set depending on type)
@@ -347,6 +369,7 @@ model Slot {
   // (Postgres cannot enforce “no overlap” via Prisma directly; we simulate with unique composite on (resource, startAt))
   @@unique([courtId, startAt], map: "uq_court_slot_start") // for COURT
   @@unique([staffId, startAt], map: "uq_staff_slot_start") // for COACH/BALLBOY
+  @@index([branchId])
   @@index([type, startAt, endAt, isAvailable])
   @@map("slots")
 }
@@ -354,6 +377,8 @@ model Slot {
 // Legacy CourtCostSchedule kept as a published price table (optional)
 // Often still useful for “price calendar” UIs and batch slot generation.
 model CourtCostSchedule {
+  branchId      String   @default("cemara")
+  branch        Branch   @relation(fields: [branchId], references: [id])
   id            String   @id @default(cuid())
   courtId       String
   // For a whole-day price grid (e.g., 08:00-09:00), store range:
@@ -368,6 +393,7 @@ model CourtCostSchedule {
   court Court @relation(fields: [courtId], references: [id])
 
   @@unique([courtId, startAt], map: "uq_court_cost_start")
+  @@index([branchId])
   @@index([courtId, startAt, endAt, isAvailable])
   @@map("court_cost_schedules")
 }
@@ -381,7 +407,7 @@ model PaymentMethod {
   logo       String?
   fees       Int      @default(0) @db.Integer // fixed fee (rupiah)
   percentage Decimal  @default(0) // percentage fee (e.g., 2 for 2%)
-  channel    String? // e.g., "VA", "EWALLET", etc.
+  channel    String? // Xendit channel code, e.g. "BCA_VIRTUAL_ACCOUNT", "QRIS"
   sequence   Int      @default(0)
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
@@ -416,6 +442,8 @@ model Payment {
 }
 
 model Invoice {
+  branchId         String  @default("cemara")
+  branch           Branch  @relation(fields: [branchId], references: [id])
   id               String  @id @default(cuid())
   // Polymorphic linkage via nullable FKs (exactly one must be set)
   bookingId        String? @unique
@@ -446,6 +474,7 @@ model Invoice {
   membershipUser MembershipUser? @relation(fields: [membershipUserId], references: [id])
   promoCode      PromoCode?      @relation(fields: [promoCodeId], references: [id])
 
+  @@index([branchId])
   @@index([status, dueDate])
   @@index([promoCodeId])
   @@map("invoices")
@@ -455,6 +484,8 @@ model Invoice {
 // Booking (Courts + optional add-ons)
 // ------------------------------
 model Booking {
+  branchId               String        @default("cemara")
+  branch                 Branch        @relation(fields: [branchId], references: [id])
   id                     String        @id @default(cuid())
   userId                 String
   status                 BookingStatus @default(HOLD)
@@ -486,6 +517,7 @@ model Booking {
   coaches        BookingCoach[]
   invoice        Invoice?
 
+  @@index([branchId])
   @@index([userId, status, createdAt])
   @@index([promoCodeId])
   @@index([membershipUserId])
@@ -638,6 +670,7 @@ model Membership {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @default(now()) @updatedAt
 
+  branches       MembershipBranch[]
   benefits       MembershipBenefit[]
   membershipUser MembershipUser[]
 
@@ -686,6 +719,8 @@ model MembershipUser {
 // Class
 // ------------------------------
 model Class {
+  branchId      String   @default("cemara")
+  branch        Branch   @relation(fields: [branchId], references: [id])
   id            String   @id @default(cuid())
   name          String
   description   String?
@@ -710,11 +745,14 @@ model Class {
 
   classBookings ClassBooking[]
 
+  @@index([branchId])
   @@index([isActive, startDate, endDate])
   @@map("classes")
 }
 
 model ClassBooking {
+  branchId           String        @default("cemara")
+  branch             Branch        @relation(fields: [branchId], references: [id])
   id                 String        @id @default(cuid())
   classId            String
   userId             String
@@ -731,6 +769,7 @@ model ClassBooking {
   details ClassBookingDetail[]
   invoice Invoice?
 
+  @@index([branchId])
   @@index([userId, status, createdAt])
   @@map("class_bookings")
 }
@@ -808,6 +847,8 @@ model ClubJoinRequest {
 }
 
 model Tournament {
+  branchId    String   @default("cemara")
+  branch      Branch   @relation(fields: [branchId], references: [id])
   id          String   @id @default(cuid())
   name        String
   description String?
@@ -826,6 +867,7 @@ model Tournament {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
+  @@index([branchId])
   @@index([isActive, startDate, endDate])
   @@map("tournaments")
 }
@@ -852,6 +894,8 @@ model PasswordResetToken {
 // Notification Model
 // ------------------------------
 model Notification {
+  branchId  String               @default("cemara")
+  branch    Branch               @relation(fields: [branchId], references: [id])
   id        String               @id @default(cuid())
   userId    String? // null for global/admin/all broadcast
   audience  NotificationAudience @default(USER)
@@ -866,6 +910,7 @@ model Notification {
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([branchId])
   @@index([userId, audience, isRead])
   @@index([type, createdAt])
   @@map("notifications")
@@ -887,4 +932,44 @@ model UserCreditCard {
 
   @@index([userId, isDefault])
   @@map("user_credit_cards")
+}
+
+// Operational data belongs to one branch. Customer accounts and membership balances are shared.
+model Branch {
+  id                       String              @id @default(cuid())
+  name                     String
+  address                  String
+  mapsUrl                  String?
+  isActive                 Boolean             @default(true)
+  sequence                 Int                 @default(0)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @default(now()) @updatedAt
+  staffRecords             Staff[]
+  courtRecords             Court[]
+  inventoryRecords         Inventory[]
+  slotRecords              Slot[]
+  courtCostScheduleRecords CourtCostSchedule[]
+  bookingRecords           Booking[]
+  invoiceRecords           Invoice[]
+  classRecords             Class[]
+  classBookingRecords      ClassBooking[]
+  tournamentRecords        Tournament[]
+  promoCodeRecords         PromoCode[]
+  bannerRecords            Banner[]
+  partnershipRecords       Partnership[]
+  notificationRecords      Notification[]
+  memberships              MembershipBranch[]
+
+  @@map("branches")
+}
+
+model MembershipBranch {
+  membershipId String
+  branchId     String
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  branch       Branch     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@id([membershipId, branchId])
+  @@index([branchId])
+  @@map("membership_branches")
 }

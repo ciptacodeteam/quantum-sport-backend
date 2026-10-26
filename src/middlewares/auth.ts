@@ -88,6 +88,7 @@ export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
     select: {
       id: true,
       isActive: true,
+      role: true,
     },
   })
 
@@ -96,6 +97,7 @@ export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
   }
 
   await assertStaffActive(dbStaff)
+  c.set('admin', { ...admin, role: dbStaff.role })
 
   return next()
 }
@@ -128,7 +130,11 @@ export const requireAdminOrViewer: MiddlewareHandler = async (c, next) => {
     throw new UnauthorizedException()
   }
 
-  if (admin.role !== 'ADMIN' && admin.role !== 'ADMIN_VIEWER') {
+  if (
+    admin.role !== 'SUPER_ADMIN' &&
+    admin.role !== 'ADMIN' &&
+    admin.role !== 'ADMIN_VIEWER'
+  ) {
     throw new ForbiddenException()
   }
 
@@ -143,7 +149,7 @@ export const requireAnyAdminRole = (roles: Role[]) => {
       throw new UnauthorizedException()
     }
 
-    if (!roles.includes(admin.role)) {
+    if (admin.role !== 'SUPER_ADMIN' && !roles.includes(admin.role)) {
       throw new ForbiddenException()
     }
 
@@ -160,7 +166,7 @@ export const requireAdminWriteAccess: MiddlewareHandler = async (c, next) => {
     throw new UnauthorizedException()
   }
 
-  if (admin.role !== 'ADMIN') {
+  if (admin.role !== 'SUPER_ADMIN' && admin.role !== 'ADMIN') {
     throw new ForbiddenException('Admin write access required')
   }
 
@@ -205,7 +211,7 @@ export const requireRole = (role: Role) => {
       throw new UnauthorizedException()
     }
 
-    if (admin.role !== role) {
+    if (admin.role !== 'SUPER_ADMIN' && admin.role !== role) {
       throw new ForbiddenException()
     }
 

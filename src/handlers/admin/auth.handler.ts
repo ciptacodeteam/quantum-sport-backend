@@ -42,7 +42,7 @@ export const registerAdminHandler = factory.createHandlers(
       const { name, email, password } = validated
 
       const existingAdmin = await db.staff.findFirst({
-        where: { role: Role.ADMIN },
+        where: { role: { in: [Role.ADMIN, Role.SUPER_ADMIN] } },
       })
 
       if (existingAdmin) {
@@ -59,7 +59,7 @@ export const registerAdminHandler = factory.createHandlers(
           name,
           email,
           password: hashedPassword,
-          role: Role.ADMIN,
+          role: Role.SUPER_ADMIN,
           joinedAt: dayjs().toDate(),
           isActive: true,
         },
@@ -133,6 +133,10 @@ export const loginAdminHandler = factory.createHandlers(
           phone: true,
           password: true,
           role: true,
+          branchId: true,
+          branch: {
+            select: { id: true, name: true, address: true, isActive: true },
+          },
           isActive: true,
         },
       })
@@ -155,7 +159,10 @@ export const loginAdminHandler = factory.createHandlers(
         )
       }
 
-      if (!user.isActive) {
+      if (
+        !user.isActive ||
+        (user.role !== Role.SUPER_ADMIN && !user.branch.isActive)
+      ) {
         c.var.logger.warn(`Login blocked for inactive staff: ${email}`)
         return c.json(
           err('Your staff account is inactive', status.FORBIDDEN),
@@ -252,6 +259,10 @@ export const getAdminProfileHandler = factory.createHandlers(async (c) => {
         image: true,
         createdAt: true,
         role: true,
+        branchId: true,
+        branch: {
+          select: { id: true, name: true, address: true, isActive: true },
+        },
         isActive: true,
         joinedAt: true,
       },
@@ -360,6 +371,10 @@ export const updateAdminProfileHandler = factory.createHandlers(
           image: true,
           createdAt: true,
           role: true,
+          branchId: true,
+          branch: {
+            select: { id: true, name: true, address: true, isActive: true },
+          },
           isActive: true,
           joinedAt: true,
         },
@@ -383,7 +398,7 @@ export const updateAdminProfileHandler = factory.createHandlers(
 export const checkAdminAccountHandler = factory.createHandlers(async (c) => {
   try {
     const existingAdmin = await db.staff.findFirst({
-      where: { role: Role.ADMIN },
+      where: { role: { in: [Role.ADMIN, Role.SUPER_ADMIN] } },
     })
 
     const hasAdmin = !!existingAdmin

@@ -47,6 +47,8 @@ export const getAllStaffHandler = factory.createHandlers(
           image: true,
           createdAt: true,
           role: true,
+          branchId: true,
+          branch: { select: { id: true, name: true } },
           coachType: true,
           coachProfile: true,
           isActive: true,
@@ -86,6 +88,8 @@ export const getStaffHandler = factory.createHandlers(
           image: true,
           createdAt: true,
           role: true,
+          branchId: true,
+          branch: { select: { id: true, name: true } },
           coachType: true,
           coachProfile: true,
           isActive: true,
@@ -125,8 +129,17 @@ export const createStaffHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('form') as CreateStaffSchema
-      const { name, email, phone, role, coachType, coachProfile, image, isActive, joinedAt } =
-        validated
+      const {
+        name,
+        email,
+        phone,
+        role,
+        coachType,
+        coachProfile,
+        image,
+        isActive,
+        joinedAt,
+      } = validated
 
       const existingStaff = await db.staff.findFirst({
         where: {
@@ -173,6 +186,8 @@ export const createStaffHandler = factory.createHandlers(
           image: true,
           createdAt: true,
           role: true,
+          branchId: true,
+          branch: { select: { id: true, name: true } },
           coachType: true,
           coachProfile: true,
           isActive: true,
@@ -282,6 +297,8 @@ export const updateStaffHandler = factory.createHandlers(
           image: true,
           createdAt: true,
           role: true,
+          branchId: true,
+          branch: { select: { id: true, name: true } },
           coachType: true,
           coachProfile: true,
           isActive: true,
@@ -392,13 +409,13 @@ export const getStaffCostsHandler = factory.createHandlers(
 
       const staffCostSlot = await db.$queryRaw`
         SELECT 
-          s."startAt"::date AS date,
+          (s."startAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')::date AS date,
           json_agg(
             json_build_object(
               'id', s.id,
               'staffId', s."staffId",
-              'startAt', s."startAt",
-              'endAt', s."endAt",
+              'startAt', s."startAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
+              'endAt', s."endAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
               'price', s.price,
               'isAvailable', s."isAvailable",
               'createdAt', s."createdAt",

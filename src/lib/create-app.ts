@@ -2,6 +2,7 @@ import { timeout } from 'hono/timeout'
 import { trimTrailingSlash } from 'hono/trailing-slash'
 
 import { timeoutException } from '@/exceptions'
+import { branchMiddleware } from '@/middlewares/branch'
 import { globalAuthMiddleware } from '@/middlewares/auth'
 import onError from '@/middlewares/error'
 import onNotFound from '@/middlewares/not-found'
@@ -32,6 +33,9 @@ export default function createApp() {
   app.use(requestId())
   app.use(logger())
   app.use(globalAuthMiddleware)
+  app.use(async (c, next) =>
+    c.req.path.startsWith('/admin/') ? next() : branchMiddleware(c, next),
+  )
   app.use(timeout(5 * 60 * 1000, timeoutException)) // 5 minutes
 
   app.notFound(onNotFound)

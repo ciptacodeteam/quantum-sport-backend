@@ -1,5 +1,5 @@
 import { MembershipType } from '@prisma/client'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 
 export function isSlotAllowedForMembershipType(
   membershipType: MembershipType | null | undefined,
@@ -19,7 +19,9 @@ export function isSlotAllowedForMembershipType(
 }
 
 export function membershipTypeLabel(membershipType: MembershipType) {
-  if (membershipType === MembershipType.HAPPY_HOUR) return 'Happy Hour (06:00 - 15:00)'
-  if (membershipType === MembershipType.AFTER_HOUR) return 'After Hour (15:00 - 00:00)'
+  if (membershipType === MembershipType.HAPPY_HOUR)
+    return 'Happy Hour (06:00 - 15:00)'
+  if (membershipType === MembershipType.AFTER_HOUR)
+    return 'After Hour (15:00 - 00:00)'
   return 'All Hour'
 }

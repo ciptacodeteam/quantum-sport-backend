@@ -1,5 +1,5 @@
 import { BookingStatus, CourtSport } from '@prisma/client'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 import { getFileUrl } from '@/services/upload.service'
 
 type InventoryAvailabilityParams = {

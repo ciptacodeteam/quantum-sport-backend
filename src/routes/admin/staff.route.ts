@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/middlewares/auth'
 import {
   changeStaffPasswordHandler,
   createStaffHandler,
@@ -14,9 +15,9 @@ const adminStaffRoute = createRouter()
   .get('/', ...getAllStaffHandler)
   .get('/:id', ...getStaffHandler)
   .get('/:id/costing', ...getStaffCostsHandler)
-  .put('/:id', ...updateStaffHandler)
-  .post('/', ...createStaffHandler)
-  .post('/:id/reset-password', ...changeStaffPasswordHandler)
-  .post('/:id/revoke-sessions', ...revokeStaffTokenHandler)
+  .put('/:id', requireAdmin, ...updateStaffHandler)
+  .post('/', requireAdmin, ...createStaffHandler)
+  .post('/:id/reset-password', requireAdmin, ...changeStaffPasswordHandler)
+  .post('/:id/revoke-sessions', requireAdmin, ...revokeStaffTokenHandler)
 
 export default adminStaffRoute

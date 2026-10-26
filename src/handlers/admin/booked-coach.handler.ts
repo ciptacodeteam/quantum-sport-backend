@@ -303,6 +303,7 @@ export const cancelCoachBookingHandler = factory.createHandlers(
             cancelledAt: new Date(),
             cancellationReason: reason || 'Cancelled by admin',
           },
+          include: { bookingCoachType: true },
         })
 
         // 5. Update the main booking total price (subtract coach price)

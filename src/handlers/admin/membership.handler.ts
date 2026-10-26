@@ -87,8 +87,15 @@ export const createMembershipHandler = factory.createHandlers(
     try {
       const membershipData = c.req.valid('json') as CreateMembershipSchema
 
+      const eligibleBranches = await db.branch.findMany({
+        where: { isActive: true },
+        select: { id: true },
+      })
       const newMembership = await db.membership.create({
         data: {
+          branches: {
+            create: eligibleBranches.map((branch) => ({ branchId: branch.id })),
+          },
           name: membershipData.name,
           description: membershipData.description,
           price: membershipData.price,

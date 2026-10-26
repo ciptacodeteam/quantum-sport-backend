@@ -5,7 +5,7 @@ import { ok } from '@/lib/response'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 import { BookingStatus, CoachType, CourtSport, SlotType } from '@prisma/client'
 import { getFileUrl } from '@/services/upload.service'
 import { filterCoachSlotsWithoutBookingConflicts } from '@/services/coach-booking-conflict.service'
@@ -132,8 +132,8 @@ export const getAvailableCoachesHandler = factory.createHandlers(
         slotId: slot.id,
         coach: slot.staff,
         price: slot.price,
-        startAt: slot.startAt,
-        endAt: slot.endAt,
+        startAt: dayjs(slot.startAt).format('YYYY-MM-DD HH:mm:ss'),
+        endAt: dayjs(slot.endAt).format('YYYY-MM-DD HH:mm:ss'),
       }))
 
       return c.json(ok(coaches), status.OK)

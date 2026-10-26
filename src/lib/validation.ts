@@ -145,7 +145,7 @@ const staffBaseSchema = z.object({
     .optional()
     .default(dayjs().format(DEFAULT_DATE_FORMAT)),
   role: z
-    .enum(['ADMIN', 'ADMIN_VIEWER', 'BALLBOY', 'COACH', 'CASHIER'] as const)
+    .enum(['SUPER_ADMIN', 'ADMIN', 'ADMIN_VIEWER', 'BALLBOY', 'COACH', 'CASHIER'] as const)
     .default('ADMIN'),
   coachType: z.enum(['PADEL', 'PADEL_TENNIS', 'TENNIS'] as const).optional(),
   coachProfile: z.string().trim().max(2000).optional(),
@@ -762,6 +762,7 @@ export const availableCourtSlotsQuerySchema = z
         message: 'Invalid datetime format for endAt',
       })
       .optional(),
+    includeUnavailable: z.enum(['true', 'false']).optional(),
     courtId: z.string().optional(),
     courtSport: z.enum(['PADEL', 'TENNIS'] as const).optional(),
   })
@@ -929,7 +930,7 @@ export type CreditCardPaymentSchema = z.infer<typeof creditCardPaymentSchema>
 // Update checkout schema to support credit card
 export const extendedCheckoutSchema = z.object({
   bookingId: z.string().optional(),
-  paymentMethodId: z.string(),
+  paymentMethodId: z.string().optional(),
   useMembership: z.boolean().optional().default(true),
   courtSlots: z.array(z.string()).optional(),
   coachSlots: z.array(z.string()).optional(),

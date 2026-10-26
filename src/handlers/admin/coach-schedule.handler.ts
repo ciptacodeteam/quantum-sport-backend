@@ -6,7 +6,7 @@ import { requireCoach } from '@/middlewares/auth'
 import { zValidator } from '@hono/zod-validator'
 import { BookingStatus, SlotType } from '@prisma/client'
 import status from 'http-status'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 
 // GET /admin/coach/me/schedule?startAt&endAt
 // Returns the authenticated coach's slots (booked and available) within an optional range

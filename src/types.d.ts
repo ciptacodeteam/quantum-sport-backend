@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client'
+import { Role, PrismaClient } from '@prisma/client'
 import { Context } from 'hono'
 import type { PinoLogger } from 'hono-pino'
 
@@ -23,6 +23,7 @@ export type AppBinding = {}
 export type AppVariables = {
   user: UserTokenPayload | null
   admin: AdminTokenPayload | null
+  branchId: string | null
   logger: PinoLogger
 }
 

@@ -538,7 +538,7 @@ export const adminCheckoutHandler = factory.createHandlers(
           }
           selectedCoachSlots = slotData
           if (courtSportForMembership) {
-            const allowedCoachTypes =
+            const allowedCoachTypes: CoachType[] =
               courtSportForMembership === CourtSport.PADEL
                 ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
                 : [CoachType.TENNIS, CoachType.PADEL_TENNIS]

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { branchScopedClient } from './branch-scope'
 
 const prismaClient = new PrismaClient({
   log: ['error', 'warn'],
@@ -7,6 +8,7 @@ const prismaClient = new PrismaClient({
   },
 })
 
-export const db = global.prisma || prismaClient
+const client = global.prisma || prismaClient
+export const db = branchScopedClient(client) as PrismaClient
 
-if (process.env.NODE_ENV !== 'production') global.prisma = db
+if (process.env.NODE_ENV !== 'production') global.prisma = client

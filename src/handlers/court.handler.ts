@@ -1,3 +1,4 @@
+import { getCourtSlotStatus } from '@/services/court-slot-status'
 import { DATETIME_FORMAT } from '@/constants'
 import { NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -16,7 +17,7 @@ import {
 import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import { BookingStatus, SlotType } from '@prisma/client'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 import status from 'http-status'
 import z from 'zod'
 
@@ -262,6 +263,11 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         },
       }
 
+      if (query.includeUnavailable === 'true') {
+        delete where.isAvailable
+        delete where.bookingDetails
+      }
+
       if (query.courtId) {
         where.courtId = query.courtId
       }
@@ -291,6 +297,10 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         },
         include: {
           court: true,
+          bookingDetails: {
+            where: { booking: { status: { not: BookingStatus.CANCELLED } } },
+            select: { booking: { select: { status: true } } },
+          },
         },
       })
 
@@ -301,8 +311,13 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         }
       }
 
-      const formattedSlots = slots.map((slot) => ({
+      const formattedSlots = slots.map(({ bookingDetails, ...slot }) => ({
         ...slot,
+        availabilityStatus: getCourtSlotStatus(
+          slot.isAvailable,
+          bookingDetails.map((detail) => detail.booking.status),
+        ),
+        isAvailable: slot.isAvailable && bookingDetails.length === 0,
         normalPrice: slot.price,
         discountPrice: slot.discountPrice,
         startAt: dayjs(slot.startAt).format(DATETIME_FORMAT),

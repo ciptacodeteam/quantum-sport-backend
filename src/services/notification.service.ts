@@ -1,3 +1,4 @@
+import { branchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
 import {
   NotificationAudience,
@@ -6,6 +7,7 @@ import {
 } from '@prisma/client'
 
 export interface CreateNotificationInput {
+  branchId?: string
   userId?: string
   audience?: NotificationAudience
   type: NotificationType
@@ -24,8 +26,35 @@ export const notificationService = {
       message,
       data,
     } = input
+    let branchId =
+      input.branchId ?? branchContext.getStore()?.branchId ?? undefined
+    if (!branchId && typeof data?.invoiceId === 'string') {
+      branchId = (
+        await db.invoice.findUnique({
+          where: { id: data.invoiceId },
+          select: { branchId: true },
+        })
+      )?.branchId
+    }
+    if (!branchId && typeof data?.bookingId === 'string') {
+      branchId = (
+        await db.booking.findUnique({
+          where: { id: data.bookingId },
+          select: { branchId: true },
+        })
+      )?.branchId
+    }
+    if (!branchId && typeof data?.membershipUserId === 'string') {
+      branchId = (
+        await db.invoice.findUnique({
+          where: { membershipUserId: data.membershipUserId },
+          select: { branchId: true },
+        })
+      )?.branchId
+    }
     return db.notification.create({
       data: {
+        branchId,
         userId: userId || null,
         audience,
         type,

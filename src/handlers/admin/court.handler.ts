@@ -32,7 +32,7 @@ import {
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { BookingStatus, SlotType } from '@prisma/client'
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 import z from 'zod'
 
 export const getAllCourtHandler = factory.createHandlers(
@@ -353,15 +353,17 @@ export const getCostHandler = factory.createHandlers(
     try {
       const { id } = c.req.valid('param') as IdSchema
 
+      if (!(await db.court.findUnique({ where: { id } })))
+        throw new NotFoundException('Court not found')
       const courtCostSlot = await db.$queryRaw`
         SELECT 
-          s."startAt"::date AS date,
+          (s."startAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')::date AS date,
           json_agg(
             json_build_object(
               'id', s.id,
               'courtId', s."courtId",
-              'startAt', s."startAt",
-              'endAt', s."endAt",
+              'startAt', s."startAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
+              'endAt', s."endAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
               'price', s.price,
               'discountPrice', s."discountPrice",
               'isAvailable', s."isAvailable",

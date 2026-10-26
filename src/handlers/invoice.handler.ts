@@ -41,6 +41,7 @@ export const getUserInvoicesHandler = factory.createHandlers(
         select: {
           id: true,
           number: true,
+          branch: { select: { id: true, name: true, address: true } },
           status: true,
           subtotal: true,
           processingFee: true,
@@ -116,6 +117,7 @@ export const getInvoiceDetailHandler = factory.createHandlers(
           OR: [{ number: id }, { id }],
         },
         include: {
+          branch: { select: { id: true, name: true, address: true } },
           user: { select: { id: true, name: true, email: true, phone: true } },
           booking: {
             select: {
@@ -125,6 +127,7 @@ export const getInvoiceDetailHandler = factory.createHandlers(
               processingFee: true,
               courtNormalPrice: true,
               courtDiscountPrice: true,
+              membershipSessionsUsed: true,
               createdAt: true,
               details: {
                 select: {
@@ -289,6 +292,7 @@ export const getInvoiceDetailHandler = factory.createHandlers(
         dueDate: invoice.dueDate,
         paidAt: invoice.paidAt,
         user: invoice.user,
+        branch: invoice.branch,
         booking: invoice.booking,
         classBooking: invoice.classBooking,
         membershipUser: invoice.membershipUser,
