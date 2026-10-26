@@ -9,7 +9,6 @@ const publicBranchPaths = [
   '/ballboys',
   '/inventories',
   '/classes',
-  '/tournaments',
   '/banners',
   '/partnerships',
   '/checkout',
