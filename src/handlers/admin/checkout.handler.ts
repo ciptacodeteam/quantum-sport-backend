@@ -1,3 +1,4 @@
+import { bookableCourtWhere } from '@/lib/court-branch-policy'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -410,6 +411,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               id: { in: courtSlots },
               type: SlotType.COURT,
               isAvailable: true,
+              court: { is: bookableCourtWhere },
             },
             include: {
               court: {
@@ -808,7 +810,11 @@ export const adminCheckoutHandler = factory.createHandlers(
                 `Inventory ${inventory.name} does not match the selected court sport`,
               )
             }
-            if (!courtSlot && inv.courtSport && inventory.sport !== inv.courtSport) {
+            if (
+              !courtSlot &&
+              inv.courtSport &&
+              inventory.sport !== inv.courtSport
+            ) {
               throw new BadRequestException(
                 `Inventory ${inventory.name} does not match the selected equipment sport`,
               )

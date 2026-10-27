@@ -188,6 +188,11 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
                     : undefined,
                 ),
                 include: {
+                  slot: {
+                    include: {
+                      court: { select: { id: true, name: true, sport: true } },
+                    },
+                  },
                   inventory: {
                     select: {
                       id: true,
@@ -327,7 +332,9 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
             })
           : []
 
-      const getInferredCourtSlotsForBallboy = (ballboy: (typeof bookedBallboys)[number]) => {
+      const getInferredCourtSlotsForBallboy = (
+        ballboy: (typeof bookedBallboys)[number],
+      ) => {
         if (ballboy.booking.details.length > 0) {
           return buildCourtSlots(ballboy.booking.details)
         }
@@ -343,25 +350,41 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
 
       const formattedInventories = bookedInventories
         .map((inv) => ({
-        id: inv.id,
-        itemType: 'inventory',
-        category: getInventoryCategory(inv.inventory.name),
-        inventory: inv.inventory,
-        quantity: inv.quantity,
-        unitPrice: inv.price,
-        totalPrice: inv.price * inv.quantity,
-        booking: {
-          id: inv.booking.id,
-          status: inv.booking.status,
-          totalPrice: inv.booking.totalPrice,
-          customer: inv.booking.user,
-          invoice: inv.booking.invoice,
-          courtSlots: buildCourtSlots(inv.booking.details),
-          createdAt: inv.booking.createdAt,
-        },
-        createdAt: inv.createdAt,
-        updatedAt: inv.updatedAt,
-      }))
+          id: inv.id,
+          itemType: 'inventory',
+          category: getInventoryCategory(inv.inventory.name),
+          inventory: inv.inventory,
+          slot: inv.slot
+            ? {
+                startAt: inv.slot.startAt,
+                endAt: inv.slot.endAt,
+                court: inv.slot.court,
+              }
+            : null,
+          quantity: inv.quantity,
+          unitPrice: inv.price,
+          totalPrice: inv.price * inv.quantity,
+          booking: {
+            id: inv.booking.id,
+            status: inv.booking.status,
+            totalPrice: inv.booking.totalPrice,
+            customer: inv.booking.user,
+            invoice: inv.booking.invoice,
+            courtSlots: buildCourtSlots(
+              inv.slot
+                ? inv.booking.details.filter(
+                    (detail) =>
+                      timeRangesOverlap(detail.slot, inv.slot!) &&
+                      (!inv.slot!.courtId ||
+                        detail.court?.id === inv.slot!.courtId),
+                  )
+                : inv.booking.details,
+            ),
+            createdAt: inv.booking.createdAt,
+          },
+          createdAt: inv.createdAt,
+          updatedAt: inv.updatedAt,
+        }))
         .filter((inv) =>
           category === 'all' || category === 'inventory'
             ? true
@@ -432,7 +455,11 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
           totalPrice: coach.booking.totalPrice,
           customer: coach.booking.user,
           invoice: coach.booking.invoice,
-          courtSlots: buildCourtSlots(coach.booking.details),
+          courtSlots: buildCourtSlots(
+            coach.booking.details.filter((detail) =>
+              timeRangesOverlap(detail.slot, coach.slot),
+            ),
+          ),
           createdAt: coach.booking.createdAt,
         },
         createdAt: coach.createdAt,
@@ -444,14 +471,15 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
         ...formattedBallboys,
         ...formattedCoaches,
       ].sort(
-        (a, b) =>
-          dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf(),
+        (a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf(),
       )
 
       const skip = queryOptions.skip || 0
       const take = queryOptions.take
       const paginatedItems =
-        take === undefined ? combinedItems : combinedItems.slice(skip, skip + take)
+        take === undefined
+          ? combinedItems
+          : combinedItems.slice(skip, skip + take)
 
       return c.json(ok(paginatedItems), status.OK)
     } catch (error) {
@@ -472,10 +500,23 @@ export const getBookedInventoryDetailHandler = factory.createHandlers(
       const inventory = await db.bookingInventory.findUnique({
         where: { id },
         include: {
+          slot: {
+            include: {
+              court: { select: { id: true, name: true, sport: true } },
+            },
+          },
           inventory: true,
           booking: {
             include: {
-              user: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true,
+                  image: true,
+                },
+              },
               invoice: {
                 include: {
                   payment: {
@@ -532,20 +573,36 @@ export const getBookedInventoryDetailHandler = factory.createHandlers(
       const detailedInventory = {
         id: inventory.id,
         inventory: inventory.inventory,
+        slot: inventory.slot
+          ? {
+              startAt: inventory.slot.startAt,
+              endAt: inventory.slot.endAt,
+              court: inventory.slot.court,
+            }
+          : null,
         quantity: inventory.quantity,
         unitPrice: inventory.price,
         totalPrice: inventory.price * inventory.quantity,
         booking: {
           ...inventory.booking,
-          courtSlots: inventory.booking.details.map((d) => ({
-            court: d.court,
-            slot: {
-              ...d.slot,
-              date: dayjs(d.slot.startAt).format('YYYY-MM-DD'),
-              startTime: dayjs(d.slot.startAt).format('HH:mm'),
-              endTime: dayjs(d.slot.endAt).format('HH:mm'),
-            },
-          })),
+          customer: inventory.booking.user,
+          courtSlots: inventory.booking.details
+            .filter(
+              (detail) =>
+                !inventory.slot ||
+                (timeRangesOverlap(detail.slot, inventory.slot) &&
+                  (!inventory.slot.courtId ||
+                    detail.court?.id === inventory.slot.courtId)),
+            )
+            .map((d) => ({
+              court: d.court,
+              slot: {
+                ...d.slot,
+                date: dayjs(d.slot.startAt).format('YYYY-MM-DD'),
+                startTime: dayjs(d.slot.startAt).format('HH:mm'),
+                endTime: dayjs(d.slot.endAt).format('HH:mm'),
+              },
+            })),
           coaches: inventory.booking.coaches.map((c) => ({
             staff: c.slot.staff,
             coachType: c.bookingCoachType,

@@ -1,3 +1,7 @@
+import {
+  bookingCheckoutWhere,
+  type BookingCheckoutType,
+} from '@/lib/booking-checkout'
 import { db } from '@/lib/prisma'
 import { BookingStatus, CourtSport, PaymentStatus } from '@prisma/client'
 import dayjs from 'dayjs'
@@ -277,6 +281,7 @@ export async function exportDataToExcel(
   source?: 'cashier' | 'online',
   courtSport?: CourtSport,
   coach?: 'with' | 'without',
+  checkoutType?: BookingCheckoutType,
 ): Promise<Buffer> {
   const workbook = XLSX.utils.book_new()
 
@@ -401,6 +406,8 @@ export async function exportDataToExcel(
     } else if (coach === 'without') {
       where.coaches = { none: {} }
     }
+
+    if (checkoutType) where.AND = [bookingCheckoutWhere(checkoutType)]
 
     const bookings = await db.booking.findMany({
       where,
@@ -731,9 +738,10 @@ export async function getBusinessAnalytics(startDate: Date, endDate: Date) {
     })
     .sort((a, b) => b.bookedHours - a.bookedHours)
 
-  const totalBookedHours = Math.round(
-    courtHours.reduce((sum, item) => sum + item.bookedHours, 0) * 10,
-  ) / 10
+  const totalBookedHours =
+    Math.round(
+      courtHours.reduce((sum, item) => sum + item.bookedHours, 0) * 10,
+    ) / 10
 
   // Top coaches
   const topCoachesData: Record<string, number> = {}
