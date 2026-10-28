@@ -215,8 +215,8 @@
     "semantic_hash": ""
   },
   "scripts/deploy-registry.sh": {
-    "mtime": 1793200213.90578,
-    "ast_hash": "feefb7d4cfa48384280e6323bc37a174",
+    "mtime": 1793202428.190707,
+    "ast_hash": "77fe4d76fd66c34feb5a61b7183e45c2",
     "semantic_hash": ""
   },
   "scripts/deploy.sh": {
@@ -245,8 +245,8 @@
     "semantic_hash": ""
   },
   "scripts/lib/common.sh": {
-    "mtime": 1793200213.16058,
-    "ast_hash": "306e69d621cb661142d8f06692697a54",
+    "mtime": 1793202424.6830132,
+    "ast_hash": "d2b7a798d28e0c44d19896a7757376bf",
     "semantic_hash": ""
   },
   "scripts/ngrok-entrypoint.sh": {
@@ -300,12 +300,12 @@
     "semantic_hash": ""
   },
   "src/env.deployed.test.ts": {
-    "mtime": 1793200202.981912,
+    "mtime": 1793200527.7252831,
     "ast_hash": "9630cb612c4d807b1958c617a13a70ce",
     "semantic_hash": ""
   },
   "src/env.ts": {
-    "mtime": 1793200109.5964987,
+    "mtime": 1793200527.725387,
     "ast_hash": "06f175909d01a5efba3246f6501354fc",
     "semantic_hash": ""
   },
@@ -320,7 +320,7 @@
     "semantic_hash": ""
   },
   "src/handlers/admin/auth.handler.ts": {
-    "mtime": 1793200117.708152,
+    "mtime": 1793200527.7255225,
     "ast_hash": "a94f31e31ccca86a11e110479c6e90ef",
     "semantic_hash": ""
   },
@@ -475,7 +475,7 @@
     "semantic_hash": ""
   },
   "src/handlers/auth.handler.ts": {
-    "mtime": 1793200115.2074928,
+    "mtime": 1793200527.7256513,
     "ast_hash": "afaf083814cc85cea391d5460dbf6f54",
     "semantic_hash": ""
   },
@@ -575,7 +575,7 @@
     "semantic_hash": ""
   },
   "src/handlers/midtrans-webhook.handler.ts": {
-    "mtime": 1793200118.542806,
+    "mtime": 1793200527.7258048,
     "ast_hash": "76c3fbe619042df037ebaa7c8f114a97",
     "semantic_hash": ""
   },
@@ -595,17 +595,17 @@
     "semantic_hash": ""
   },
   "src/handlers/phone.handler.ts": {
-    "mtime": 1793200116.009917,
+    "mtime": 1793200527.7259405,
     "ast_hash": "32897c79a96b66f843abdd220827395b",
     "semantic_hash": ""
   },
   "src/handlers/verification.handler.ts": {
-    "mtime": 1793200116.842734,
+    "mtime": 1793200527.7260926,
     "ast_hash": "e327fad38a6de7572075b2aa49ab08c0",
     "semantic_hash": ""
   },
   "src/handlers/xendit-test.handler.ts": {
-    "mtime": 1793200119.1516345,
+    "mtime": 1793200527.726218,
     "ast_hash": "f78e5a7dbfbc0d23f3b3b50d209c34ae",
     "semantic_hash": ""
   },
@@ -630,7 +630,7 @@
     "semantic_hash": ""
   },
   "src/lib/auth-cookies.ts": {
-    "mtime": 1793200111.4409807,
+    "mtime": 1793200527.7263477,
     "ast_hash": "a9b7b69f5a9a754da909a19cddba1097",
     "semantic_hash": ""
   },
@@ -730,7 +730,7 @@
     "semantic_hash": ""
   },
   "src/lib/logger.ts": {
-    "mtime": 1793200112.2410853,
+    "mtime": 1793200527.7264743,
     "ast_hash": "24c2b3283070ce43b51d8969d937302f",
     "semantic_hash": ""
   },
@@ -760,7 +760,7 @@
     "semantic_hash": ""
   },
   "src/lib/prisma.ts": {
-    "mtime": 1793200113.382144,
+    "mtime": 1793200527.7266138,
     "ast_hash": "b93fda8bb1f37cd140d5c6957c79c01a",
     "semantic_hash": ""
   },
@@ -1215,7 +1215,7 @@
     "semantic_hash": ""
   },
   "src/services/otp.service.ts": {
-    "mtime": 1793200110.656422,
+    "mtime": 1793200527.7267544,
     "ast_hash": "d52b98ce3268f0e86acfb3e3c1763a21",
     "semantic_hash": ""
   },
@@ -1395,7 +1395,7 @@
     "semantic_hash": ""
   },
   ".github/workflows/docker-staging.yml": {
-    "mtime": 1793200248.4574184,
+    "mtime": 1793200527.7091048,
     "ast_hash": "8c7fa08abff5244f1d1b3b48fe7cc7d0",
     "semantic_hash": ""
   },
@@ -1410,7 +1410,7 @@
     "semantic_hash": ""
   },
   "docker-compose.prod.yml": {
-    "mtime": 1793200212.3082564,
+    "mtime": 1793200527.7092614,
     "ast_hash": "25fdd1cdf8a2ae7d29237974bc85a89c",
     "semantic_hash": ""
   },
@@ -1490,8 +1490,8 @@
     "semantic_hash": ""
   },
   "docs/DEPLOYMENT.md": {
-    "mtime": 1793200301.8802354,
-    "ast_hash": "0db54b7f56b1d38651189cc0df0a8232",
+    "mtime": 1793202437.4245412,
+    "ast_hash": "a324071e309b5961b44e72c2b214738e",
     "semantic_hash": ""
   },
   "docs/DEPLOYMENT_CHECKLIST.md": {
@@ -1607,6 +1607,11 @@
   "prisma/README-demo.md": {
     "mtime": 1793199491.3342748,
     "ast_hash": "3221b9637fefad177f0a30dfbd27556a",
+    "semantic_hash": ""
+  },
+  "docker-compose.staging.yml": {
+    "mtime": 1793202430.9430053,
+    "ast_hash": "41118ffc74816a0c7b0c3bb3fc1455de",
     "semantic_hash": ""
   }
 }

@@ -1,0 +1,59 @@
+# Staging shares the production Postgres container (database quantum_sport_staging).
+# Redis stays on its own network so the hostname "redis" cannot reach production.
+# Apply with:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml ...
+
+services:
+  db:
+    profiles: ["bundled-db"]
+
+  redis:
+    networks: !override
+      - staging-internal
+
+  app:
+    networks: !override
+      - staging-internal
+      - prod-data
+    depends_on: !override
+      redis:
+        condition: service_healthy
+
+  email-worker:
+    networks: !override
+      - staging-internal
+      - prod-data
+    depends_on: !override
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler-worker:
+    networks: !override
+      - staging-internal
+      - prod-data
+    depends_on: !override
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    profiles: ["edge"]
+    ports: !override
+      - "127.0.0.1:${NGINX_HTTP_PORT:-8080}:80"
+      - "127.0.0.1:${NGINX_HTTPS_PORT:-8443}:443"
+
+  certbot:
+    profiles: ["edge"]
+
+networks:
+  staging-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/16
+  prod-data:
+    external: true
+    name: ${PROD_DOCKER_NETWORK:-quantum-sport-backend_quantum-sport-network}

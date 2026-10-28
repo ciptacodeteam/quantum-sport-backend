@@ -62,14 +62,20 @@ if [ "${SKIP_PULL_CODE:-}" != "true" ]; then
   sync_repo_for_deploy
 fi
 
-print_header "Ensuring database and redis are up"
-compose -f docker-compose.prod.yml up -d db redis
+if [ "$(read_env_value DEPLOY_ENV 2>/dev/null || true)" = "staging" ]; then
+  print_header "Ensuring staging redis is up"
+  print_info "Using the production Postgres container and database quantum_sport_staging"
+  compose_stack up -d redis
+else
+  print_header "Ensuring database and redis are up"
+  compose_stack up -d db redis
+fi
 
 print_header "Pulling application image"
-compose -f docker-compose.prod.yml pull app
+compose_stack pull app
 
 print_header "Restarting application"
-compose -f docker-compose.prod.yml up -d --no-deps app
+compose_stack up -d --no-deps app
 
 print_info "Waiting for container health + HTTP /health ..."
 DEPLOY_OK=false
@@ -79,7 +85,7 @@ fi
 
 if [ "$DEPLOY_OK" != true ]; then
   print_error "New deployment failed health checks"
-  compose -f docker-compose.prod.yml logs --tail=30 app || true
+  compose_stack logs --tail=30 app || true
 
   if [ -n "$PREVIOUS_APP_IMAGE" ] && [ "$PREVIOUS_APP_IMAGE" != "$TARGET_APP_IMAGE" ]; then
     if rollback_app_deployment "$PREVIOUS_APP_IMAGE"; then
@@ -98,11 +104,11 @@ persist_app_image "$TARGET_APP_IMAGE"
 save_last_good_app_image "$TARGET_APP_IMAGE"
 
 print_header "Restarting workers"
-compose -f docker-compose.prod.yml pull email-worker scheduler-worker 2>/dev/null || true
-compose -f docker-compose.prod.yml up -d --no-deps email-worker scheduler-worker
+compose_stack pull email-worker scheduler-worker 2>/dev/null || true
+compose_stack up -d --no-deps email-worker scheduler-worker
 
 reload_nginx_if_needed "${CHANGED_FILES:-}"
 
 print_header "Deployment Complete"
-compose -f docker-compose.prod.yml ps
+compose_stack ps
 print_success "Registry deployment finished — ${TARGET_APP_IMAGE}"

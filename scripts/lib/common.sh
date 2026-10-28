@@ -189,6 +189,19 @@ export_compose_env() {
   fi
 }
 
+# Production uses docker-compose.prod.yml only.
+# Staging adds docker-compose.staging.yml so the app joins the existing
+# Postgres network and does not start a second database.
+compose_stack() {
+  local -a files=(-f docker-compose.prod.yml)
+  local deploy_env
+  deploy_env="$(read_env_value DEPLOY_ENV 2>/dev/null || true)"
+  if [ "$deploy_env" = "staging" ]; then
+    files+=(-f docker-compose.staging.yml)
+  fi
+  compose "${files[@]}" "$@"
+}
+
 nginx_config_changed() {
   echo "${1:-}" | grep -qE '^docker/nginx/'
 }
@@ -199,14 +212,14 @@ reload_nginx_if_needed() {
     return 0
   fi
 
-  if ! compose -f docker-compose.prod.yml ps nginx 2>/dev/null | grep -qE 'running|Up'; then
+  if ! compose_stack ps nginx 2>/dev/null | grep -qE 'running|Up'; then
     print_info "Nginx is not running — skipping reload"
     return 0
   fi
 
   print_info "Nginx configuration changed — validating and reloading..."
-  compose -f docker-compose.prod.yml exec -T nginx nginx -t
-  compose -f docker-compose.prod.yml exec -T nginx nginx -s reload
+  compose_stack exec -T nginx nginx -t
+  compose_stack exec -T nginx nginx -s reload
   print_success "Nginx reloaded"
 }
 
@@ -215,7 +228,7 @@ wait_for_app_healthy() {
   local attempt=1
 
   while [ "$attempt" -le "$max_attempts" ]; do
-    if compose -f docker-compose.prod.yml ps app 2>/dev/null | grep -q "(healthy)"; then
+    if compose_stack ps app 2>/dev/null | grep -q "(healthy)"; then
       print_success "Application is healthy (attempt ${attempt}/${max_attempts})"
       return 0
     fi
@@ -225,7 +238,7 @@ wait_for_app_healthy() {
   done
 
   print_error "Application did not become healthy in time"
-  compose -f docker-compose.prod.yml logs --tail=50 app || true
+  compose_stack logs --tail=50 app || true
   return 1
 }
 
@@ -273,7 +286,10 @@ read_persisted_app_image() {
 }
 
 read_running_app_image() {
-  docker inspect quantum-sport-app-prod --format '{{.Config.Image}}' 2>/dev/null | tr -d '\r' || true
+  local slot
+  slot="$(read_env_value DEPLOY_ENV 2>/dev/null || true)"
+  slot="${slot:-prod}"
+  docker inspect "quantum-sport-app-${slot}" --format '{{.Config.Image}}' 2>/dev/null | tr -d '\r' || true
 }
 
 read_last_good_app_image() {
@@ -300,11 +316,11 @@ rollback_app_deployment() {
   print_warning "Target: $rollback_image"
 
   export APP_IMAGE="$rollback_image"
-  compose -f docker-compose.prod.yml pull app 2>/dev/null || true
-  compose -f docker-compose.prod.yml up -d --no-deps app
+  compose_stack pull app 2>/dev/null || true
+  compose_stack up -d --no-deps app
 
   if wait_for_app_healthy 30 && probe_app_http_health "$(resolve_app_port)" 12; then
-    compose -f docker-compose.prod.yml up -d --no-deps email-worker scheduler-worker
+    compose_stack up -d --no-deps email-worker scheduler-worker
     persist_app_image "$rollback_image"
     save_last_good_app_image "$rollback_image"
     print_success "Rollback complete — previous version is serving again"

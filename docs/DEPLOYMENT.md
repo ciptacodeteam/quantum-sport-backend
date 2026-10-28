@@ -354,10 +354,18 @@ git clone -b staging <repo-url> ~/quantum-sport-backend-staging
 cd ~/quantum-sport-backend-staging
 cp docker/env.staging.template .env
 nano .env   # staging DB password, JWT secrets, Fazpass/SMTP/Midtrans, public URLs
-
-# Do not start nginx or certbot here. Production already owns ports 80 and 443.
-docker compose -f docker-compose.prod.yml up -d db redis
 ```
+
+Staging does not start its own Postgres. `DATABASE_URL` must use host `quantum-sport-db-prod`, port `5432`, and database `quantum_sport_staging` inside the container `quantum-sport-db-prod`. Create that database once:
+
+```bash
+docker exec -it quantum-sport-db-prod psql -U postgres -c \
+  "CREATE USER quantum_staging WITH PASSWORD 'password-staging';"
+docker exec -it quantum-sport-db-prod psql -U postgres -c \
+  "CREATE DATABASE quantum_sport_staging OWNER quantum_staging;"
+```
+
+Do not run `docker compose up -d db` from the staging folder, and do not start nginx or certbot. Production already owns ports 80 and 443. The deploy script starts only the staging Redis, then the app and workers, and attaches them to `quantum-sport-backend_quantum-sport-network`.
 
 Then add the GitHub secret `DO_STAGING_PROJECT_PATH` (for example `/home/deploy/quantum-sport-backend-staging`) and open port `8001` on the firewall. Leave `5434` bound to `127.0.0.1` only.
 
