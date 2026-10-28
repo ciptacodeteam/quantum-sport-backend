@@ -1,3 +1,5 @@
+import { bookableCourtWhere } from '@/lib/court-branch-policy'
+import { assertClientCheckoutHasNoAddOns } from '@/lib/client-checkout-policy'
 import { consumeMembershipHours } from '@/services/membership-checkout.service'
 import { env } from '@/env'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -250,6 +252,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
       }
 
       const validated = c.req.valid('json') as ApplyPromoCodeSchema
+      assertClientCheckoutHasNoAddOns(validated)
       const {
         promoCode: rawPromoCode,
         courtSlots: rawCourtSlots,
@@ -307,6 +310,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
               id: { in: courtSlots },
               type: SlotType.COURT,
               isAvailable: true,
+              court: { is: bookableCourtWhere },
             },
             include: {
               court: {
@@ -564,6 +568,7 @@ export const checkoutHandler = factory.createHandlers(
       }
 
       const validated = c.req.valid('json') as any
+      assertClientCheckoutHasNoAddOns(validated)
       const {
         bookingId,
         paymentMethodId,
@@ -724,6 +729,7 @@ export const checkoutHandler = factory.createHandlers(
               id: { in: courtSlots },
               type: SlotType.COURT,
               isAvailable: true,
+              court: { is: bookableCourtWhere },
             },
             include: {
               court: {

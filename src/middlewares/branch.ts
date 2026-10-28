@@ -9,7 +9,6 @@ const publicBranchPaths = [
   '/ballboys',
   '/inventories',
   '/classes',
-  '/banners',
   '/partnerships',
   '/checkout',
   '/memberships',
@@ -31,6 +30,12 @@ export const branchMiddleware: MiddlewareHandler = async (c, next) => {
     })
     if (!staff?.isActive) throw new ForbiddenException('Akun staf tidak aktif.')
     const isSuperAdmin = staff.role === 'SUPER_ADMIN'
+    // Banner content is shared across locations; branch selection does not scope it.
+    if (path === '/admin/banners' || path.startsWith('/admin/banners/'))
+      return withBranchContext(
+        { branchId: null, isAdmin: true, isSuperAdmin, staffId: admin.id },
+        next,
+      )
     if (!isSuperAdmin && requested && requested !== staff.branchId)
       throw new ForbiddenException(
         'Akun Anda hanya dapat mengakses cabang yang ditugaskan.',

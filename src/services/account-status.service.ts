@@ -46,8 +46,9 @@ export async function assertUserNotBanned(user: BanFields): Promise<BanFields> {
 export async function assertStaffActive(staff: {
   id: string
   isActive: boolean
+  role?: string
 }) {
-  if (!staff.isActive) {
+  if (!staff.isActive || staff.role === 'COACH' || staff.role === 'BALLBOY') {
     throw new ForbiddenException('Your staff account is inactive')
   }
 }

@@ -145,7 +145,7 @@ const staffBaseSchema = z.object({
     .optional()
     .default(dayjs().format(DEFAULT_DATE_FORMAT)),
   role: z
-    .enum(['SUPER_ADMIN', 'ADMIN', 'ADMIN_VIEWER', 'BALLBOY', 'COACH', 'CASHIER'] as const)
+    .enum(['SUPER_ADMIN', 'ADMIN', 'ADMIN_VIEWER', 'CASHIER'] as const)
     .default('ADMIN'),
   coachType: z.enum(['PADEL', 'PADEL_TENNIS', 'TENNIS'] as const).optional(),
   coachProfile: z.string().trim().max(2000).optional(),
@@ -379,9 +379,20 @@ export type OverrideSingleStaffCostSchema = z.infer<
 
 // Banner Schemas
 export const createBannerSchema = z.object({
-  image: z.file(),
-  link: z.string().url().optional(),
-  isActive: z.coerce.boolean().optional(),
+  image: z
+    .file()
+    .max(5 * 1024 * 1024)
+    .mime(['image/jpeg', 'image/png', 'image/webp']),
+  link: z.union([z.literal(''), z.url({ protocol: /^https?$/ })]).optional(),
+  isActive: z.preprocess(
+    (value) =>
+      value === 'false' || value === '0'
+        ? false
+        : value === 'true' || value === '1'
+          ? true
+          : value,
+    z.boolean().optional(),
+  ),
   startAt: z
     .string()
     .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {

@@ -38,6 +38,7 @@ export const getAllStaffHandler = factory.createHandlers(
         where: {
           ...queryOptions.where,
           id: { not: staffId }, // Exclude the currently logged-in admin
+          role: { notIn: ['COACH', 'BALLBOY'] },
         },
         select: {
           id: true,
@@ -129,17 +130,7 @@ export const createStaffHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('form') as CreateStaffSchema
-      const {
-        name,
-        email,
-        phone,
-        role,
-        coachType,
-        coachProfile,
-        image,
-        isActive,
-        joinedAt,
-      } = validated
+      const { name, email, phone, role, image, isActive, joinedAt } = validated
 
       const existingStaff = await db.staff.findFirst({
         where: {
@@ -172,8 +163,8 @@ export const createStaffHandler = factory.createHandlers(
           phone: formatedPhone,
           password: hashedPassword,
           role,
-          coachType,
-          coachProfile: role === 'COACH' ? coachProfile : null,
+          coachType: null,
+          coachProfile: null,
           image: imageUrl,
           isActive,
           joinedAt: joinedAt ? new Date(joinedAt) : new Date(),
@@ -223,6 +214,15 @@ export const updateStaffHandler = factory.createHandlers(
 
       if (!existingStaff) {
         throw new NotFoundException('Staff not found')
+      }
+
+      if (
+        ['COACH', 'BALLBOY'].includes(existingStaff.role) &&
+        !validatedForm.role
+      ) {
+        throw new BadRequestException(
+          'Pilih peran karyawan yang masih didukung sebelum menyimpan akun lama.',
+        )
       }
 
       if (validatedForm.email && validatedForm.email !== existingStaff.email) {
@@ -276,13 +276,8 @@ export const updateStaffHandler = factory.createHandlers(
           email: validatedForm.email,
           phone,
           role: validatedForm.role,
-          coachType: validatedForm.coachType,
-          coachProfile:
-            validatedForm.role === 'COACH'
-              ? validatedForm.coachProfile
-              : validatedForm.role
-                ? null
-                : validatedForm.coachProfile,
+          coachType: null,
+          coachProfile: null,
           image: imageUrl,
           isActive,
           joinedAt: validatedForm.joinedAt

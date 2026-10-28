@@ -80,20 +80,22 @@ export const createBannerHandler = factory.createHandlers(
     try {
       const bannerData = c.req.valid('form') as CreateBannerSchema
 
-      let imageUrl: string = ""
+      let imageUrl: string = ''
       if (bannerData.image) {
-        const uploadResult = await uploadFile(bannerData.image, { 
-            subdir: BANNER_SUBDIR 
+        const uploadResult = await uploadFile(bannerData.image, {
+          subdir: BANNER_SUBDIR,
         })
         imageUrl = uploadResult.relativePath
       }
 
       const newBanner = await db.banner.create({
         data: {
-            image: imageUrl,
-            link: bannerData.link,
-            startAt: bannerData.startAt ? new Date(bannerData.startAt) : null,
-            endAt: bannerData.endAt ? new Date(bannerData.endAt) : null,
+          image: imageUrl,
+          sequence: bannerData.sequence,
+          isActive: bannerData.isActive,
+          link: bannerData.link === '' ? null : bannerData.link,
+          startAt: bannerData.startAt ? new Date(bannerData.startAt) : null,
+          endAt: bannerData.endAt ? new Date(bannerData.endAt) : null,
         },
       })
 
@@ -127,8 +129,8 @@ export const updateBannerHandler = factory.createHandlers(
           await deleteFile(existingBanner.image)
         }
 
-        const uploadResult = await uploadFile(bannerData.image, { 
-            subdir: BANNER_SUBDIR 
+        const uploadResult = await uploadFile(bannerData.image, {
+          subdir: BANNER_SUBDIR,
         })
         imageUrl = uploadResult.relativePath
       }
@@ -136,11 +138,16 @@ export const updateBannerHandler = factory.createHandlers(
       const updatedBanner = await db.banner.update({
         where: { id },
         data: {
-            image: imageUrl,
-            link: bannerData.link,
-            startAt: bannerData.startAt ? new Date(bannerData.startAt) : existingBanner.startAt,
-            endAt: bannerData.endAt ? new Date(bannerData.endAt) : existingBanner.endAt,
-            sequence: bannerData.sequence,
+          image: imageUrl,
+          isActive: bannerData.isActive,
+          link: bannerData.link === '' ? null : bannerData.link,
+          startAt: bannerData.startAt
+            ? new Date(bannerData.startAt)
+            : existingBanner.startAt,
+          endAt: bannerData.endAt
+            ? new Date(bannerData.endAt)
+            : existingBanner.endAt,
+          sequence: bannerData.sequence,
         },
       })
 
@@ -156,25 +163,25 @@ export const deleteBannerHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   async (c) => {
     try {
-        const { id } = c.req.valid('param') as IdSchema
-        
-        const existingBanner = await db.banner.findUnique({
-            where: { id },
-        })
+      const { id } = c.req.valid('param') as IdSchema
 
-        if (!existingBanner) {
-            throw new NotFoundException('Banner not found')
-        }
+      const existingBanner = await db.banner.findUnique({
+        where: { id },
+      })
 
-        if (existingBanner.image) {
-            await deleteFile(existingBanner.image)
-        }
+      if (!existingBanner) {
+        throw new NotFoundException('Banner not found')
+      }
 
-        await db.banner.delete({
-            where: { id },
-        })
+      if (existingBanner.image) {
+        await deleteFile(existingBanner.image)
+      }
 
-        return c.json(ok(null, 'Banner deleted successfully'), status.OK)
+      await db.banner.delete({
+        where: { id },
+      })
+
+      return c.json(ok(null, 'Banner deleted successfully'), status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in deleteBannerHandler: ${error}`)
       throw error

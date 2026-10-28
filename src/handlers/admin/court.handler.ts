@@ -1,3 +1,8 @@
+import { branchContext } from '@/lib/branch-context'
+import {
+  supportedCourtWhere,
+  assertCourtSportAtBranch,
+} from '@/lib/court-branch-policy'
 import { DATETIME_FORMAT } from '@/constants'
 import { COURT_SUBDIR } from '@/config'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -57,6 +62,7 @@ export const getAllCourtHandler = factory.createHandlers(
       const items = await db.court.findMany({
         ...queryOptions,
         where: {
+          ...supportedCourtWhere,
           ...(query.courtSport ? { sport: query.courtSport } : {}),
           ...queryOptions.where,
         },
@@ -114,6 +120,7 @@ export const createCourtHandler = factory.createHandlers(
     try {
       const body = c.req.valid('form') as CreateCourtSchema
       const { name, description, image, isActive, sport } = body
+      assertCourtSportAtBranch(sport, branchContext.getStore()?.branchId)
 
       let imageUrl: string | undefined
 
@@ -162,6 +169,11 @@ export const updateCourtHandler = factory.createHandlers(
       if (!existingItem) {
         throw new NotFoundException('Court item not found')
       }
+
+      assertCourtSportAtBranch(
+        sport ?? existingItem.sport,
+        existingItem.branchId,
+      )
 
       let imageUrl = existingItem.image
 
@@ -286,6 +298,7 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         court: {
           is: {
             isActive: true,
+            ...supportedCourtWhere,
             ...(query.courtSport ? { sport: query.courtSport } : {}),
           },
         },

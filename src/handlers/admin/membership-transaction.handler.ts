@@ -16,6 +16,10 @@ import status from 'http-status'
 import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
 import { z } from 'zod'
+import {
+  membershipTransactionStatuses,
+  membershipTransactionStatusWhere,
+} from '@/lib/membership-transaction-filter'
 
 // GET /admin/membership-transactions
 // Get all membership transactions
@@ -25,6 +29,7 @@ const membershipTransactionsQuerySchema = searchQuerySchema.extend({
     .optional()
     .describe('Filter by transaction source: cashier or online'),
   sport: z.nativeEnum(CourtSport).optional(),
+  status: z.enum(membershipTransactionStatuses).optional(),
 })
 
 export const getAllMembershipTransactionsHandler = factory.createHandlers(
@@ -38,7 +43,10 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
       })
 
       // Add source filter if provided
-      let where = queryOptions.where || {}
+      let where = {
+        ...queryOptions.where,
+        ...membershipTransactionStatusWhere(query.status),
+      }
       if (query.source) {
         if (query.source === 'cashier') {
           where = {
@@ -431,12 +439,16 @@ export const exportMembershipTransactionsToExcelHandler =
       try {
         const query = c.req.valid('query') as SearchQuerySchema & {
           sport?: CourtSport
+          status?: string
         }
         const queryOptions = buildFindManyOptions(query, {
           defaultOrderBy: { createdAt: 'desc' },
           searchableFields: [],
         })
-        let where = queryOptions.where || {}
+        let where = {
+          ...queryOptions.where,
+          ...membershipTransactionStatusWhere(query.status),
+        }
         if (query.sport) {
           where = {
             ...where,

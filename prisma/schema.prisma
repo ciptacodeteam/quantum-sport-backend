@@ -229,8 +229,6 @@ model AuthToken {
 // Catalogs / Content
 // ------------------------------
 model Banner {
-  branchId  String    @default("cemara")
-  branch    Branch    @relation(fields: [branchId], references: [id])
   id        String    @id @default(cuid())
   image     String
   link      String?
@@ -241,7 +239,6 @@ model Banner {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt
 
-  @@index([branchId])
   @@index([isActive, startAt, endAt, sequence])
   @@map("banners")
 }
@@ -955,7 +952,6 @@ model Branch {
   classBookingRecords      ClassBooking[]
   tournamentRecords        Tournament[]
   promoCodeRecords         PromoCode[]
-  bannerRecords            Banner[]
   partnershipRecords       Partnership[]
   notificationRecords      Notification[]
   memberships              MembershipBranch[]

@@ -161,6 +161,8 @@ export const loginAdminHandler = factory.createHandlers(
 
       if (
         !user.isActive ||
+        user.role === Role.COACH ||
+        user.role === Role.BALLBOY ||
         (user.role !== Role.SUPER_ADMIN && !user.branch.isActive)
       ) {
         c.var.logger.warn(`Login blocked for inactive staff: ${email}`)

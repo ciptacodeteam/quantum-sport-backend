@@ -176,27 +176,25 @@ it('rejects a membership balance lost to a concurrent checkout', async () => {
   ).rejects.toThrow('sisa jam tidak mencukupi')
   expect(tx.invoice.create).not.toHaveBeenCalled()
 })
-it('keeps paid add-ons in the regular payment flow', async () => {
-  const response = await checkout({
-    courtSlots: ['court-slot'],
-    useMembership: true,
-    paymentMethodId: 'qris',
-    inventories: [{ inventoryId: 'towel', quantity: 1 }],
-  })
-  expect(response.data).toMatchObject({
-    paymentStatus: 'PENDING',
-    total: 21110,
-  })
-  expect(mocks.gateway.charge).toHaveBeenCalledWith(
-    expect.objectContaining({ amount: 21110 }),
-  )
-  expect(tx.payment.create).toHaveBeenCalledOnce()
-  const invoiceData = tx.invoice.create.mock.calls[0][0].data
-  expect(invoiceData.paidAt).toBeNull()
-  expect(invoiceData.dueDate.getTime() - invoiceData.issuedAt.getTime()).toBe(
-    15 * 60 * 1000,
-  )
-})
+it.each([
+  { inventories: [{ inventoryId: 'towel', quantity: 1 }] },
+  { coachSlots: ['coach-slot'] },
+  { ballboySlots: [{ slotId: 'ballboy-slot', courtSlotId: 'court-slot' }] },
+])(
+  'rejects add-on ordering from the customer checkout before changing stock or payments',
+  async (selection) => {
+    await expect(
+      checkout({
+        courtSlots: ['court-slot'],
+        useMembership: true,
+        paymentMethodId: 'qris',
+        ...selection,
+      }),
+    ).rejects.toThrow('Add-ons hanya dapat dipesan melalui admin.')
+    expect(mocks.db.$transaction).not.toHaveBeenCalled()
+    expect(mocks.gateway.charge).not.toHaveBeenCalled()
+  },
+)
 it('accepts an omitted payment method for server-side eligibility checks', () => {
   expect(
     extendedCheckoutSchema.safeParse({

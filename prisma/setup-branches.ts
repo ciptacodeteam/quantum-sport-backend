@@ -29,6 +29,10 @@ try {
   } else {
     console.info('Struktur cabang sudah tersedia; migrasi tidak diulang.')
   }
+  // Keep banner content shared even when upgrading through the legacy branch SQL.
+  await db.$executeRawUnsafe(
+    await readFile(new URL('./global-banners.sql', import.meta.url), 'utf8'),
+  )
   const email = process.argv
     .find((arg) => arg.startsWith('--super-admin-email='))
     ?.slice('--super-admin-email='.length)

@@ -114,3 +114,23 @@ it('does not leak the selected branch across concurrent requests', async () => {
   expect(await responses[1].json()).toMatchObject({ branchId: 's-parman' })
   expect(branchContext.getStore()).toBeUndefined()
 })
+it('serves shared banners without a selected public branch', async () => {
+  for (const path of ['/banners', '/banners/banner-id']) {
+    expect((await app.request(path)).status).toBe(200)
+    expect(
+      (await app.request(path, { headers: { 'X-Branch-ID': 'missing' } }))
+        .status,
+    ).toBe(200)
+  }
+})
+it('keeps admin banners global even when a branch header is present', async () => {
+  for (const branch of ['cemara', 's-parman', 'all']) {
+    const response = await app.request('/admin/banners', {
+      method: 'POST',
+      headers: { 'X-Branch-ID': branch },
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ superAdmin: false })
+    expect(mocks.branch).not.toHaveBeenCalled()
+  }
+})

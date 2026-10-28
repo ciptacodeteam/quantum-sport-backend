@@ -1,3 +1,9 @@
+import {
+  bookingCheckoutTypes,
+  bookingCheckoutWhere,
+} from '@/lib/booking-checkout'
+import clubTime from '@/lib/club-time'
+import { getOngoingSchedule } from '@/lib/ongoing-schedule'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -94,6 +100,7 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
 // GET /admin/bookings
 // Get all booking transactions
 const bookingsQuerySchema = searchQuerySchema.extend({
+  checkoutType: z.enum(bookingCheckoutTypes).optional(),
   source: z
     .enum(['cashier', 'online'])
     .optional()
@@ -161,6 +168,10 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
             },
           },
         }
+      }
+
+      if (query.checkoutType) {
+        where = { AND: [where, bookingCheckoutWhere(query.checkoutType)] }
       }
 
       const bookings = await db.booking.findMany({
@@ -540,12 +551,12 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
 
         for (const inventory of booking.inventories) {
           if (inventory.slot?.startAt) {
-            inventory.slot.startAt = dayjs(inventory.slot.startAt).format(
+            inventory.slot.startAt = clubTime(inventory.slot.startAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
           if (inventory.slot?.endAt) {
-            inventory.slot.endAt = dayjs(inventory.slot.endAt).format(
+            inventory.slot.endAt = clubTime(inventory.slot.endAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
@@ -557,12 +568,12 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         // Format booking detail slots
         for (const detail of booking.details) {
           if (detail.slot?.startAt) {
-            detail.slot.startAt = dayjs(detail.slot.startAt).format(
+            detail.slot.startAt = clubTime(detail.slot.startAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
           if (detail.slot?.endAt) {
-            detail.slot.endAt = dayjs(detail.slot.endAt).format(
+            detail.slot.endAt = clubTime(detail.slot.endAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
@@ -571,12 +582,12 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         // Format coach slots
         for (const coach of booking.coaches) {
           if (coach.slot?.startAt) {
-            coach.slot.startAt = dayjs(coach.slot.startAt).format(
+            coach.slot.startAt = clubTime(coach.slot.startAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
           if (coach.slot?.endAt) {
-            coach.slot.endAt = dayjs(coach.slot.endAt).format(
+            coach.slot.endAt = clubTime(coach.slot.endAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
@@ -585,22 +596,22 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         // Format ballboy slots
         for (const ballboy of booking.ballboys) {
           if (ballboy.slot?.startAt) {
-            ballboy.slot.startAt = dayjs(ballboy.slot.startAt).format(
+            ballboy.slot.startAt = clubTime(ballboy.slot.startAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
           if (ballboy.slot?.endAt) {
-            ballboy.slot.endAt = dayjs(ballboy.slot.endAt).format(
+            ballboy.slot.endAt = clubTime(ballboy.slot.endAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
           if (ballboy.courtSlot?.startAt) {
-            ballboy.courtSlot.startAt = dayjs(ballboy.courtSlot.startAt).format(
-              'YYYY-MM-DD HH:mm:ss',
-            ) as any
+            ballboy.courtSlot.startAt = clubTime(
+              ballboy.courtSlot.startAt,
+            ).format('YYYY-MM-DD HH:mm:ss') as any
           }
           if (ballboy.courtSlot?.endAt) {
-            ballboy.courtSlot.endAt = dayjs(ballboy.courtSlot.endAt).format(
+            ballboy.courtSlot.endAt = clubTime(ballboy.courtSlot.endAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ) as any
           }
@@ -1254,6 +1265,7 @@ export const exportBookingTransactionsToExcelHandler = factory.createHandlers(
 // GET /admin/bookings/export
 // Export booking transactions to Excel using date range with enriched columns
 const bookingsExportQuerySchema = z.object({
+  checkoutType: z.enum(bookingCheckoutTypes).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   source: z.enum(['cashier', 'online']).optional(),
@@ -1280,6 +1292,7 @@ export const exportBookingsHandler = factory.createHandlers(
         query.source,
         query.courtSport,
         query.coach,
+        query.checkoutType,
       )
       const filename = `bookings-export-${dayjs().format('YYYY-MM-DD')}.xlsx`
 
@@ -1313,9 +1326,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
               details: {
                 some: {
                   slot: {
-                    startAt: {
-                      gte: dayjs().subtract(2, 'hours').toDate(), // Include slots that started up to 2 hours ago
-                    },
+                    endAt: { gt: now },
                   },
                 },
               },
@@ -1328,9 +1339,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
                   },
                   slot: {
                     isAvailable: false,
-                    startAt: {
-                      gte: dayjs().subtract(2, 'hours').toDate(),
-                    },
+                    endAt: { gt: now },
                   },
                 },
               },
@@ -1343,9 +1352,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
                   },
                   slot: {
                     isAvailable: false,
-                    startAt: {
-                      gte: dayjs().subtract(2, 'hours').toDate(),
-                    },
+                    endAt: { gt: now },
                   },
                 },
               },
@@ -1437,7 +1444,8 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
                 isAvailable: false,
               },
             },
-            include: {
+            select: {
+              price: true,
               slot: {
                 select: {
                   id: true,
@@ -1502,27 +1510,9 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
             })),
           ]
 
-          const nearestSlot = scheduleSlots.reduce(
-            (nearest, slot) => {
-              const slotStart = dayjs(slot.startAt)
-              return !nearest || slotStart.isBefore(dayjs(nearest.startAt))
-                ? slot
-                : nearest
-            },
-            null as { startAt: Date; endAt: Date } | null,
-          )
-
-          if (!nearestSlot) return null
-
-          // Determine if booking is ongoing, upcoming, or completed
-          const slotStart = dayjs(nearestSlot.startAt)
-          const slotEnd = nearestSlot.endAt
-
-          const scheduleStatus = slotStart.isAfter(now)
-            ? 'upcoming'
-            : dayjs(slotEnd).isAfter(now)
-              ? 'ongoing'
-              : 'completed'
+          const schedule = getOngoingSchedule(scheduleSlots, now)
+          if (!schedule) return null
+          const slotStart = dayjs(schedule.startAt)
 
           // Calculate time difference
           const minutesFromNow = slotStart.diff(dayjs(), 'minutes')
@@ -1545,9 +1535,9 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
             user: booking.user,
             cashier: booking.cashier,
             schedule: {
-              startAt: nearestSlot.startAt,
-              endAt: nearestSlot.endAt,
-              status: scheduleStatus,
+              startAt: schedule.startAt,
+              endAt: schedule.endAt,
+              status: schedule.status,
               minutesFromNow,
               timeDisplay,
             },

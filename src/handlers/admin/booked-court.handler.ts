@@ -1,3 +1,4 @@
+import { assertCourtSportAtBranch } from '@/lib/court-branch-policy'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -967,7 +968,7 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
         const bookingDetail = await tx.bookingDetail.findUnique({
           where: { id: bookingDetailId },
           include: {
-            slot: true,
+            slot: { include: { court: true } },
             court: true,
             booking: {
               include: {
@@ -1017,6 +1018,22 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
 
         if (!newSlot || newSlot.type !== SlotType.COURT) {
           throw new NotFoundException('Target court slot not found')
+        }
+
+        assertCourtSportAtBranch(newSlot.court?.sport, newSlot.court?.branchId)
+        if (newSlot.court?.isActive === false)
+          throw new BadRequestException('Lapangan tujuan tidak aktif.')
+
+        const sourceSport =
+          bookingDetail.court?.sport ?? bookingDetail.slot.court?.sport
+        if (
+          !sourceSport ||
+          !newSlot.court?.sport ||
+          sourceSport !== newSlot.court.sport
+        ) {
+          throw new BadRequestException(
+            'Reschedule hanya diperbolehkan ke lapangan dengan jenis olahraga yang sama (padel ke padel, tenis ke tenis)',
+          )
         }
 
         if (!newSlot.isAvailable) {

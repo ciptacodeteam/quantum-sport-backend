@@ -1,3 +1,7 @@
+import {
+  supportedCourtWhere,
+  assertCourtSportAtBranch,
+} from '@/lib/court-branch-policy'
 import { getCourtSlotStatus } from '@/services/court-slot-status'
 import { DATETIME_FORMAT } from '@/constants'
 import { NotFoundException } from '@/exceptions'
@@ -102,6 +106,7 @@ export const getAllCourtHandler = factory.createHandlers(
         ...queryOptions,
         where: {
           isActive: true,
+          ...supportedCourtWhere,
           ...(query.courtSport ? { sport: query.courtSport } : {}),
           slot: {
             some: slotWhere,
@@ -135,6 +140,7 @@ export const getCourtHandler = factory.createHandlers(
         where: { id, isActive: true },
       })
 
+      if (court) assertCourtSportAtBranch(court.sport, court.branchId)
       if (!court) {
         throw new NotFoundException('Court not found')
       }
@@ -165,6 +171,7 @@ export const getCourtSlotsHandler = factory.createHandlers(
         where: { id: courtId, isActive: true },
       })
 
+      if (court) assertCourtSportAtBranch(court.sport, court.branchId)
       if (!court) {
         throw new NotFoundException('Court not found')
       }
@@ -258,6 +265,7 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         court: {
           is: {
             isActive: true,
+            ...supportedCourtWhere,
             ...(query.courtSport ? { sport: query.courtSport } : {}),
           },
         },
