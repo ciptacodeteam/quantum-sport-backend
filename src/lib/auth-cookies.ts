@@ -1,4 +1,4 @@
-import { env } from '@/env'
+import { env, isDeployedEnv } from '@/env'
 import { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 
@@ -10,7 +10,7 @@ export const LEGACY_ACCESS_TOKEN_COOKIE = 'token'
 function baseCookieOptions() {
   return {
     httpOnly: true,
-    secure: env.nodeEnv === 'production',
+    secure: isDeployedEnv(),
     sameSite: 'Lax' as const,
     path: '/',
   }

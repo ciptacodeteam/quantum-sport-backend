@@ -1,4 +1,4 @@
-import { env } from '@/env'
+import { isDeployedEnv } from '@/env'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -7,7 +7,7 @@ import { xenditService } from '@/services/xendit.service'
 import status from 'http-status'
 
 export const xenditTestHandler = factory.createHandlers(async (c) => {
-  if (env.nodeEnv === 'production') {
+  if (isDeployedEnv()) {
     return c.json(
       err('Not allowed in production', status.FORBIDDEN),
       status.FORBIDDEN,

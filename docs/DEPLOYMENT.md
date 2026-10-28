@@ -308,7 +308,9 @@ Pushes to `main` run `.github/workflows/docker-production.yml`:
 1. **test** — lint, typecheck, unit tests
 2. **build-and-deploy** — build image on GitHub runners, push to GHCR, SSH to VPS and run `scripts/deploy-registry.sh` (pull + restart, no build on the droplet)
 
-Image: `ghcr.io/<github-owner>/quantum-sport-backend:<commit-sha>`
+Image: `ghcr.io/<github-owner>/quantum-sport-backend:<commit-sha>` and `:latest`
+
+Pushes to `staging` run `.github/workflows/docker-staging.yml` on the **same droplet**, in a second checkout. That workflow tags the image `:staging` and the commit SHA. It does not push `:latest`, so production keeps its tag. The staging stack uses its own Postgres volume, container names (`*-staging`), and host ports (`8001` for the API, `5434` for the database tunnel). Production nginx stays on `80`/`443`.
 
 ### GitHub repository secrets
 
@@ -317,7 +319,8 @@ Image: `ghcr.io/<github-owner>/quantum-sport-backend:<commit-sha>`
 | `DO_HOST` | `123.45.67.89` | VPS IP or hostname |
 | `DO_SSH_PORT` | `22` | SSH port |
 | `DO_USERNAME` | `deploy` | SSH user |
-| `DO_PROJECT_PATH` | `/home/deploy/quantum-sport-backend` | Repo path on VPS |
+| `DO_PROJECT_PATH` | `/home/deploy/quantum-sport-backend` | Production repo path on VPS |
+| `DO_STAGING_PROJECT_PATH` | `/home/deploy/quantum-sport-backend-staging` | Staging repo path on the same VPS |
 | `DO_SSH_PRIVATE_KEY` | `-----BEGIN OPENSSH PRIVATE KEY-----...` | Deploy key (or use B64 variant) |
 | `DO_SSH_PRIVATE_KEY_B64` | *(optional)* | Base64-encoded key (easier on Windows) |
 
@@ -342,6 +345,30 @@ docker compose -f docker-compose.prod.yml up -d db redis nginx certbot
 
 Add the GitHub Actions deploy public key to `~/.ssh/authorized_keys` on the VPS.
 
+### One-time staging setup (same droplet)
+
+Staging does not share the production checkout, database volume, or published ports. `NODE_ENV=staging` still sends real OTP, email codes, and payment webhooks the same way production does. Secure cookies are on, so browser login needs HTTPS in front of the staging URL later. Port `8001` is enough for health checks and API calls.
+
+```bash
+git clone -b staging <repo-url> ~/quantum-sport-backend-staging
+cd ~/quantum-sport-backend-staging
+cp docker/env.staging.template .env
+nano .env   # staging DB password, JWT secrets, Fazpass/SMTP/Midtrans, public URLs
+
+# Do not start nginx or certbot here. Production already owns ports 80 and 443.
+docker compose -f docker-compose.prod.yml up -d db redis
+```
+
+Then add the GitHub secret `DO_STAGING_PROJECT_PATH` (for example `/home/deploy/quantum-sport-backend-staging`) and open port `8001` on the firewall. Leave `5434` bound to `127.0.0.1` only.
+
+Confirm the staging database name before the first deploy:
+
+```bash
+grep -E '^(DB_NAME|DB_HOST_PORT|PORT|NODE_ENV|COMPOSE_PROJECT_NAME|DEPLOY_ENV)=' .env
+```
+
+Expected: `DB_NAME=quantum_sport_staging`, `DB_HOST_PORT=5434`, `PORT=8001`, `NODE_ENV=staging`, `DEPLOY_ENV=staging`, `COMPOSE_PROJECT_NAME=quantum-sport-staging`.
+
 ### Manual registry deploy (same as CI)
 
 ```bash
@@ -352,11 +379,11 @@ bash scripts/deploy-registry.sh
 
 ## Production Checklist
 
-- [ ] GitHub Actions secrets configured (`DO_HOST`, `DO_SSH_*`, `DO_PROJECT_PATH`)
+- [ ] GitHub Actions secrets configured (`DO_HOST`, `DO_SSH_*`, `DO_PROJECT_PATH`, `DO_STAGING_PROJECT_PATH`)
 - [ ] `.env` configured with all required variables
 - [ ] Strong passwords for `DB_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET`
 - [ ] SSL configured (`./scripts/setup-ssl.sh`)
-- [ ] Firewall: only 80, 443, SSH exposed
+- [ ] Firewall: 80, 443, SSH, and staging API port 8001. Database ports stay on localhost.
 - [ ] All services show "Up (healthy)"
 - [ ] Database migrations completed
 - [ ] Database backups scheduled

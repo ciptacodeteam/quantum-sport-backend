@@ -1,4 +1,4 @@
-import { env } from '@/env'
+import { env, isDeployedEnv } from '@/env'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
@@ -27,7 +27,7 @@ import {
 
 export const midtransFinishHandler = factory.createHandlers((c) => {
   const invoiceList =
-    env.nodeEnv === 'production'
+    isDeployedEnv()
       ? `${env.frontEndUrl.replace(/\/$/, '')}/invoice`
       : 'http://localhost:3000/invoice'
   return c.redirect(invoiceList, 303)

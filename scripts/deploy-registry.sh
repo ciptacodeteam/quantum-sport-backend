@@ -62,6 +62,9 @@ if [ "${SKIP_PULL_CODE:-}" != "true" ]; then
   sync_repo_for_deploy
 fi
 
+print_header "Ensuring database and redis are up"
+compose -f docker-compose.prod.yml up -d db redis
+
 print_header "Pulling application image"
 compose -f docker-compose.prod.yml pull app
 

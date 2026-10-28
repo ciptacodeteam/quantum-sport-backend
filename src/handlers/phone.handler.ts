@@ -1,5 +1,5 @@
 import { DEFAULT_OTP_CODE } from '@/constants'
-import { env } from '@/env'
+import { isDeployedEnv } from '@/env'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -104,7 +104,7 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
       let code = DEFAULT_OTP_CODE
       let requestId = Math.random().toString(36).substring(2, 30)
 
-      if (env.nodeEnv === 'production') {
+      if (isDeployedEnv()) {
         const otpResult = await sendPhoneOtp(formattedPhone)
         // Fazpass returns a masked OTP — store placeholder only; verify via Fazpass API
         code = 'MASKED'
@@ -212,7 +212,7 @@ export const verifyPhoneVerificationOtpHandler = factory.createHandlers(
         )
       }
 
-      if (env.nodeEnv === 'production') {
+      if (isDeployedEnv()) {
         // Fazpass request API masks the OTP; verify with provider, not local DB code
         const result = await verifyPhoneOtp(requestId, normalizedCode)
 

@@ -48,3 +48,10 @@ export const env = {
   },
   storageStrategy: process.env.STORAGE_STRATEGY || 'local', // 'local' or 'blob'
 }
+
+const DEPLOYED_NODE_ENVS = new Set(['production', 'staging'])
+
+/** Live droplet runtimes. Development keeps local OTP codes and insecure cookies. */
+export function isDeployedEnv(nodeEnv = env.nodeEnv) {
+  return DEPLOYED_NODE_ENVS.has(nodeEnv)
+}

@@ -1,5 +1,5 @@
 import { DEFAULT_OTP_CODE } from '@/constants'
-import { env } from '@/env'
+import { env, isDeployedEnv } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -153,7 +153,7 @@ export const loginHandler = factory.createHandlers(
 
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
-        secure: env.nodeEnv === 'production',
+        secure: isDeployedEnv(),
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
@@ -266,7 +266,7 @@ export const registerHandler = factory.createHandlers(
 
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
-        secure: env.nodeEnv === 'production',
+        secure: isDeployedEnv(),
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
@@ -394,7 +394,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
 
     setCookie(c, 'refreshToken', newRefreshToken, {
       httpOnly: true,
-      secure: env.nodeEnv === 'production',
+      secure: isDeployedEnv(),
       sameSite: 'Lax',
       expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
     })
@@ -439,7 +439,7 @@ export const forgotPasswordHandler = factory.createHandlers(
       let code = DEFAULT_OTP_CODE
       let requestId = Math.random().toString(36).substring(2, 30)
 
-      if (env.nodeEnv === 'production') {
+      if (isDeployedEnv()) {
         const otpResult = await sendPhoneOtp(formattedPhone)
         // Fazpass returns a masked OTP — store placeholder only; verify via Fazpass API
         code = 'MASKED'
@@ -614,7 +614,7 @@ export const loginWithEmailHandler = factory.createHandlers(
 
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
-        secure: env.nodeEnv === 'production',
+        secure: isDeployedEnv(),
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
@@ -738,7 +738,7 @@ export const requestEmailChangeHandler = factory.createHandlers(
 
       // Generate OTP code
       const code =
-        env.nodeEnv === 'production' ? await generateOtp(6) : '888888'
+        isDeployedEnv() ? await generateOtp(6) : '888888'
       const requestId = crypto.randomUUID()
       const expiresAt = dayjs().add(10, 'minutes').toDate()
 

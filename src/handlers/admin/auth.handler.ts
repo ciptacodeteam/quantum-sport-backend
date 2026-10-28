@@ -1,5 +1,5 @@
 import { ADMIN_PROFILE_SUBDIR } from '@/config'
-import { env } from '@/env'
+import { env, isDeployedEnv } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -94,7 +94,7 @@ export const registerAdminHandler = factory.createHandlers(
 
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
-        secure: env.nodeEnv === 'production',
+        secure: isDeployedEnv(),
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
@@ -199,7 +199,7 @@ export const loginAdminHandler = factory.createHandlers(
 
       setCookie(c, 'refreshToken', refreshToken, {
         httpOnly: true,
-        secure: env.nodeEnv === 'production',
+        secure: isDeployedEnv(),
         sameSite: 'Lax',
         expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
       })
@@ -493,7 +493,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
 
     setCookie(c, 'refreshToken', newRefreshToken, {
       httpOnly: true,
-      secure: env.nodeEnv === 'production',
+      secure: isDeployedEnv(),
       sameSite: 'Lax',
       expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
     })

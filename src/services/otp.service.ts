@@ -1,5 +1,5 @@
 import { DEFAULT_OTP_CODE } from '@/constants'
-import { env } from '@/env'
+import { isDeployedEnv } from '@/env'
 import { BadRequestException } from '@/exceptions'
 import { log } from '@/lib/logger'
 import { db } from '@/lib/prisma'
@@ -47,7 +47,7 @@ export async function validateOtp(
 
   // Fazpass /otp/request returns a MASKED otp — never compare it locally in production.
   // Always verify with Fazpass using the code the user received.
-  if (env.nodeEnv === 'production') {
+  if (isDeployedEnv()) {
     const result = await verifyPhoneOtp(requestId, normalizedCode)
     if (!result.success) {
       throw new BadRequestException(result.message)

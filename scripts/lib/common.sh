@@ -199,6 +199,11 @@ reload_nginx_if_needed() {
     return 0
   fi
 
+  if ! compose -f docker-compose.prod.yml ps nginx 2>/dev/null | grep -qE 'running|Up'; then
+    print_info "Nginx is not running — skipping reload"
+    return 0
+  fi
+
   print_info "Nginx configuration changed — validating and reloading..."
   compose -f docker-compose.prod.yml exec -T nginx nginx -t
   compose -f docker-compose.prod.yml exec -T nginx nginx -s reload

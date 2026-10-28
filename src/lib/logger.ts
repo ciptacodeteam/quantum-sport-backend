@@ -1,4 +1,4 @@
-import { env } from '@/env'
+import { env, isDeployedEnv } from '@/env'
 import { pinoLogger } from 'hono-pino'
 import pino from 'pino'
 import pretty from 'pino-pretty'
@@ -6,7 +6,7 @@ import pretty from 'pino-pretty'
 // In serverless environments (Vercel), we use stdout
 // In local development, we can optionally write to files
 const isVercel = process.env.VERCEL === '1'
-const isProduction = env.nodeEnv === 'production'
+const isProduction = isDeployedEnv()
 
 const SENSITIVE_KEY =
   /^(password|token|refreshToken|accessToken|authorization|cookie|x-callback-token|card_number|cvv|secret)$/i

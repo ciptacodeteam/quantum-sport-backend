@@ -2,7 +2,7 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:16-alpine
-    container_name: quantum-sport-db-prod
+    container_name: quantum-sport-db-${DEPLOY_ENV:-prod}
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-.env}
@@ -40,7 +40,7 @@ services:
   # Redis Cache & Queue
   redis:
     image: redis:7-alpine
-    container_name: quantum-sport-redis-prod
+    container_name: quantum-sport-redis-${DEPLOY_ENV:-prod}
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-.env}
@@ -76,13 +76,13 @@ services:
       args:
         BUILDKIT_INLINE_CACHE: 1
     image: ${APP_IMAGE:-quantum-sport-backend:latest}
-    container_name: quantum-sport-app-prod
+    container_name: quantum-sport-app-${DEPLOY_ENV:-prod}
     restart: unless-stopped
     shm_size: '512mb'
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-8000}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379
@@ -127,12 +127,12 @@ services:
   # Email Queue Worker
   email-worker:
     image: ${APP_IMAGE:-quantum-sport-backend:latest}
-    container_name: quantum-sport-email-worker-prod
+    container_name: quantum-sport-email-worker-${DEPLOY_ENV:-prod}
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: ${DATABASE_URL_WORKER}
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -170,12 +170,12 @@ services:
   # Scheduler Worker (Transaction Expiry Checker)
   scheduler-worker:
     image: ${APP_IMAGE:-quantum-sport-backend:latest}
-    container_name: quantum-sport-scheduler-worker-prod
+    container_name: quantum-sport-scheduler-worker-${DEPLOY_ENV:-prod}
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: ${DATABASE_URL_WORKER}
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -217,11 +217,11 @@ services:
   # 3. Or change the port mapping (e.g., '8080:80')
   nginx:
     image: nginx:alpine
-    container_name: quantum-sport-nginx-prod
+    container_name: quantum-sport-nginx-${DEPLOY_ENV:-prod}
     restart: unless-stopped
     ports:
-      - '80:80'
-      - '443:443'
+      - '${NGINX_HTTP_PORT:-80}:80'
+      - '${NGINX_HTTPS_PORT:-443}:443'
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
@@ -257,7 +257,7 @@ services:
   # Renewal uses webroot so challenge files are written to certbot_www and nginx serves them.
   certbot:
     image: certbot/certbot:latest
-    container_name: quantum-sport-certbot
+    container_name: ${CERTBOT_CONTAINER_NAME:-quantum-sport-certbot}
     volumes:
       - certbot_certs:/etc/letsencrypt
       - certbot_www:/var/www/certbot
