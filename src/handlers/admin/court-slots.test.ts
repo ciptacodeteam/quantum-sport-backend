@@ -1,6 +1,7 @@
+vi.mock('@/services/rolling-court-schedule.service', () => ({ ensureRollingCourtSchedules: vi.fn() }))
 import { beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ slots: vi.fn() }))
-vi.mock('@/lib/prisma', () => ({ db: { slot: { findMany: mocks.slots } } }))
+const mocks = vi.hoisted(() => ({ slots: vi.fn(), oneSlot: vi.fn(), update: vi.fn(), fetched: vi.fn() }))
+vi.mock('@/lib/prisma', () => ({ db: { slot: { findMany: mocks.slots, findUnique: mocks.oneSlot }, $transaction: (fn: any) => fn({ slot: { updateMany: mocks.update, findUniqueOrThrow: mocks.fetched } }) } }))
 vi.mock('@/lib/create-app', () => ({
   factory: { createHandlers: (...handlers: unknown[]) => handlers },
 }))
@@ -13,7 +14,7 @@ vi.mock('@/services/costing.service', () => ({
   bulkUpdateCourtSlotPricing: vi.fn(),
   updateSlotPricing: vi.fn(),
 }))
-import { getAvailableCourtSlotsHandler } from './court.handler'
+import { getAvailableCourtSlotsHandler, updateCourtSlotAvailabilityHandler } from './court.handler'
 
 beforeEach(() => vi.clearAllMocks())
 const slot = {
@@ -72,5 +73,28 @@ it('preserves the available-only default for other callers', async () => {
   expect(mocks.slots.mock.calls[0][0].where).toMatchObject({
     isAvailable: true,
     bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } },
+  })
+})
+
+async function toggle(isAvailable = true) {
+  return (updateCourtSlotAvailabilityHandler.at(-1) as any)({
+    req: { valid: (target: string) => target === 'param' ? { id: 'slot' } : { isAvailable } },
+    var: { logger: { fatal: vi.fn() } }, json: (body: any) => body,
+  }, vi.fn())
+}
+it('rejects manually reopening slots with active bookings or weekly rule closures', async () => {
+  mocks.oneSlot.mockResolvedValue({ ...slot, type: 'COURT', isAvailable: false, bookingDetails: [{ id: 'booking-detail' }] })
+  await expect(toggle()).rejects.toThrow('active bookings')
+  mocks.oneSlot.mockResolvedValue({ ...slot, type: 'COURT', isAvailable: false, scheduleClosed: true })
+  await expect(toggle()).rejects.toThrow('aturan jadwal')
+  expect(mocks.update).not.toHaveBeenCalled()
+})
+it('rejects a manual toggle if a checkout changed availability concurrently', async () => {
+  mocks.oneSlot.mockResolvedValue({ ...slot, type: 'COURT', isAvailable: true })
+  mocks.update.mockResolvedValue({ count: 0 })
+  await expect(toggle(false)).rejects.toThrow('Status slot sudah berubah')
+  expect(mocks.update).toHaveBeenCalledWith({
+    where: { id: 'slot', isAvailable: true, bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } } },
+    data: { isAvailable: false },
   })
 })

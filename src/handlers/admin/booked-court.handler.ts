@@ -1,3 +1,6 @@
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
+import { canRescheduleAt } from '@/lib/reschedule-policy'
+import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
 import { assertCourtSportAtBranch } from '@/lib/court-branch-policy'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -700,8 +703,6 @@ export const getBookingsByCourtHandler = factory.createHandlers(
   },
 )
 
-const MIN_RESCHEDULE_DAYS = 3
-
 // Schema for cancel booking request
 const cancelBookingSchema = z.object({
   reason: z.string().min(1, 'Cancellation reason is required').optional(),
@@ -964,250 +965,281 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
       const { id: bookingDetailId } = c.req.valid('param') as IdSchema
       const { newSlotId } = c.req.valid('json') as RescheduleCourtSchema
 
-      const result = await db.$transaction(async (tx) => {
-        const bookingDetail = await tx.bookingDetail.findUnique({
-          where: { id: bookingDetailId },
-          include: {
-            slot: { include: { court: true } },
-            court: true,
-            booking: {
-              include: {
-                invoice: true,
-                coaches: {
-                  include: {
-                    slot: true,
-                  },
-                },
-              },
-            },
-          },
-        })
-
-        if (!bookingDetail) {
-          throw new NotFoundException('Booked court not found')
-        }
-
-        if (bookingDetail.booking.status === BookingStatus.CANCELLED) {
-          throw new BadRequestException('Cannot reschedule a cancelled booking')
-        }
-
-        const hoursUntilStart = dayjs(bookingDetail.slot.startAt).diff(
-          dayjs(),
-          'hour',
-          true,
-        )
-
-        if (hoursUntilStart < MIN_RESCHEDULE_DAYS * 24) {
-          throw new BadRequestException(
-            `Reschedule is only allowed at least ${MIN_RESCHEDULE_DAYS} days before play date`,
-          )
-        }
-
-        if (bookingDetail.slotId === newSlotId) {
-          throw new BadRequestException(
-            'Selected slot is the same as the current booking',
-          )
-        }
-
-        const newSlot = await tx.slot.findUnique({
-          where: { id: newSlotId },
-          include: {
-            court: true,
-          },
-        })
-
-        if (!newSlot || newSlot.type !== SlotType.COURT) {
-          throw new NotFoundException('Target court slot not found')
-        }
-
-        assertCourtSportAtBranch(newSlot.court?.sport, newSlot.court?.branchId)
-        if (newSlot.court?.isActive === false)
-          throw new BadRequestException('Lapangan tujuan tidak aktif.')
-
-        const sourceSport =
-          bookingDetail.court?.sport ?? bookingDetail.slot.court?.sport
-        if (
-          !sourceSport ||
-          !newSlot.court?.sport ||
-          sourceSport !== newSlot.court.sport
-        ) {
-          throw new BadRequestException(
-            'Reschedule hanya diperbolehkan ke lapangan dengan jenis olahraga yang sama (padel ke padel, tenis ke tenis)',
-          )
-        }
-
-        if (!newSlot.isAvailable) {
-          throw new BadRequestException('Selected slot is no longer available')
-        }
-
-        if (!newSlot.courtId) {
-          throw new BadRequestException(
-            'Selected slot must be associated with a court',
-          )
-        }
-
-        if (dayjs(newSlot.startAt).isBefore(dayjs())) {
-          throw new BadRequestException('Selected slot time has already passed')
-        }
-
-        // Before actually moving the court slot, check if there are coach slots
-        // at the same time that also need to be moved. If any corresponding
-        // coach slot is not available at the new time, block the reschedule.
-        const relatedCoaches = bookingDetail.booking.coaches.filter((coach) => {
-          return (
-            dayjs(coach.slot.startAt).isSame(bookingDetail.slot.startAt) &&
-            dayjs(coach.slot.endAt).isSame(bookingDetail.slot.endAt)
-          )
-        })
-
-        const coachSlotReplacements: {
-          bookingCoachId: string
-          oldSlotId: string
-          newSlotId: string
-        }[] = []
-
-        for (const coach of relatedCoaches) {
-          const coachSlot = await tx.slot.findFirst({
-            where: {
-              type: SlotType.COACH,
-              staffId: coach.slot.staffId,
-              startAt: newSlot.startAt,
-              endAt: newSlot.endAt,
-              isAvailable: true,
-            },
+      const result = await db.$transaction(
+        async (tx) => {
+          const bookingDetail = await tx.bookingDetail.findUnique({
+            where: { id: bookingDetailId },
             include: {
-              bookingCoaches: {
-                where: {
-                  status: {
-                    not: BookingStatus.CANCELLED,
-                  },
-                  booking: {
-                    status: {
-                      not: BookingStatus.CANCELLED,
+              slot: { include: { court: true } },
+              court: true,
+              booking: {
+                include: {
+                  invoice: true,
+                  membershipUser: { include: { membership: true } },
+                  coaches: {
+                    include: {
+                      slot: true,
                     },
                   },
                 },
-                select: { id: true },
-                take: 1,
               },
             },
           })
 
-          if (!coachSlot || coachSlot.bookingCoaches.length > 0) {
+          if (!bookingDetail) {
+            throw new NotFoundException('Booked court not found')
+          }
+
+          if (bookingDetail.booking.status !== BookingStatus.CONFIRMED) {
             throw new BadRequestException(
-              'Selected slot is not available for the assigned coach at the new time',
+              'Hanya booking terkonfirmasi yang dapat dijadwalkan ulang.',
+            )
+          }
+          if (
+            bookingDetail.booking.invoice &&
+            bookingDetail.booking.invoice.status !== PaymentStatus.PAID
+          ) {
+            throw new BadRequestException(
+              'Pembayaran harus lunas sebelum reschedule.',
+            )
+          }
+          if (!canRescheduleAt(bookingDetail.slot.startAt)) {
+            throw new BadRequestException(
+              'Reschedule maksimal H-2 (minimal 48 jam sebelum jadwal asal).',
             )
           }
 
-          coachSlotReplacements.push({
-            bookingCoachId: coach.id,
-            oldSlotId: coach.slotId,
-            newSlotId: coachSlot.id,
-          })
-        }
-
-        // Release old court slot and lock new court slot
-        await tx.slot.update({
-          where: { id: bookingDetail.slotId },
-          data: {
-            isAvailable: true,
-          },
-        })
-
-        await tx.slot.update({
-          where: { id: newSlot.id },
-          data: {
-            isAvailable: false,
-          },
-        })
-
-        const updatedDetail = await tx.bookingDetail.update({
-          where: { id: bookingDetailId },
-          data: {
-            slotId: newSlot.id,
-            price: newSlot.price,
-            courtId: newSlot.courtId,
-          },
-          include: {
-            slot: true,
-            court: true,
-          },
-        })
-
-        // Apply coach slot moves (if any)
-        for (const item of coachSlotReplacements) {
-          // release old coach slot
-          await tx.slot.update({
-            where: { id: item.oldSlotId },
-            data: {
-              isAvailable: true,
-            },
-          })
-
-          // lock new coach slot
-          await tx.slot.update({
-            where: { id: item.newSlotId },
-            data: {
-              isAvailable: false,
-            },
-          })
-
-          // move booking coach to new slot
-          await tx.bookingCoach.update({
-            where: { id: item.bookingCoachId },
-            data: {
-              slotId: item.newSlotId,
-            },
-          })
-        }
-
-        const priceDifference = newSlot.price - bookingDetail.price
-        let updatedBooking =
-          bookingDetail.booking as typeof bookingDetail.booking & {
-            invoice: typeof bookingDetail.booking.invoice
-            coaches: typeof bookingDetail.booking.coaches
+          if (bookingDetail.slotId === newSlotId) {
+            throw new BadRequestException(
+              'Selected slot is the same as the current booking',
+            )
           }
 
-        if (priceDifference !== 0) {
-          updatedBooking = (await tx.booking.update({
-            where: { id: bookingDetail.bookingId },
-            data: {
-              totalPrice: {
-                increment: priceDifference,
-              },
-            },
+          const newSlot = await tx.slot.findUnique({
+            where: { id: newSlotId },
             include: {
-              invoice: true,
-              coaches: {
-                include: {
-                  slot: true,
-                },
-              },
+              court: true,
             },
-          })) as typeof updatedBooking
+          })
 
-          if (bookingDetail.booking.invoice) {
-            await tx.invoice.update({
-              where: { id: bookingDetail.booking.invoice.id },
-              data: {
-                subtotal: {
-                  increment: priceDifference,
-                },
-                total: {
-                  increment: priceDifference,
+          if (!newSlot || newSlot.type !== SlotType.COURT) {
+            throw new NotFoundException('Target court slot not found')
+          }
+
+          assertCourtSportAtBranch(
+            newSlot.court?.sport,
+            newSlot.court?.branchId,
+          )
+          if (newSlot.court?.isActive === false)
+            throw new BadRequestException('Lapangan tujuan tidak aktif.')
+
+          const sourceSport =
+            bookingDetail.court?.sport ?? bookingDetail.slot.court?.sport
+          if (
+            !sourceSport ||
+            !newSlot.court?.sport ||
+            sourceSport !== newSlot.court.sport
+          ) {
+            throw new BadRequestException(
+              'Reschedule hanya diperbolehkan ke lapangan dengan jenis olahraga yang sama (padel ke padel, tenis ke tenis)',
+            )
+          }
+
+          if (newSlot.court?.branchId !== bookingDetail.booking.branchId) {
+            throw new BadRequestException(
+              'Reschedule hanya diperbolehkan dalam cabang yang sama.',
+            )
+          }
+          if (
+            newSlot.endAt.getTime() - newSlot.startAt.getTime() !==
+            bookingDetail.slot.endAt.getTime() -
+              bookingDetail.slot.startAt.getTime()
+          ) {
+            throw new BadRequestException(
+              'Durasi jadwal pengganti harus sama dengan jadwal asal.',
+            )
+          }
+          const usesMembership =
+            !!bookingDetail.booking.membershipUserId &&
+            (bookingDetail.booking.courtDiscountPrice === 0 ||
+              bookingDetail.discountPrice === 0)
+          if (
+            usesMembership &&
+            (!bookingDetail.booking.membershipUser ||
+              !isSlotAllowedForMembershipType(
+                bookingDetail.booking.membershipUser.membership.type,
+                newSlot.startAt,
+              ))
+          ) {
+            throw new BadRequestException(
+              'Jam pengganti tidak sesuai ketentuan membership.',
+            )
+          }
+          const oldCashPrice =
+            bookingDetail.discountPrice > 0
+              ? bookingDetail.discountPrice
+              : bookingDetail.price
+          const newCashPrice =
+            newSlot.discountPrice && newSlot.discountPrice > 0
+              ? newSlot.discountPrice
+              : newSlot.price
+          if (!usesMembership && oldCashPrice !== newCashPrice) {
+            throw new BadRequestException(
+              'Pilih jadwal pengganti dengan harga yang sama. Perubahan biaya tidak dapat diproses melalui reschedule.',
+            )
+          }
+
+          if (!newSlot.isAvailable) {
+            throw new BadRequestException(
+              'Selected slot is no longer available',
+            )
+          }
+
+          if (!newSlot.courtId) {
+            throw new BadRequestException(
+              'Selected slot must be associated with a court',
+            )
+          }
+
+          if (newSlot.startAt.getTime() <= Date.now()) {
+            throw new BadRequestException(
+              'Selected slot time has already passed',
+            )
+          }
+
+          // Before actually moving the court slot, check if there are coach slots
+          // at the same time that also need to be moved. If any corresponding
+          // coach slot is not available at the new time, block the reschedule.
+          const relatedCoaches = bookingDetail.booking.coaches.filter(
+            (coach) => {
+              return (
+                dayjs(coach.slot.startAt).isSame(bookingDetail.slot.startAt) &&
+                dayjs(coach.slot.endAt).isSame(bookingDetail.slot.endAt)
+              )
+            },
+          )
+
+          const coachSlotReplacements: {
+            bookingCoachId: string
+            oldSlotId: string
+            newSlotId: string
+          }[] = []
+
+          for (const coach of relatedCoaches) {
+            const coachSlot = await tx.slot.findFirst({
+              where: {
+                type: SlotType.COACH,
+                staffId: coach.slot.staffId,
+                startAt: newSlot.startAt,
+                endAt: newSlot.endAt,
+                isAvailable: true,
+              },
+              include: {
+                bookingCoaches: {
+                  where: {
+                    status: {
+                      not: BookingStatus.CANCELLED,
+                    },
+                    booking: {
+                      status: {
+                        not: BookingStatus.CANCELLED,
+                      },
+                    },
+                  },
+                  select: { id: true },
+                  take: 1,
                 },
               },
             })
-          }
-        }
 
-        return {
-          updatedDetail,
-          updatedBooking,
-          previousSlot: bookingDetail.slot,
-          priceDifference,
-        }
-      })
+            if (!coachSlot || coachSlot.bookingCoaches.length > 0) {
+              throw new BadRequestException(
+                'Selected slot is not available for the assigned coach at the new time',
+              )
+            }
+
+            coachSlotReplacements.push({
+              bookingCoachId: coach.id,
+              oldSlotId: coach.slotId,
+              newSlotId: coachSlot.id,
+            })
+          }
+
+          // Claim before releasing the original slot. Concurrent attempts cannot both win.
+          const claimed = await tx.slot.updateMany({
+            where: {
+              id: newSlot.id,
+              ...rollingBookingWindowWhere(),
+              type: SlotType.COURT,
+              isAvailable: true,
+              bookingDetails: {
+                none: { booking: { status: { not: BookingStatus.CANCELLED } } },
+              },
+            },
+            data: { isAvailable: false },
+          })
+          if (claimed.count !== 1) {
+            throw new BadRequestException(
+              'Jadwal pengganti baru saja dipesan. Silakan pilih jadwal lain.',
+            )
+          }
+          await tx.slot.update({
+            where: { id: bookingDetail.slotId },
+            data: { isAvailable: true },
+          })
+
+          const updatedDetail = await tx.bookingDetail.update({
+            where: { id: bookingDetailId },
+            data: {
+              slotId: newSlot.id,
+              price: newSlot.price,
+              courtId: newSlot.courtId,
+            },
+            include: {
+              slot: true,
+              court: true,
+            },
+          })
+
+          // Apply coach slot moves (if any)
+          for (const item of coachSlotReplacements) {
+            // release old coach slot
+            await tx.slot.update({
+              where: { id: item.oldSlotId },
+              data: {
+                isAvailable: true,
+              },
+            })
+
+            // lock new coach slot
+            await tx.slot.update({
+              where: { id: item.newSlotId },
+              data: {
+                isAvailable: false,
+              },
+            })
+
+            // move booking coach to new slot
+            await tx.bookingCoach.update({
+              where: { id: item.bookingCoachId },
+              data: {
+                slotId: item.newSlotId,
+              },
+            })
+          }
+
+          const priceDifference = 0
+          const updatedBooking = bookingDetail.booking
+
+          return {
+            updatedDetail,
+            updatedBooking,
+            previousSlot: bookingDetail.slot,
+            priceDifference,
+          }
+        },
+        { isolationLevel: 'Serializable' },
+      )
 
       return c.json(
         ok(

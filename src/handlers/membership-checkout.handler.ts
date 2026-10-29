@@ -1,3 +1,7 @@
+import {
+  paymentDeadline,
+  PAYMENT_WINDOW_MINUTES,
+} from '@/lib/booking-time-policy'
 import { env } from '@/env'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -101,6 +105,7 @@ export const membershipCheckoutHandler = factory.createHandlers(
         })
 
         // Create invoice
+        const issuedAt = new Date()
         const invoice = await tx.invoice.create({
           data: {
             userId: user.id,
@@ -110,8 +115,8 @@ export const membershipCheckoutHandler = factory.createHandlers(
             processingFee,
             total: finalTotal,
             status: PaymentStatus.PENDING,
-            dueDate: dayjs().add(1, 'day').toDate(),
-            issuedAt: new Date(),
+            dueDate: paymentDeadline(issuedAt),
+            issuedAt,
           },
         })
 
@@ -129,11 +134,7 @@ export const membershipCheckoutHandler = factory.createHandlers(
               select: { name: true, email: true, phone: true },
             })
             const expiryMinutes =
-              channelCode === 'CARDS'
-                ? undefined
-                : channelCode.includes('VIRTUAL_ACCOUNT')
-                  ? 24 * 60
-                  : 60
+              channelCode === 'CARDS' ? undefined : PAYMENT_WINDOW_MINUTES
             c.var.logger.info(
               `Creating Midtrans charge channel=${channelCode} amount=${finalTotal}`,
             )
@@ -162,7 +163,7 @@ export const membershipCheckoutHandler = factory.createHandlers(
             amount: finalTotal,
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
-            dueDate: dayjs().add(24, 'hours').toDate(),
+            dueDate: invoice.dueDate,
             externalRef: xenditInvoiceResponse?.transaction_id || null,
             meta: xenditInvoiceResponse
               ? {

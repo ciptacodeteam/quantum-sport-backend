@@ -1,3 +1,5 @@
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
+import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
 import { branchContext } from '@/lib/branch-context'
 import {
   supportedCourtWhere,
@@ -278,12 +280,14 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules()
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
         courtSport?: 'PADEL' | 'TENNIS'
       }
 
       const where: any = {
+        ...rollingBookingWindowWhere(),
         type: SlotType.COURT,
         isAvailable: true,
         bookingDetails: {
@@ -379,6 +383,7 @@ export const getCostHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules(c.req.valid('param').id)
       const { id } = c.req.valid('param') as IdSchema
 
       if (!(await db.court.findUnique({ where: { id } })))
@@ -394,7 +399,8 @@ export const getCostHandler = factory.createHandlers(
               'endAt', s."endAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
               'price', s.price,
               'discountPrice', s."discountPrice",
-              'isAvailable', s."isAvailable",
+              'isAvailable', (s."isAvailable" AND NOT s."scheduleClosed"),
+              'scheduleClosed', s."scheduleClosed",
               'createdAt', s."createdAt",
               'updatedAt', s."updatedAt"
             )
@@ -451,21 +457,29 @@ export const updateCourtSlotAvailabilityHandler = factory.createHandlers(
         throw new BadRequestException('Slot is not a court slot')
       }
 
-      // Prevent disabling slots that have active bookings
-      if (!isAvailable && slot.bookingDetails.length > 0) {
+      if (isAvailable && slot.scheduleClosed) {
+        throw new BadRequestException('Slot ditutup oleh aturan jadwal. Ubah hari atau jam pada pengaturan jadwal otomatis.')
+      }
+
+      // Active bookings must never be released via the manual availability toggle.
+      if (slot.bookingDetails.length > 0) {
         throw new BadRequestException(
-          'Cannot disable court slot with active bookings',
+          'Cannot change availability of court slot with active bookings',
         )
       }
 
-      const updatedSlot = await db.slot.update({
-        where: { id },
-        data: {
-          isAvailable,
-        },
-        include: {
-          court: true,
-        },
+      const updatedSlot = await db.$transaction(async tx => {
+        const changed = await tx.slot.updateMany({
+          where: {
+            id,
+            isAvailable: slot.isAvailable,
+            ...(isAvailable ? { scheduleClosed: false } : {}),
+            bookingDetails: { none: { booking: { status: { not: BookingStatus.CANCELLED } } } },
+          },
+          data: { isAvailable },
+        })
+        if (changed.count !== 1) throw new BadRequestException('Status slot sudah berubah. Muat ulang jadwal terlebih dahulu.')
+        return tx.slot.findUniqueOrThrow({ where: { id }, include: { court: true } })
       })
 
       // Transform court image if exists

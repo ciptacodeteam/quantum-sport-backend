@@ -271,6 +271,10 @@ model Court {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @default(now()) @updatedAt
 
+  bookingWindowMonths Int?
+  rollingPricing Json?
+  slotsGeneratedThrough DateTime? @db.Date
+
   costSchedules CourtCostSchedule[]
   bookingDetail BookingDetail[]
   slot          Slot[]
@@ -352,6 +356,8 @@ model Slot {
   isAvailable   Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
+
+  scheduleClosed Boolean @default(false)
 
   court Court? @relation(fields: [courtId], references: [id])
   staff Staff? @relation(fields: [staffId], references: [id])

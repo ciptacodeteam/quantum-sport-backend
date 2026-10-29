@@ -1,3 +1,5 @@
+import { rollingCourtPricingSchema } from '@/lib/rolling-booking-window'
+import { saveRollingCourtSchedule } from '@/services/rolling-court-schedule.service'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import {
@@ -22,7 +24,7 @@ import { err, ok } from '@/lib/response'
 import status from 'http-status'
 import { db } from '@/lib/prisma'
 import buildFindManyOptions from '@/lib/query'
-import { NotFoundException } from '@/exceptions'
+import { BadRequestException, NotFoundException } from '@/exceptions'
 import dayjs from 'dayjs'
 import { DATETIME_FORMAT } from '@/constants'
 
@@ -60,6 +62,14 @@ export const createCourtCostHandler = factory.createHandlers(
   async (c) => {
     try {
       const validated = c.req.valid('json') as CreateCourtCostSchema
+      const court = await db.court.findUnique({
+        where: { id: validated.courtId },
+      })
+      if (!court) throw new NotFoundException('Court not found')
+      if (court.bookingWindowMonths)
+        throw new BadRequestException(
+          'Gunakan pengaturan jadwal berjalan untuk lapangan ini.',
+        )
       const {
         courtId,
         fromDate,
@@ -185,5 +195,13 @@ export const overrideSingleCourtCostHandler = factory.createHandlers(
       c.var.logger.error(`Error updating court cost: ${error}`)
       throw error
     }
+  },
+)
+
+export const saveRollingCourtScheduleHandler = factory.createHandlers(
+  zValidator('json', rollingCourtPricingSchema, validateHook),
+  async (c) => {
+    const result = await saveRollingCourtSchedule(c.req.valid('json'))
+    return c.json(ok(result, 'Jadwal berjalan berhasil disimpan'), status.OK)
   },
 )

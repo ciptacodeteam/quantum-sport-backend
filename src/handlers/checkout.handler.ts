@@ -1,3 +1,9 @@
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
+import {
+  courtBookingCutoff,
+  paymentDeadline,
+  PAYMENT_WINDOW_MINUTES,
+} from '@/lib/booking-time-policy'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
 import { assertClientCheckoutHasNoAddOns } from '@/lib/client-checkout-policy'
 import { consumeMembershipHours } from '@/services/membership-checkout.service'
@@ -308,6 +314,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
           const courtSlotData = await tx.slot.findMany({
             where: {
               id: { in: courtSlots },
+              ...rollingBookingWindowWhere(),
               type: SlotType.COURT,
               isAvailable: true,
               court: { is: bookableCourtWhere },
@@ -577,11 +584,23 @@ export const checkoutHandler = factory.createHandlers(
         ballboySlots: rawBallboySlots,
         inventories,
         useMembership,
+        membershipCourtSlotIds,
+        membershipUserId,
         promoCode: rawPromoCode,
       } = validated
 
       // Clean slot IDs to remove any accidentally appended time suffixes
       const courtSlots = cleanSlotIds(rawCourtSlots)
+      const explicitMembershipSelection = membershipCourtSlotIds !== undefined
+      const membershipSlotIds = new Set<string>(membershipCourtSlotIds ?? [])
+      if (
+        explicitMembershipSelection &&
+        (membershipSlotIds.size !== membershipCourtSlotIds.length ||
+          [...membershipSlotIds].some((id) => !courtSlots?.includes(id)) ||
+          (useMembership === false && membershipSlotIds.size > 0))
+      ) {
+        throw new BadRequestException('Pilihan slot membership tidak valid.')
+      }
       const coachSlots = cleanSlotIds(rawCoachSlots)
       const ballboySelections = normalizeBallboySelections(rawBallboySlots)
       const ballboySlots = Array.from(
@@ -613,6 +632,7 @@ export const checkoutHandler = factory.createHandlers(
       // Use one cutoff for the entire transaction. Client-side filtering is only
       // a UX aid; checkout must reject stale carts and direct API requests too.
       const checkoutStartedAt = new Date()
+      const courtCutoff = courtBookingCutoff(checkoutStartedAt)
 
       const result = await db.$transaction(async (tx) => {
         // Find or create booking
@@ -727,6 +747,7 @@ export const checkoutHandler = factory.createHandlers(
           const courtSlotData = await tx.slot.findMany({
             where: {
               id: { in: courtSlots },
+              ...rollingBookingWindowWhere(),
               type: SlotType.COURT,
               isAvailable: true,
               court: { is: bookableCourtWhere },
@@ -758,11 +779,11 @@ export const checkoutHandler = factory.createHandlers(
           }
           if (
             courtSlotData.some(
-              (slot) => slot.startAt.getTime() <= checkoutStartedAt.getTime(),
+              (slot) => slot.startAt.getTime() <= courtCutoff.getTime(),
             )
           ) {
             throw new BadRequestException(
-              'One or more court slots have already started',
+              'One or more court slots are past the 15-minute booking grace period',
             )
           }
           selectedCourtSlots = courtSlotData
@@ -777,8 +798,11 @@ export const checkoutHandler = factory.createHandlers(
             )
           }
           selectedCourtSport = courtSports[0] ?? null
+          const membershipSlots = explicitMembershipSelection
+            ? courtSlotData.filter((slot) => membershipSlotIds.has(slot.id))
+            : courtSlotData
           membershipSessionsToUse =
-            calculateMembershipSessionsForCourtSlots(courtSlotData)
+            calculateMembershipSessionsForCourtSlots(membershipSlots)
 
           if (
             useMembership &&
@@ -788,6 +812,7 @@ export const checkoutHandler = factory.createHandlers(
             const membershipCandidates = await tx.membershipUser.findMany({
               where: {
                 userId: user.id,
+                ...(membershipUserId ? { id: membershipUserId } : {}),
                 isExpired: false,
                 isSuspended: false,
                 startDate: { lte: new Date() },
@@ -808,13 +833,23 @@ export const checkoutHandler = factory.createHandlers(
 
             activeMembership =
               membershipCandidates.find((candidate) =>
-                courtSlotData.every((slot) =>
+                membershipSlots.every((slot) =>
                   isSlotAllowedForMembershipType(
                     candidate.membership.type,
                     slot.startAt,
                   ),
                 ),
               ) ?? null
+          }
+
+          if (
+            explicitMembershipSelection &&
+            membershipSlotIds.size > 0 &&
+            !activeMembership
+          ) {
+            throw new BadRequestException(
+              'Membership tidak tersedia, kuota tidak cukup, atau jam yang dipilih tidak sesuai paket.',
+            )
           }
 
           for (const slot of courtSlotData) {
@@ -828,7 +863,7 @@ export const checkoutHandler = factory.createHandlers(
           await claimSlotsAtomically(tx, {
             slotIds: courtSlots,
             type: SlotType.COURT,
-            startsAfter: checkoutStartedAt,
+            startsAfter: courtCutoff,
             unavailableMessage:
               'One or more court slots not found or unavailable',
           })
@@ -839,7 +874,11 @@ export const checkoutHandler = factory.createHandlers(
               slot.discountPrice && slot.discountPrice > 0
                 ? slot.discountPrice
                 : slot.price
-            const paidCourtPrice = activeMembership ? 0 : discountedPrice
+            const paidCourtPrice =
+              activeMembership &&
+              (!explicitMembershipSelection || membershipSlotIds.has(slot.id))
+                ? 0
+                : discountedPrice
             courtNormalPrice += normalPrice
             courtDiscountPrice += paidCourtPrice
             totalPrice += paidCourtPrice
@@ -1378,9 +1417,7 @@ export const checkoutHandler = factory.createHandlers(
               : PaymentStatus.PENDING,
             paidAt: coveredByMembership ? issuedAt : null,
             // dueDate is required even when membership settles the invoice immediately.
-            dueDate: coveredByMembership
-              ? issuedAt
-              : dayjs(issuedAt).add(15, 'minutes').toDate(),
+            dueDate: coveredByMembership ? issuedAt : paymentDeadline(issuedAt),
             issuedAt,
           },
         })
@@ -1453,7 +1490,8 @@ export const checkoutHandler = factory.createHandlers(
               orderId: invoiceNumber,
               amount: finalTotal,
               channelCode,
-              expiryMinutes: channelCode === 'CARDS' ? undefined : 15,
+              expiryMinutes:
+                channelCode === 'CARDS' ? undefined : PAYMENT_WINDOW_MINUTES,
               tokenId: validated.cardPayment?.tokenId,
               customer: userDetails ?? undefined,
               description: `Payment for booking ${booking.id}`,
@@ -1474,7 +1512,7 @@ export const checkoutHandler = factory.createHandlers(
             amount: finalTotal,
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
-            dueDate: dayjs().add(15, 'minutes').toDate(),
+            dueDate: invoice.dueDate,
             externalRef: xenditInvoiceResponse?.transaction_id || null,
             meta: xenditInvoiceResponse
               ? {
@@ -1502,8 +1540,8 @@ export const checkoutHandler = factory.createHandlers(
           data: { paymentId: payment.id },
         })
 
-        // Set hold expiry (15 minutes for all payment methods)
-        const holdExpiresAt = dayjs().add(15, 'minutes').toDate()
+        // Keep the reservation and payment on the same deadline.
+        const holdExpiresAt = invoice.dueDate
 
         // Update booking status to HOLD
         await tx.booking.update({
@@ -1641,7 +1679,10 @@ export const cancelPaymentSessionHandler = factory.createHandlers(
         },
         include: { invoice: { select: { userId: true } } },
       })
-      const meta = payment?.meta as { gateway?: string; order_id?: string } | null
+      const meta = payment?.meta as {
+        gateway?: string
+        order_id?: string
+      } | null
       if (meta?.gateway === 'midtrans' && meta.order_id) {
         if (payment?.invoice && payment.invoice.userId !== user.id) {
           throw new NotFoundException(

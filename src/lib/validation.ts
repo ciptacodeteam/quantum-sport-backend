@@ -889,6 +889,8 @@ export const extendedCheckoutSchema = z.object({
   paymentMethodId: z.string().optional(),
   useMembership: z.boolean().optional().default(true),
   courtSlots: z.array(z.string()).optional(),
+  membershipCourtSlotIds: z.array(z.string()).optional(),
+  membershipUserId: z.string().optional(),
   coachSlots: z.array(z.string()).optional(),
   ballboySlots: z.array(ballboySelectionSchema).optional(),
   inventories: z

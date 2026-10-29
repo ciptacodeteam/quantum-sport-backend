@@ -1,3 +1,4 @@
+import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
 import { Queue, Worker } from 'bullmq'
 import { db } from '@/lib/prisma'
 import { BookingStatus, PaymentStatus } from '@prisma/client'
@@ -160,10 +161,7 @@ export async function checkExpiredTransactions() {
 
           // Delete membership user if payment expired (not yet paid)
           if (payment.invoice.membershipUser) {
-            await discardUnpaidMembership(
-              tx,
-              payment.invoice.membershipUser.id,
-            )
+            await discardUnpaidMembership(tx, payment.invoice.membershipUser.id)
             log.info(
               `Deleted unpaid membership ${payment.invoice.membershipUser.id}`,
             )
@@ -365,6 +363,9 @@ export function startSchedulerWorker() {
     async (job) => {
       if (job.name === 'check-expired-transactions') {
         log.info('Running scheduled expiry check...')
+        await ensureRollingCourtSchedules().catch((error) =>
+          log.error(`Rolling schedule generation failed: ${error}`),
+        )
         const [expiredResult, inventoryResult] = await Promise.all([
           checkExpiredTransactions(),
           restoreCompletedInventorySessions(),
