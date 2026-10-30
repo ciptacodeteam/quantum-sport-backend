@@ -2,11 +2,15 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@/types'
 import { branchContext } from '@/lib/branch-context'
-const mocks = vi.hoisted(() => ({ staff: vi.fn(), branch: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  staff: vi.fn(),
+  branch: vi.fn(),
+  branches: vi.fn(),
+}))
 vi.mock('@/lib/prisma', () => ({
   db: {
     staff: { findUnique: mocks.staff },
-    branch: { findFirst: mocks.branch },
+    branch: { findFirst: mocks.branch, findMany: mocks.branches },
   },
 }))
 import { branchMiddleware } from './branch'
@@ -40,6 +44,16 @@ beforeEach(() => {
       ? { id: where.id, isActive: true }
       : null,
   )
+  mocks.branches.mockResolvedValue([{ id: 'cemara' }, { id: 's-parman' }])
+})
+it('keeps the only active branch when an old client omits the header', async () => {
+  mocks.branches.mockResolvedValue([{ id: 'cemara' }])
+  expect(await (await app.request('/courts')).json()).toMatchObject({
+    branchId: 'cemara',
+  })
+  expect(await (await app.request('/checkout')).json()).toMatchObject({
+    branchId: 'cemara',
+  })
 })
 it('requires an active branch for public booking and checkout', async () => {
   expect((await app.request('/courts')).status).toBe(400)

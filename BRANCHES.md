@@ -6,9 +6,9 @@ Akun pelanggan dan saldo MembershipUser terpusat. Data operasional memiliki bran
 
 1. Cadangkan database dengan prosedur operasional yang biasa dipakai.
 2. Jalankan `bun run db:generate`.
-3. Jalankan `bun run db:setup-branches --super-admin-email=superadmin@quantumsocialclub.com --from-admin-email=admin@quantum.com` dengan DATABASE_URL database tujuan. Skrip menerapkan `prisma/branches.sql` secara transaksional tanpa menghapus booking, invoice, atau saldo. Akun sumber wajib merupakan ADMIN aktif; pergantian email mempertahankan password akun sumber. Tanpa opsi email, hanya struktur cabang yang dipasang.
-4. Restart backend, deploy frontend, dan login kembali ke dashboard.
-5. Super admin memilih cabang sebelum membuat lapangan, jadwal, inventori, atau staf. Gunakan **Kelola cabang** untuk menugaskan staf dan mengatur cakupan membership. Cabang S. Parman mulai tanpa data lapangan: buat fasilitas yang benar di cabang tersebut.
+3. Pratinjau dulu: `bun run db:setup-branches`. Lalu terapkan dengan `bun run db:setup-branches --apply --super-admin-email=EMAIL_ADMIN_YANG_SUDAH_ADA`. Skrip menolak lanjut jika jumlah baris berkurang atau ada data lama di luar Cemara. Email dan password admin tidak diubah. S. Parman dibuat nonaktif.
+4. Setelah itu baru deploy backend dan frontend. App lama boleh tetap jalan selama SQL berjalan. Jangan deploy image baru sebelum `--apply` selesai.
+5. Super admin memilih cabang sebelum membuat lapangan, jadwal, inventori, atau staf. Aktifkan S. Parman dari kelola cabang hanya setelah lapangan dan jadwalnya ada.
 
 Jangan memakai `db:fresh` atau seed contoh untuk migrasi data produksi. `db:push` saja tidak membuat dua cabang awal atau cakupan membership; gunakan skrip setup.
 
