@@ -2,11 +2,35 @@ vi.mock('@/services/tariff-policy.service', () => ({
   getTariffPeriods: vi.fn().mockResolvedValue([]),
 }))
 import { beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({
-  db: { paymentMethod: { findUnique: vi.fn() }, $transaction: vi.fn() },
-  gateway: { charge: vi.fn(), cancel: vi.fn() },
-  notify: vi.fn(),
-}))
+const mocks = vi.hoisted(() => {
+  const charge = vi.fn()
+  const gateway = {
+    charge,
+    cancel: vi.fn(),
+    checkoutMode: vi.fn(() => 'core' as const),
+    initiateCheckoutPayment: vi.fn(async (input: Record<string, unknown>) => {
+      const result = await charge(input)
+      return {
+        mode: 'core' as const,
+        charge: result,
+        meta: {
+          gateway: 'midtrans',
+          checkout_mode: 'core',
+          payment_request_id: result.transaction_id,
+          transaction_id: result.transaction_id,
+          order_id: input.orderId,
+          status: result.status,
+          actions: result.actions,
+        },
+      }
+    }),
+  }
+  return {
+    db: { paymentMethod: { findUnique: vi.fn() }, $transaction: vi.fn() },
+    gateway,
+    notify: vi.fn(),
+  }
+})
 vi.mock('@/lib/prisma', () => ({ db: mocks.db }))
 vi.mock('@/env', () => ({
   env: {
@@ -15,6 +39,7 @@ vi.mock('@/env', () => ({
       serverKey: 'SB-Mid-server-test',
       clientKey: 'SB-Mid-client-test',
       merchantId: 'M',
+      checkoutMode: 'core' as const,
     },
     frontEndUrl: 'http://localhost:3000',
   },

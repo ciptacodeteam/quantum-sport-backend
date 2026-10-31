@@ -5,6 +5,7 @@ import {
   buildChargeBody,
   isPaidStatus,
   normalizeCharge,
+  snapEnabledPayments,
   validSignature,
 } from './midtrans.service'
 
@@ -124,5 +125,13 @@ describe('midtrans charge mapping', () => {
     expect(() =>
       buildChargeBody({ orderId: 'INV-1', amount: 10000, channelCode: 'CARDS' }),
     ).toThrow('Card token is required')
+  })
+
+  it('maps master-data channels to Snap enabled_payments', () => {
+    expect(snapEnabledPayments('CIMB_VIRTUAL_ACCOUNT')).toEqual(['cimb_va'])
+    expect(snapEnabledPayments('MANDIRI_VIRTUAL_ACCOUNT')).toEqual(['echannel'])
+    expect(snapEnabledPayments('QRIS')).toEqual(['other_qris'])
+    expect(snapEnabledPayments('CARDS')).toEqual(['credit_card'])
+    expect(() => snapEnabledPayments('BSI_VIRTUAL_ACCOUNT')).toThrow('Snap')
   })
 })
