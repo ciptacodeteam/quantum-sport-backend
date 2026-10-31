@@ -2,7 +2,7 @@ import {
   bookingCheckoutTypes,
   bookingCheckoutWhere,
 } from '@/lib/booking-checkout'
-import clubTime, { formatClubWallClock } from '@/lib/club-time'
+import { formatClubWallClock } from '@/lib/club-time'
 import { getOngoingSchedule } from '@/lib/ongoing-schedule'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'

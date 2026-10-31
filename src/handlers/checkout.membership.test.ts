@@ -295,13 +295,14 @@ it.each([
 })
 
 function mixedSlots() {
+  // Wall-clock hours (timestamp without time zone): 14–15 happy, 15–16 peak boundary, 16–17 peak
   const slots = [14, 15, 16].map((hour, index) => ({
     id: `slot-${index}`,
     courtId: 'court',
     price: 200000,
     discountPrice: index === 1 ? 150000 : 0,
-    startAt: new Date(`2030-10-23T${hour}:00:00+07:00`),
-    endAt: new Date(`2030-10-23T${hour + 1}:00:00+07:00`),
+    startAt: new Date(`2030-10-23T${hour}:00:00Z`),
+    endAt: new Date(`2030-10-23T${hour + 1}:00:00Z`),
     court: { sport: 'PADEL' },
     bookingDetails: [],
   }))

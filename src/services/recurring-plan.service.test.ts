@@ -3,7 +3,7 @@ import type { Court } from '@prisma/client'
 const mocks = vi.hoisted(() => ({ rules: vi.fn() }))
 vi.mock('./tariff-policy.service', () => ({ getTariffPeriods: mocks.rules }))
 import { planRecurringSessions, recurringEnd } from './recurring-plan.service'
-import dayjs, { toClubWallDate } from '@/lib/club-time'
+import { toClubWallDate } from '@/lib/club-time'
 const now = new Date('2026-10-30T03:00:00Z')
 const court = {
   id: 'a',
