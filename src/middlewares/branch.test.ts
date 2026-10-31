@@ -2,11 +2,15 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@/types'
 import { branchContext } from '@/lib/branch-context'
-const mocks = vi.hoisted(() => ({ staff: vi.fn(), branch: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  staff: vi.fn(),
+  branch: vi.fn(),
+  branches: vi.fn(),
+}))
 vi.mock('@/lib/prisma', () => ({
   db: {
     staff: { findUnique: mocks.staff },
-    branch: { findFirst: mocks.branch },
+    branch: { findFirst: mocks.branch, findMany: mocks.branches },
   },
 }))
 import { branchMiddleware } from './branch'
@@ -40,6 +44,16 @@ beforeEach(() => {
       ? { id: where.id, isActive: true }
       : null,
   )
+  mocks.branches.mockResolvedValue([{ id: 'cemara' }, { id: 's-parman' }])
+})
+it('keeps the only active branch when an old client omits the header', async () => {
+  mocks.branches.mockResolvedValue([{ id: 'cemara' }])
+  expect(await (await app.request('/courts')).json()).toMatchObject({
+    branchId: 'cemara',
+  })
+  expect(await (await app.request('/checkout')).json()).toMatchObject({
+    branchId: 'cemara',
+  })
 })
 it('requires an active branch for public booking and checkout', async () => {
   expect((await app.request('/courts')).status).toBe(400)
@@ -87,10 +101,10 @@ it('allows the actual super admin to select a branch or read combined data despi
     ).json(),
   ).toMatchObject({ branchId: 's-parman', superAdmin: true })
 })
-it('keeps customer history shared while scoping active membership eligibility', async () => {
+it('keeps the entire customer Value Pack flow branch-independent', async () => {
   expect((await app.request('/memberships/my/tracking')).status).toBe(200)
   expect((await app.request('/memberships/my')).status).toBe(200)
-  expect((await app.request('/memberships/my/active')).status).toBe(400)
+  expect((await app.request('/memberships/my/active')).status).toBe(200)
   expect((await app.request('/invoices/INV-TEST')).status).toBe(200)
 })
 it('uses the selling branch for financial reports and membership transaction administration', async () => {
@@ -134,3 +148,22 @@ it('keeps admin banners global even when a branch header is present', async () =
     expect(mocks.branch).not.toHaveBeenCalled()
   }
 })
+it.each([
+  '/memberships',
+  '/memberships/product',
+  '/memberships/checkout',
+  '/memberships/product/renewal-preview',
+])(
+  'does not require or inherit the selected booking branch for %s',
+  async (path) => {
+    expect((await app.request(path)).status).toBe(200)
+    const response = await app.request(path, {
+      headers: { 'X-Branch-ID': 'unrelated-old-branch' },
+    })
+    expect(response.status).toBe(200)
+    expect(
+      ((await response.json()) as { branchId?: string }).branchId,
+    ).toBeUndefined()
+    expect(mocks.branch).not.toHaveBeenCalled()
+  },
+)

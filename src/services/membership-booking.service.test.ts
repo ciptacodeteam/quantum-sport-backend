@@ -39,7 +39,7 @@ describe('restoreMembershipSessionsForCancelledBooking', () => {
     expect(tx.membershipUser.update).toHaveBeenCalledWith({
       where: { id: 'membership-user-1' },
       data: {
-        remainingSessions: 10,
+        remainingSessions: { increment: 2 },
         isExpired: false,
       },
     })
@@ -63,7 +63,7 @@ describe('restoreMembershipSessionsForCancelledBooking', () => {
     expect(tx.membershipUser.update).toHaveBeenCalledWith({
       where: { id: 'membership-user-2' },
       data: {
-        remainingSessions: 1,
+        remainingSessions: { increment: 1 },
         isExpired: false,
       },
     })

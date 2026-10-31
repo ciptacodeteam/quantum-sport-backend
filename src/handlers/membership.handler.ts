@@ -151,6 +151,7 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
       const activeMembership = await db.membershipUser.findFirst({
         where: {
           userId: user.id,
+          remainingSessions: { gt: 0 },
           isExpired: false,
           isSuspended: false,
           startDate: { lte: now }, // Membership must have started
@@ -168,6 +169,7 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
               id: true,
               name: true,
               price: true,
+              sessions: true,
               sport: true,
               type: true,
             },
@@ -190,6 +192,7 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
                   price: activeMembership.membership.price,
+                  sessions: activeMembership.membership.sessions,
                   sport: activeMembership.membership.sport,
                   type: activeMembership.membership.type,
                 },

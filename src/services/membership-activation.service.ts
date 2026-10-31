@@ -1,3 +1,8 @@
+import {
+  applyPaidMembershipRenewal,
+  lockCustomerWallet,
+  withCustomerWallet,
+} from './membership-renewal.service'
 import type { Prisma } from '@prisma/client'
 import dayjs from 'dayjs'
 
@@ -19,44 +24,55 @@ type MembershipActivationDb = {
  * Duration starts at payment time so unpaid checkout wait does not consume days.
  */
 export async function activateMembershipAfterPayment(
-  tx: MembershipActivationDb,
+  tx: Prisma.TransactionClient,
   membershipUserId: string,
   now = new Date(),
 ): Promise<boolean> {
-  const membershipUser = await tx.membershipUser.findUnique({
-    where: { id: membershipUserId },
-    include: {
-      membership: {
-        select: {
-          duration: true,
+  return withCustomerWallet(async () => {
+    const identity = await tx.membershipUser.findUnique({
+      where: { id: membershipUserId },
+      select: { userId: true },
+    })
+    if (!identity) return false
+    await lockCustomerWallet(tx, identity.userId)
+    const membershipUser = await tx.membershipUser.findUnique({
+      where: { id: membershipUserId },
+      include: {
+        membership: {
+          select: {
+            duration: true,
+          },
         },
+        invoice: { select: { status: true } },
       },
-    },
+    })
+
+    if (!membershipUser || membershipUser.invoice?.status !== 'PAID') {
+      return false
+    }
+
+    if (membershipUser.renewalAppliedAt) return true
+    const startDate = now
+    const endDate = dayjs(now)
+      .add(membershipUser.membership.duration, 'days')
+      .toDate()
+
+    await tx.membershipUser.update({
+      where: { id: membershipUserId },
+      data: {
+        startDate,
+        endDate,
+        remainingDuration: membershipUser.membership.duration,
+        isExpired: false,
+        isSuspended: false,
+        suspensionReason: null,
+        suspensionEndDate: null,
+      },
+    })
+
+    await applyPaidMembershipRenewal(tx, membershipUserId, now)
+    return true
   })
-
-  if (!membershipUser) {
-    return false
-  }
-
-  const startDate = now
-  const endDate = dayjs(now)
-    .add(membershipUser.membership.duration, 'days')
-    .toDate()
-
-  await tx.membershipUser.update({
-    where: { id: membershipUserId },
-    data: {
-      startDate,
-      endDate,
-      remainingDuration: membershipUser.membership.duration,
-      isExpired: false,
-      isSuspended: false,
-      suspensionReason: null,
-      suspensionEndDate: null,
-    },
-  })
-
-  return true
 }
 
 /**

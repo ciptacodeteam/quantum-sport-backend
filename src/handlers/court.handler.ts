@@ -1,3 +1,6 @@
+import { courtBookingRange } from '@/lib/court-booking-range'
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
+import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
 import {
   supportedCourtWhere,
   assertCourtSportAtBranch,
@@ -54,6 +57,7 @@ export const getAllCourtHandler = factory.createHandlers(
   ),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules()
       const query = c.req.valid('query') as SearchQuerySchema & {
         startAt?: string
         endAt?: string
@@ -66,6 +70,7 @@ export const getAllCourtHandler = factory.createHandlers(
 
       // Build where clause for available slots
       const slotWhere: any = {
+        ...rollingBookingWindowWhere(),
         type: SlotType.COURT,
         isAvailable: true,
         bookingDetails: {
@@ -163,6 +168,7 @@ export const getCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules()
       const { id: courtId } = c.req.valid('param') as IdSchema
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema
 
@@ -178,6 +184,7 @@ export const getCourtSlotsHandler = factory.createHandlers(
 
       // Build where clause
       const where: any = {
+        ...rollingBookingWindowWhere(),
         type: SlotType.COURT,
         courtId,
         isAvailable: true,
@@ -245,12 +252,14 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules()
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
         courtSport?: 'PADEL' | 'TENNIS'
       }
 
       const where: any = {
+        ...rollingBookingWindowWhere(),
         type: SlotType.COURT,
         isAvailable: true,
         bookingDetails: {
@@ -339,5 +348,37 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
       c.var.logger.fatal(`Error in getAvailableCourtSlotsHandler: ${error}`)
       throw error
     }
+  },
+)
+
+export const getCourtBookingWindowHandler = factory.createHandlers(
+  zValidator(
+    'query',
+    z.object({ courtSport: z.enum(['PADEL', 'TENNIS']).optional() }),
+    validateHook,
+  ),
+  async (c) => {
+    const { courtSport } = c.req.valid('query')
+    const courts = await db.court.findMany({
+      where: {
+        isActive: true,
+        ...supportedCourtWhere,
+        ...(courtSport ? { sport: courtSport } : {}),
+      },
+      select: {
+        bookingWindowMonths: true,
+        slot: {
+          where: {
+            type: 'COURT',
+            scheduleClosed: false,
+            startAt: { gte: dayjs().startOf('day').toDate() },
+          },
+          orderBy: { startAt: 'desc' },
+          take: 1,
+          select: { startAt: true },
+        },
+      },
+    })
+    return c.json(ok(courtBookingRange(courts)), status.OK)
   },
 )

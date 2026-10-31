@@ -58,14 +58,11 @@ export function branchWhere(
       ? { branchId, role: { not: 'SUPER_ADMIN' } }
       : { branchId }
   if (parents[model]) return { [parents[model]]: { branchId } }
-  // Membership has one shared balance, with explicit eligible branches.
-  if (model === 'Membership') return { branches: { some: { branchId } } }
+  // Products and customer quota are shared across playing locations. Only
+  // financial sales reports retain the purchase invoice's branch attribution.
+  if (model === 'Membership' || model === 'MembershipBenefit') return null
   if (model === 'MembershipUser')
-    return context.membershipMode === 'sales'
-      ? { invoice: { branchId } }
-      : { membership: { branches: { some: { branchId } } } }
-  if (model === 'MembershipBenefit')
-    return { membership: { branches: { some: { branchId } } } }
+    return context.membershipMode === 'sales' ? { invoice: { branchId } } : null
   if (model === 'MembershipBranch') return { branchId }
   if (model === 'AuthToken' && context.isAdmin) return { staff: { branchId } }
   return null

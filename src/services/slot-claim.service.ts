@@ -1,3 +1,4 @@
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import { BadRequestException } from '@/exceptions'
 import type { Prisma, SlotType } from '@prisma/client'
 
@@ -13,11 +14,16 @@ export async function claimSlotsAtomically(
     slotIds,
     type,
     startsAfter,
+    windowAt,
+    allowOutsideWindow = false,
     unavailableMessage = 'One or more slots not found or unavailable',
   }: {
     slotIds: string[]
     type: SlotType
     startsAfter?: Date
+    windowAt?: Date
+    /** Trusted recurring scheduler only; regular checkout always enforces the public horizon. */
+    allowOutsideWindow?: boolean
     unavailableMessage?: string
   },
 ): Promise<void> {
@@ -31,6 +37,16 @@ export async function claimSlotsAtomically(
       id: { in: uniqueSlotIds },
       type,
       isAvailable: true,
+      ...(type === 'COURT'
+        ? {
+            ...(allowOutsideWindow
+              ? { scheduleClosed: false }
+              : rollingBookingWindowWhere(windowAt)),
+            bookingDetails: {
+              none: { booking: { status: { not: 'CANCELLED' } } },
+            },
+          }
+        : {}),
       ...(startsAfter ? { startAt: { gt: startsAfter } } : {}),
     },
     data: {

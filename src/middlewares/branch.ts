@@ -11,7 +11,6 @@ const publicBranchPaths = [
   '/classes',
   '/partnerships',
   '/checkout',
-  '/memberships',
 ]
 const sharedCustomerPaths = ['/memberships/my', '/memberships/my/tracking']
 export const branchMiddleware: MiddlewareHandler = async (c, next) => {
@@ -20,7 +19,7 @@ export const branchMiddleware: MiddlewareHandler = async (c, next) => {
   const authPath = path.startsWith('/admin/auth/')
   if (authPath || path === '/branches' || path.startsWith('/branches/'))
     return next()
-  const requested = c.req.header('X-Branch-ID')
+  let requested = c.req.header('X-Branch-ID')
   if (isAdmin) {
     const admin = c.get('admin')
     if (!admin?.id) return next() // Authentication middleware handles this case.
@@ -77,6 +76,13 @@ export const branchMiddleware: MiddlewareHandler = async (c, next) => {
     return next()
   // Cancel-session is protected by invoice ownership and must work after changing branch.
   if (path === '/checkout/cancel-session') return next()
+  if (!requested) {
+    const active = await db.branch.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    })
+    if (active.length === 1) requested = active[0].id
+  }
   if (!requested || requested === 'all')
     throw new BadRequestException('Pilih cabang terlebih dahulu.')
   const branch = await db.branch.findFirst({

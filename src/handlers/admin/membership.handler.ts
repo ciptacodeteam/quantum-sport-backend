@@ -1,3 +1,4 @@
+import { applyPaidMembershipRenewal } from '@/services/membership-renewal.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -332,7 +333,8 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
           },
         })
 
-        return { membershipUser, invoice }
+        const renewed = await applyPaidMembershipRenewal(tx, membershipUser.id)
+        return { membershipUser: renewed ?? membershipUser, invoice }
       })
 
       c.var.logger.info(
@@ -348,6 +350,8 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
             total: result.invoice.total,
             startDate: result.membershipUser.startDate,
             endDate: result.membershipUser.endDate,
+            remainingSessions: result.membershipUser.remainingSessions,
+            debtSettledSessions: result.membershipUser.debtSettledSessions,
           },
           'Admin membership checkout successful',
         ),

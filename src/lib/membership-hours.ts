@@ -1,27 +1,39 @@
 import { MembershipType } from '@prisma/client'
-import dayjs from '@/lib/club-time'
+import {
+  resolveTariffPeriod,
+  tariffBand,
+  type TariffRule,
+} from '@/lib/tariff-period'
+import { branchContext } from '@/lib/branch-context'
 
 export function isSlotAllowedForMembershipType(
   membershipType: MembershipType | null | undefined,
   startAt: Date | string,
+  options: {
+    rules?: TariffRule[]
+    branchId?: string
+    sport?: string
+    endAt?: Date | string
+  } = {},
 ) {
   if (!membershipType || membershipType === MembershipType.ALL_HOUR) {
     return true
   }
 
-  const hour = dayjs(startAt).hour()
-
-  if (membershipType === MembershipType.HAPPY_HOUR) {
-    return hour >= 6 && hour < 15
-  }
-
-  return hour >= 15 || hour < 6
+  const bands = resolveTariffPeriod(
+    options.rules ?? [],
+    startAt,
+    options.branchId ?? branchContext.getStore()?.branchId ?? '',
+    options.sport ?? 'PADEL',
+  )
+  const band = tariffBand(startAt, bands, options.endAt)
+  return membershipType === MembershipType.HAPPY_HOUR
+    ? band === 'happyHour'
+    : band === 'peakHour'
 }
 
 export function membershipTypeLabel(membershipType: MembershipType) {
-  if (membershipType === MembershipType.HAPPY_HOUR)
-    return 'Happy Hour (06:00 - 15:00)'
-  if (membershipType === MembershipType.AFTER_HOUR)
-    return 'After Hour (15:00 - 00:00)'
+  if (membershipType === MembershipType.HAPPY_HOUR) return 'Happy Hour'
+  if (membershipType === MembershipType.AFTER_HOUR) return 'Peak Hour'
   return 'All Hour'
 }

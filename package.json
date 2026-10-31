@@ -39,7 +39,11 @@
     "worker:email": "bun run src/workers/email.worker.ts",
     "worker:scheduler": "bun run src/workers/scheduler.worker.ts",
     "db:fix-payment-va-channels": "bun prisma/fix-payment-va-channels.ts",
-    "db:setup-branches": "bun prisma/setup-branches.ts"
+    "db:setup-branches": "bun prisma/setup-branches.ts",
+    "db:tariff-periods": "prisma db execute --schema prisma/schema.prisma --file prisma/tariff-periods.sql",
+    "db:rolling-booking-window": "prisma db execute --schema prisma/schema.prisma --file prisma/rolling-booking-window.sql",
+    "db:recurring-bookings": "prisma db execute --schema prisma/schema.prisma --file prisma/recurring-bookings.sql",
+    "db:membership-renewal": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-renewal.sql"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",

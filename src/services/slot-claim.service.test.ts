@@ -1,3 +1,4 @@
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import { BadRequestException } from '@/exceptions'
 import { SlotType } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
@@ -19,6 +20,8 @@ describe('claimSlotsAtomically', () => {
         id: { in: ['slot-1'] },
         type: SlotType.COURT,
         isAvailable: true,
+        ...rollingBookingWindowWhere(),
+        bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } },
         startAt: { gt: cutoff },
       },
       data: { isAvailable: false },

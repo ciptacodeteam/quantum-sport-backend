@@ -1,16 +1,16 @@
-# Graph Report - quantum-sport-backend  (2026-10-28)
+# Graph Report - quantum-sport-backend  (2026-10-31)
 
 ## Corpus Check
-- 318 files · ~169,832 words
+- 370 files · ~194,709 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2637 nodes · 4569 edges · 216 communities (169 shown, 47 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 71 edges (avg confidence: 0.76)
+- 2819 nodes · 5302 edges · 233 communities (170 shown, 63 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 76 edges (avg confidence: 0.76)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6e316d5c`
+- Built from commit: `d211cbf1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,11 +18,11 @@
 - common.sh
 - BullMQ Setup & Integration Guide
 - Xendit Cards Payment - CORRECT IMPLEMENTATION
-- create-app.ts
+- factory
 - Ngrok Setup for Xendit Webhook Testing
 - branch-scope.ts
 - Coach Type CRUD Management - Admin API
-- phone.service.ts
+- rolling-court-schedule.service.ts
 - Email Worker Docker Guide
 - Production Deployment Guide
 - scripts
@@ -32,21 +32,21 @@
 - Ongoing Booking Schedule API
 - Analytics APIs - Quick Reference Card
 - validation.ts
-- app.ts
-- admin/membership.route.ts
+- exceptions/index.ts
+- NotFoundException
 - Daily Transactions Analytics API
 - Password Reset Implementation
 - Transaction Expiry Scheduler
 - compilerOptions
-- booking.handler.ts
+- upload.service.ts
 - Domain and SSL Setup Guide
-- handlers/membership.handler.ts
+- membership-checkout.handler.ts
 - admin/court.handler.ts
 - API Testing Scenarios
 - Dashboard Statistics API
 - Cards Session JS Integration Guide
 - devDependencies
-- email.service.ts
+- logger.ts
 - costing.service.ts
 - Club CRUD API for Non-Admin Users
 - 🎯 Production Deployment Checklist
@@ -54,9 +54,9 @@
 - handlers/auth.handler.ts
 - Migration Recovery Guide
 - handlers/checkout.handler.ts
-- logger.ts
+- ok
 - Prisma Studio in Production
-- Best Practices Implemented
+- court-performance.service.ts
 - admin/auth.handler.ts
 - payment-reconcile.service.ts
 - midtrans.service.ts
@@ -64,7 +64,7 @@
 - Admin Viewer Role Implementation
 - Xendit Payment Integration (v3 API)
 - env.ts
-- booked-ballboy.handler.ts
+- booking.handler.ts
 - user.handler.ts
 - XenditService
 - Analytics APIs - Setup & Testing Guide
@@ -76,10 +76,10 @@
 - Xendit V3 Webhook Implementation
 - BullMQ Integration - Final Checklist ✅
 - booked-court.handler.ts
-- createRouter
+- create-app.ts
 - Daily Transactions API - Quick Reference
 - Docker Quick Reference
-- analytics.handler.ts
+- ballboy-cost.handler.ts
 - Analytics APIs - Complete Documentation
 - 3. Business Insights Analytics
 - Coach Type CRUD - Quick Reference
@@ -87,86 +87,86 @@
 - Getting Started with Production Deployment
 - blob-backup.ts
 - admin/banner.handler.ts
-- admin/checkout.handler.ts
-- membership-transaction.handler.ts
-- Pre-Deployment
+- credit-card.handler.ts
+- recurring-booking.service.ts
+- prisma.ts
 - 🚨 Troubleshooting
 - notification.handler.ts
 - xendit-webhook.handler.ts
 - Midtrans Core API — Foundations
 - Midtrans Core API — Sandbox Testing
-- booked-inventory-display.test.ts
+- booked-inventory.handler.ts
 - admin/inventory.handler.ts
 - Midtrans Core API — Bank Transfer (VA & Bill Payment)
 - Midtrans Core API — Notifications (Webhook)
 - Midtrans Subscription / Recurring API (v1)
 - SSL Quick Setup for api.quantumsocialclub.id
-- credit-card.handler.ts
-- Implementation Logic
+- midtrans-webhook.handler.ts
+- ✨ What the Script Does
 - dependencies
 - Midtrans Core API — E-Wallet & QRIS
 - 4. Bulk Data Export to Excel
-- Core Components Verified
+- clubTime
 - Data demo lokal
 - cleanup-and-build.sh
 - staff.handler.ts
-- membership-tracking.handler.test.ts
-- booking-bundle-discount.service.ts
-- inventory-availability.service.ts
+- membership-tracking.handler.ts
+- tariff-period.route.ts
+- admin/checkout.handler.ts
 - types.d.ts
 - Midtrans Core API — Google Pay™
 - Midtrans Core API — Statuses, Codes, Errors, Deprecations
 - Credit Card Payment with 3DS - API Payload Examples
 - deploy-prod.sh
-- booked-coach.handler.ts
-- routes/court.route.ts
-- membership-booking.service.ts
+- 🔧 Troubleshooting Commands
+- handlers/court.handler.ts
+- password-reset.service.ts
 - GoPay Tokenization (Core API) — reference
 - Test Cases
-- SendOTPResponse
+- phone.service.dto.ts
 - Error Responses
 - setup-ssl.sh
-- class-booking.route.ts
-- admin/class.route.ts
-- coach-type.route.ts
-- admin/partnership.route.ts
-- admin/payment-method.route.ts
-- promo-code.route.ts
-- coach-booking-conflict.service.ts
+- class-booking.handler.ts
+- admin/class.handler.ts
+- coach-type.handler.ts
+- admin/partnership.handler.ts
+- admin/payment-method.handler.ts
+- promo-code.handler.ts
+- 🐛 Debugging
 - dashboard-stats-verification.ts
 - Midtrans Core API — Router
 - Midtrans Core API — Over The Counter (cstore)
 - Development Guide: Adding a New API Route
 - 🔧 Troubleshooting
 - 1. Save a New Credit Card
-- ballboy-cost.route.ts
-- coach-cost.route.ts
-- court-cost.route.ts
-- staff-cost.route.ts
-- routes/coach.route.ts
-- routes/invoice.route.ts
-- auth-cookies.ts
-- ongoing-schedule.ts
+- Pengaturan jam tarif
+- config.ts
+- Running Services
+- staff-cost.handler.ts
+- Pembelian paket baru dan saldo minus
+- Frontend Integration
+- Channel-Specific Configuration
+- Booking rutin membership (admin)
 - Cabang
 - Midtrans Core API — Cardless Credit (Akulaku, Kredivo)
 - Implementation Details
 - Postman Collection Examples
 - Troubleshooting
-- 🔐 Password Reset API
-- Post-Deployment
+- Jadwal booking berjalan
+- Court Performance
 - 3DS Authentication Flow
 - Test Cards (Xendit Sandbox)
-- Testing Workflow
+- Existing Endpoints (Reference)
 - package.json
-- 🐛 Debugging
-- password-reset.route.ts
-- slot-claim.service.ts
-- court-branch-policy.ts
+- Queue Management
+- validate-hook.ts
+- Production Deployment
+- Troubleshooting
 - day.ts
 - What Was Added
 - Date Range Parameters
-- court-slots.test.ts
-- Deployment
+- Testing
+- 📧 Email Queue API
 - 2. List Saved Credit Cards
 - 3. Update Credit Card (Mark as Default)
 - 5. Checkout with NEW Credit Card (No Save)
@@ -174,12 +174,16 @@
 - 7. Checkout with SAVED Credit Card
 - 8. Membership Checkout with NEW Credit Card
 - 9. Membership Checkout with SAVED Credit Card
-- password.ts
+- argon2
+- shared-value-pack-and-booking-window.md
 - fix-payment-va-channels.ts
 - get-ngrok-url.sh
-- admin/invoice.route.ts
-- routes/class.route.ts
+- Health Checks
+- @prisma/client
+- dotenv
 - Response Format
+- tariff-period.route.test.ts
+- @hono/node-server
 - cemara-only-tennis.ts
 - cleanup.ts
 - fix-ballboy-booking-status.ts
@@ -205,7 +209,20 @@
 - fix-slots.ts
 - ngrok-entrypoint.sh
 - api/index.ts
-- vitest
+- hono-pino
+- @hono/zod-validator
+- http-status
+- ioredis
+- nodemailer
+- pino
+- pino-http
+- pino-pretty
+- sharp
+- slugify
+- @types/xlsx
+- @vercel/blob
+- xendit-node
+- zod
 - prettier.config.js
 - setup-branches.ts
 - check-container-logs.sh
@@ -223,33 +240,33 @@
 - refreshTokenSchema
 
 ## God Nodes (most connected - your core abstractions)
-1. `db` - 62 edges
-2. `ok()` - 58 edges
-3. `factory` - 55 edges
-4. `createRouter()` - 54 edges
-5. `validateHook()` - 46 edges
-6. `scripts` - 37 edges
-7. `NotFoundException` - 35 edges
-8. `SearchQuerySchema` - 32 edges
-9. `BadRequestException` - 30 edges
-10. `buildFindManyOptions()` - 30 edges
+1. `db` - 76 edges
+2. `ok()` - 63 edges
+3. `createRouter()` - 58 edges
+4. `factory` - 58 edges
+5. `validateHook()` - 50 edges
+6. `clubTime()` - 44 edges
+7. `scripts` - 41 edges
+8. `NotFoundException` - 39 edges
+9. `BadRequestException` - 36 edges
+10. `SearchQuerySchema` - 32 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `main()` --calls--> `hashPassword()`  [EXTRACTED]
-  prisma/seed-demo.ts → src/lib/password.ts
+- `main()` --calls--> `withBranchContext()`  [EXTRACTED]
+  prisma/verify-global-banners.ts → src/lib/branch-context.ts
+- `at()` --calls--> `clubTime()`  [EXTRACTED]
+  prisma/seed-demo.ts → src/lib/club-time.ts
+- `main()` --calls--> `clubTime()`  [EXTRACTED]
+  prisma/seed-demo.ts → src/lib/club-time.ts
 - `main()` --calls--> `clubTime()`  [EXTRACTED]
   prisma/seed-value-pack-demo.ts → src/lib/club-time.ts
 - `main()` --calls--> `clubTime()`  [EXTRACTED]
   prisma/verify-demo.ts → src/lib/club-time.ts
-- `main()` --calls--> `withBranchContext()`  [EXTRACTED]
-  prisma/verify-global-banners.ts → src/lib/branch-context.ts
-- `dayNumber()` --references--> `dayjs`  [EXTRACTED]
-  src/services/costing.service.ts → package.json
 
 ## Import Cycles
 - None detected.
 
-## Communities (216 total, 47 thin omitted)
+## Communities (233 total, 63 thin omitted)
 
 ### Community 0 - "common.sh"
 Cohesion: 0.09
@@ -263,29 +280,29 @@ Nodes (48): 1. Always Use Template Variables, 2. Handle Email Failures Gracefull
 Cohesion: 0.04
 Nodes (46): 1. Service Layer, 2. Handler Layer, 3. Route Layer, 4. Validation Schema, API Endpoint, Cancel Payment Session API, Changelog, Frontend Implementation (+38 more)
 
-### Community 3 - "create-app.ts"
-Cohesion: 0.11
-Nodes (30): BadRequestException, NotFoundException, timeoutException(), bookedInventoriesQuerySchema, cancelBookingSchema, idSchema, adminMembershipCheckoutSchema, membershipQuerySchema (+22 more)
+### Community 3 - "factory"
+Cohesion: 0.09
+Nodes (27): cancelBallboyBookingHandler, cancelBookingSchema, getAllBookedBallboysHandler, getBookedBallboyDetailHandler, bookedCoachesQuerySchema, cancelBookingSchema, cancelCoachBookingHandler, getAllBookedCoachesHandler (+19 more)
 
 ### Community 4 - "Ngrok Setup for Xendit Webhook Testing"
 Cohesion: 0.05
 Nodes (43): Auto-Update Xendit Webhook (Advanced), Best Practices, Can't Access Webhook URL, Custom Domain Setup (Paid Plans), Detailed Configuration, Docker Compose Commands Reference, Docker Services, Environment Variables (+35 more)
 
 ### Community 5 - "branch-scope.ts"
-Cohesion: 0.11
-Nodes (25): db, main(), raw, BranchContext, withBranchContext(), andWhere(), Args, asArray() (+17 more)
+Cohesion: 0.15
+Nodes (19): db, main(), raw, andWhere(), Args, asArray(), assertReference(), branchScopedClient() (+11 more)
 
 ### Community 6 - "Coach Type CRUD Management - Admin API"
 Cohesion: 0.05
 Nodes (41): 1. GET /admin/coach-types, 2. GET /admin/coach-types/:id, 3. POST /admin/coach-types, 4. PUT /admin/coach-types/:id, 5. DELETE /admin/coach-types/:id, API Endpoints, `BookingCoachType` Model, Coach Type CRUD Management - Admin API (+33 more)
 
-### Community 7 - "phone.service.ts"
-Cohesion: 0.08
-Nodes (10): formatPhoneForFazpass(), GenerateOTPPayload, GenerateOTPResponse, OTPData, SendOTPPayload, VerifyOTPPayload, VerifyOTPResponse, mapFazpassVerifyMessage() (+2 more)
+### Community 7 - "rolling-court-schedule.service.ts"
+Cohesion: 0.19
+Nodes (21): bookingWindowEnd(), buildRollingCourtSlots(), rollingBookingWindowWhere(), RollingCourtPricing, rollingCourtPricingSchema, config, filter, matchesRollingSlotRule() (+13 more)
 
 ### Community 8 - "Email Worker Docker Guide"
-Cohesion: 0.05
-Nodes (40): 1. Update docker-compose.yml, 2. Setup Monitoring, 3. Setup Logging, 4. Production Environment, Architecture, Automated Health Check Script, Check Service Status, Clear Queue (Emergency Only) (+32 more)
+Cohesion: 0.10
+Nodes (20): Architecture, Check Service Status, Debug Worker, Development Workflow, Email Worker Docker Guide, Environment Variables, Iterate on Worker Code, Monitoring Email Worker (+12 more)
 
 ### Community 9 - "Production Deployment Guide"
 Cohesion: 0.05
@@ -293,11 +310,11 @@ Nodes (38): 1. Clone and configure, 2. Deploy, 2GB RAM (minimum), 3. Verify, 4. 
 
 ### Community 10 - "scripts"
 Cohesion: 0.05
-Nodes (37): scripts, build, db:check-expired, db:fix-ballboy-booking-status, db:fix-ballboy-slot-reuse, db:fix-booking-admin-note, db:fix-coach-booking-status, db:fix-coach-type-enum (+29 more)
+Nodes (41): scripts, build, db:check-expired, db:fix-ballboy-booking-status, db:fix-ballboy-slot-reuse, db:fix-booking-admin-note, db:fix-coach-booking-status, db:fix-coach-type-enum (+33 more)
 
 ### Community 11 - "Deploy Script Guide"
-Cohesion: 0.06
-Nodes (36): 1. **Pre-flight Checks** ✈️, 2. **Deployment Confirmation** ⚠️, 3. **Code Update** 📥, 4. **Build Process** 🏗️, 5. **Service Startup** 🚀, 6. **Health Verification** 🏥, 7. **Post-Deployment** ✅, Access Container Shell (+28 more)
+Cohesion: 0.10
+Nodes (21): 🎛️ Advanced Usage, Clean Build, ❌ Common Errors, Deploy Script Guide, 📋 Environment Variables, Error: Application not healthy, Error: Build failed, Error: .env not found (+13 more)
 
 ### Community 12 - "Quantum Sport Backend"
 Cohesion: 0.06
@@ -317,23 +334,23 @@ Nodes (31): 1️⃣ Income by Source, 2️⃣ Payment Methods, 3️⃣ Business 
 
 ### Community 16 - "validation.ts"
 Cohesion: 0.07
-Nodes (37): sendPhoneOtpSchema, sendPhoneVerificationOtpHandler, verifyPhoneVerificationOtpHandler, err(), authTokenCookieSchema, ballboySelectionSchema, CheckoutSchema, CreateBallboyCostSchema (+29 more)
+Nodes (35): createCoachCostHandler, getCoachCostHandler, overrideSingleCoachCostHandler, updateCoachCostHandler, createCourtCostHandler, getCourtCostHandler, overrideSingleCourtCostHandler, saveRollingCourtScheduleHandler (+27 more)
 
-### Community 17 - "app.ts"
-Cohesion: 0.09
-Nodes (20): adminRoutes, app, routes, adminCheckoutHandler, getMyCoachScheduleHandler, healthCheckHandler, getAvailableInventoryHandler, getPublicPartnershipLogosHandler (+12 more)
+### Community 17 - "exceptions/index.ts"
+Cohesion: 0.12
+Nodes (18): BadRequestException, ForbiddenException, BranchContext, withBranchContext(), assertCourtSportAtBranch(), bookableCourtWhere, supportedCourtWhere, TariffPeriodInput (+10 more)
 
-### Community 18 - "admin/membership.route.ts"
-Cohesion: 0.25
-Nodes (7): adminMembershipCheckoutHandler, createMembershipHandler, deleteMembershipHandler, getAllMembershipHandler, getMembershipHandler, updateMembershipHandler, adminMembershipRoute
+### Community 18 - "NotFoundException"
+Cohesion: 0.11
+Nodes (22): NotFoundException, adminMembershipCheckoutHandler, adminMembershipCheckoutSchema, createMembershipHandler, deleteMembershipHandler, getAllMembershipHandler, getMembershipHandler, membershipQuerySchema (+14 more)
 
 ### Community 19 - "Daily Transactions Analytics API"
 Cohesion: 0.07
 Nodes (29): 100% Accurate Calculation Method, 30 Days (Default), 3 Months, 7 Days, Chart.js Example, chartData Array, Daily Transactions Analytics API, Data Accuracy Guarantee (+21 more)
 
 ### Community 20 - "Password Reset Implementation"
-Cohesion: 0.12
-Nodes (17): 1. Password Reset Service (`src/services/password-reset.service.ts`), 2. Admin Handler (`src/handlers/admin/user.handler.ts`), 3. Database Model, Architecture, Components, Email Not Sending, Email Template, Features (+9 more)
+Cohesion: 0.07
+Nodes (30): 1. Password Reset Service (`src/services/password-reset.service.ts`), 2. Admin Handler (`src/handlers/admin/user.handler.ts`), 3. Database Model, Architecture, Best Practices Implemented, Components, 📧 Email Delivery, Email Not Sending (+22 more)
 
 ### Community 21 - "Transaction Expiry Scheduler"
 Cohesion: 0.07
@@ -343,21 +360,21 @@ Nodes (29): Architecture, BullMQ Dashboard, Clearing Old Jobs, Components, Confi
 Cohesion: 0.07
 Nodes (29): ESNext, generated/**/*.ts, node, ./node_modules/@types, prisma/**/*.ts, serve.ts, src/**/*.ts, tests/**/*.ts (+21 more)
 
-### Community 23 - "booking.handler.ts"
-Cohesion: 0.12
-Nodes (20): IMAGE_MIME_WHITELIST, STORAGE_ROOT, bookingsExportQuerySchema, bookingsQuerySchema, scheduleQuerySchema, sniffImageMime(), buildFilename(), FilenameOpts (+12 more)
+### Community 23 - "upload.service.ts"
+Cohesion: 0.21
+Nodes (10): IMAGE_MIME_WHITELIST, sniffImageMime(), buildFilename(), FilenameOpts, randomId(), toWebp(), WebpResult, uploadFile() (+2 more)
 
 ### Community 24 - "Domain and SSL Setup Guide"
 Cohesion: 0.10
 Nodes (21): 1. Nginx Config, 2. Environment Variables, 3. Docker Compose, 📚 Additional Resources, 🔄 Certificate Auto-Renewal, 🎯 Complete Setup Checklist, 🔧 Configuration Files, 🔄 Deployment After SSL Setup (+13 more)
 
-### Community 25 - "handlers/membership.handler.ts"
-Cohesion: 0.33
-Nodes (7): membershipCheckoutHandler, getAllMembershipHandler, getMembershipHandler, getMyActiveMembershipHandler, getUserMembershipsHandler, membershipQuerySchema, membershipRoute
+### Community 25 - "membership-checkout.handler.ts"
+Cohesion: 0.43
+Nodes (4): membershipCheckoutHandler, membershipCheckoutSchema, courtBookingCutoff(), paymentDeadline()
 
 ### Community 26 - "admin/court.handler.ts"
-Cohesion: 0.14
-Nodes (18): bulkUpdateCourtSlotPricingHandler, createCourtHandler, deleteCourtHandler, getAllCourtHandler, getAvailableCourtSlotsHandler, getCostHandler, getCourtHandler, updateCourtHandler (+10 more)
+Cohesion: 0.10
+Nodes (24): bulkDisableCourtSlotsHandler, bulkUpdateCourtSlotPricingHandler, createCourtHandler, deleteCourtHandler, getAllCourtHandler, getAvailableCourtSlotsHandler, getCostHandler, getCourtHandler (+16 more)
 
 ### Community 27 - "API Testing Scenarios"
 Cohesion: 0.08
@@ -372,32 +389,32 @@ Cohesion: 0.09
 Nodes (22): 1. Cards Session JS Setup, 2. Checkout Request Payload, 3. Save Card Endpoint, A. One-time Payment (tanpa simpan kartu), B. Payment + Save Card (PAY_AND_SAVE), Backend Implementation Details, C. Saved Card Payment, Cards Session JS Integration Guide (+14 more)
 
 ### Community 30 - "devDependencies"
-Cohesion: 0.09
-Nodes (23): eslint, eslint-config-prettier, devDependencies, eslint, eslint-config-prettier, prettier, prisma, tsc-alias (+15 more)
+Cohesion: 0.08
+Nodes (25): eslint, eslint-config-prettier, devDependencies, eslint, eslint-config-prettier, prettier, prisma, tsc-alias (+17 more)
 
-### Community 31 - "email.service.ts"
-Cohesion: 0.22
-Nodes (11): closeEmailQueue(), EmailJob, emailQueue, initEmailWorker(), createTransporter(), emailTemplates, queueCustomEmail(), queueSendTemplatedEmail() (+3 more)
+### Community 31 - "logger.ts"
+Cohesion: 0.14
+Nodes (20): getPinoConfig(), isProduction, log, logger(), redactSensitive(), getRedisConnection(), getRedisUrl(), closeEmailQueue() (+12 more)
 
 ### Community 32 - "costing.service.ts"
-Cohesion: 0.07
-Nodes (38): dayjs, dayjs, apply, args, argument(), at(), batches(), customers (+30 more)
+Cohesion: 0.14
+Nodes (22): dayjs, dayjs, bulkUpdateCourtSlotPricing(), BulkUpdateCourtSlotPricingPayload, dayNumber(), hoursForBand(), OverrideSingleBallboyCostPayload, overrideSingleCourtHourPrice() (+14 more)
 
 ### Community 33 - "Club CRUD API for Non-Admin Users"
 Cohesion: 0.09
 Nodes (21): API Registration, Authorization Logic, Browse Public Clubs, Club CRUD API for Non-Admin Users, Create, Create a Club, Delete, Differences from Admin API (+13 more)
 
 ### Community 34 - "🎯 Production Deployment Checklist"
-Cohesion: 0.09
-Nodes (23): 13. GitHub Actions, 14. Regular Tasks, 15. Scaling Considerations, 16. Incident Response, 17. Legal & Compliance, 18. Performance, 19. Launch Checklist, Access Shell (+15 more)
+Cohesion: 0.05
+Nodes (38): 10. Backup, 11. Documentation, 12. Testing, 13. GitHub Actions, 14. Regular Tasks, 15. Scaling Considerations, 16. Incident Response, 17. Legal & Compliance (+30 more)
 
 ### Community 35 - "auth.ts"
-Cohesion: 0.13
-Nodes (16): ForbiddenException, UnauthorizedException, resolveAccessTokenFromRequest(), validateToken(), blockAdminViewerWrites(), globalAuthMiddleware(), requireAdmin(), requireAdminAuth() (+8 more)
+Cohesion: 0.16
+Nodes (14): UnauthorizedException, resolveAccessTokenFromRequest(), validateToken(), blockAdminViewerWrites(), globalAuthMiddleware(), requireAdmin(), requireAdminAuth(), requireAdminViewer() (+6 more)
 
 ### Community 36 - "handlers/auth.handler.ts"
-Cohesion: 0.14
-Nodes (22): changeUserPasswordHandler, checkAccountHandler, forgotPasswordHandler, getProfileHandler(), loginHandler, loginWithEmailHandler, logoutHandler, refreshTokenHandler (+14 more)
+Cohesion: 0.19
+Nodes (17): changeUserPasswordHandler, checkAccountHandler, forgotPasswordHandler, getProfileHandler(), loginHandler, loginWithEmailHandler, logoutHandler, refreshTokenHandler (+9 more)
 
 ### Community 37 - "Migration Recovery Guide"
 Cohesion: 0.10
@@ -405,31 +422,31 @@ Nodes (20): Alternative: Manual Migration Execution, Case A: Enum was partially 
 
 ### Community 38 - "handlers/checkout.handler.ts"
 Cohesion: 0.10
-Nodes (14): applyPromoCodeHandler, ballboyCoversCourtSlot(), BallboySelectionInput, cancelPaymentSessionHandler, cancelPaymentSessionSchema, checkoutHandler, validateBallboysForTennisCourts(), membership (+6 more)
+Nodes (13): ballboyCoversCourtSlot(), BallboySelectionInput, cancelPaymentSessionSchema, checkoutHandler, validateBallboysForTennisCourts(), membership, mocks, assertClientCheckoutHasNoAddOns() (+5 more)
 
-### Community 39 - "logger.ts"
-Cohesion: 0.18
-Nodes (16): getPinoConfig(), isProduction, log, logger(), redactSensitive(), getRedisConnection(), getRedisUrl(), reconnectRedis() (+8 more)
+### Community 39 - "ok"
+Cohesion: 0.21
+Nodes (19): handleInvoiceWebhookV2(), handlePaymentSessionWebhook(), handlePaymentWebhookV3(), ok(), cancelHoldBookingAndReleaseResources(), cancelHoldClassBookingAndRestoreCapacity(), Tx, discardUnpaidMembership() (+11 more)
 
 ### Community 40 - "Prisma Studio in Production"
 Cohesion: 0.10
 Nodes (19): Access Prisma Studio, Alternative: Run Locally, Best Practices, Can't access from remote, Configuration, Connection refused, Environment Variables, Option 1: SSH Tunnel + Local Prisma Studio (+11 more)
 
-### Community 41 - "Best Practices Implemented"
+### Community 41 - "court-performance.service.ts"
 Cohesion: 0.29
-Nodes (7): Best Practices Implemented, 📧 Email Delivery, 📊 Monitoring, ⚡ Performance, 📱 Phone Fallback, 🔐 Security, 🛡️ Validation
+Nodes (10): courtPayment(), getCourtPerformance(), Interval, intervalHours(), membershipDetail(), PerformanceBooking, booking(), court (+2 more)
 
 ### Community 42 - "admin/auth.handler.ts"
-Cohesion: 0.17
-Nodes (16): changePasswordAdminHandler, checkAdminAccountHandler, getAdminProfileHandler, loginAdminHandler, logoutAdminHandler, refreshTokenAdminHandler, registerAdminHandler, updateAdminProfileHandler (+8 more)
+Cohesion: 0.13
+Nodes (18): changePasswordAdminHandler, checkAdminAccountHandler, getAdminProfileHandler, loginAdminHandler, logoutAdminHandler, refreshTokenAdminHandler, registerAdminHandler, updateAdminProfileHandler (+10 more)
 
 ### Community 43 - "payment-reconcile.service.ts"
-Cohesion: 0.15
-Nodes (17): activateMembershipAfterPayment(), MembershipActivationDb, midtransService, asMeta(), extractGatewayPaymentRequestId(), FinalizePaymentResult, GATEWAY_PAID_STATUSES, isGatewayPaymentCompleted() (+9 more)
+Cohesion: 0.19
+Nodes (15): isPaidStatus(), asMeta(), extractGatewayPaymentRequestId(), FinalizePaymentResult, GATEWAY_PAID_STATUSES, isGatewayPaymentCompleted(), PaymentMeta, reapplyInventoryForRevivedBooking() (+7 more)
 
 ### Community 44 - "midtrans.service.ts"
-Cohesion: 0.17
-Nodes (16): amountsMatch(), buildChargeBody(), ChargeInput, isPaidStatus(), isSandboxKey(), isSupportedChannel(), midtransBaseUrl(), MidtransBody (+8 more)
+Cohesion: 0.16
+Nodes (16): amountsMatch(), buildChargeBody(), ChargeInput, isSandboxKey(), isSupportedChannel(), midtransBaseUrl(), MidtransBody, MidtransCustomer (+8 more)
 
 ### Community 45 - "Midtrans Core API — JSON Objects"
 Cohesion: 0.11
@@ -440,20 +457,20 @@ Cohesion: 0.11
 Nodes (17): 1. Schema Updates (`prisma/schema.prisma`), 2. Validation Schema (`src/lib/validation.ts`), 3. Middleware Updates (`src/middlewares/auth.ts`), 4. Global Admin Route Protection (`src/app.ts`), Admin Viewer Role Implementation, Benefits, Changes Made, Creating Admin Viewer Staff (+9 more)
 
 ### Community 47 - "Xendit Payment Integration (v3 API)"
-Cohesion: 0.06
-Nodes (31): 1. Checkout (Create Payment), 1. Display Payment Actions, 2. Get Invoice Detail (with Payment Instructions), 2. Show Payment Instructions, 3. Handle Payment Result, 3. Webhook (Xendit → Backend), API Endpoints, Architecture (+23 more)
+Cohesion: 0.10
+Nodes (20): 1. Checkout (Create Payment), 2. Get Invoice Detail (with Payment Instructions), 3. Webhook (Xendit → Backend), API Endpoints, Architecture, Booking Status Flow, Common Errors, Components (+12 more)
 
 ### Community 48 - "env.ts"
-Cohesion: 0.15
-Nodes (12): DEPLOYED_NODE_ENVS, env, isDeployedEnv(), sendVerificationOtpHandler, verifyVerificationOtpHandler, corsMiddlewareOptions, SendVerificationOtpSchema, VerifyVerificationOtpSchema (+4 more)
+Cohesion: 0.23
+Nodes (10): DEPLOYED_NODE_ENVS, env, isDeployedEnv(), baseCookieOptions(), clearAdminAuthCookies(), clearUserAuthCookies(), setAdminAccessTokenCookie(), setUserAccessTokenCookie() (+2 more)
 
-### Community 49 - "booked-ballboy.handler.ts"
-Cohesion: 0.43
-Nodes (5): cancelBallboyBookingHandler, cancelBookingSchema, getAllBookedBallboysHandler, getBookedBallboyDetailHandler, adminBookedBallboyRoute
+### Community 49 - "booking.handler.ts"
+Cohesion: 0.05
+Nodes (49): xlsx, db, main(), DailyTransactionsQuery, dailyTransactionsQuerySchema, dateRangeSchema, exportAnalyticsToExcelHandler, exportBulkDataHandler (+41 more)
 
 ### Community 50 - "user.handler.ts"
-Cohesion: 0.12
-Nodes (20): banUserHandler, banUserSchema, customerSearchSchema, getAllUsersHandler, getCustomerMembershipDetailsHandler, getUserDetailHandler, searchCustomersHandler, sendResetPasswordLinkHandler (+12 more)
+Cohesion: 0.17
+Nodes (15): banUserHandler, banUserSchema, customerSearchSchema, getAllUsersHandler, getCustomerMembershipDetailsHandler, getUserDetailHandler, searchCustomersHandler, sendResetPasswordLinkHandler (+7 more)
 
 ### Community 52 - "Analytics APIs - Setup & Testing Guide"
 Cohesion: 0.12
@@ -461,15 +478,15 @@ Nodes (17): Analytics APIs - Setup & Testing Guide, API Endpoints Summary, Cachi
 
 ### Community 53 - "BullMQ Quick Reference"
 Cohesion: 0.12
-Nodes (16): Available Templates, BullMQ Quick Reference, ✅ Checklist, 🗄️ Database Models, Development Environment, 🐳 Docker Commands, 📧 Email Queue API, 🛠️ Environment Variables (+8 more)
+Nodes (17): 1. Request Reset (User-initiated), 2. Verify Token, 3. Reset Password, 4. Admin-Triggered Reset, BullMQ Quick Reference, ✅ Checklist, 🗄️ Database Models, Development Environment (+9 more)
 
 ### Community 54 - "seed.ts"
-Cohesion: 0.23
-Nodes (16): db, main(), seedBanners(), seedBookings(), seedClasses(), seedCoachTypes(), seedCourts(), seedInventories() (+8 more)
+Cohesion: 0.11
+Nodes (27): db, apply, args, argument(), at(), batches(), customers, db (+19 more)
 
 ### Community 55 - "xendit.service.ts"
-Cohesion: 0.11
-Nodes (18): Authenticate3DSRequest, Authenticate3DSResponse, Create3DSChallengeRequest, CreateInvoiceRequest, CreatePaymentRequestV3, CreatePaymentSessionRequest, CreateVirtualAccountRequest, PaymentAction (+10 more)
+Cohesion: 0.12
+Nodes (16): Authenticate3DSRequest, Authenticate3DSResponse, Create3DSChallengeRequest, CreateInvoiceRequest, CreatePaymentRequestV3, CreatePaymentSessionRequest, CreateVirtualAccountRequest, PaymentAction (+8 more)
 
 ### Community 56 - "4. Features (all use the same `/v2/charge`; extra fields in `credit_card`)"
 Cohesion: 0.12
@@ -484,16 +501,16 @@ Cohesion: 0.12
 Nodes (15): 1. Payment Token Status Webhook, 2. Payment Request Status Webhook, 3. Payment Status Webhook, Booking/ClassBooking Tables, Configuration, Database Updates, Error Responses, Invoice Table (+7 more)
 
 ### Community 59 - "BullMQ Integration - Final Checklist ✅"
-Cohesion: 0.12
-Nodes (16): Before Production, BullMQ Integration - Final Checklist ✅, Documentation Navigation, Enable Debug Logging, Monitor Queue Metrics, Next Steps After Verification, Performance Optimization, Pre-Launch Verification (+8 more)
+Cohesion: 0.07
+Nodes (30): Before Production, BullMQ Integration - Final Checklist ✅, ✅ Configuration, Core Components Verified, ✅ Database Schema, ✅ Dependencies Installed, ✅ Docker Configuration, Documentation Navigation (+22 more)
 
 ### Community 60 - "booked-court.handler.ts"
-Cohesion: 0.18
-Nodes (11): bookedCourtsQuerySchema, cancelBookingHandler, cancelBookingSchema, getAllBookedCourtsHandler, getBookedCourtDetailHandler, getBookedCourtsSummaryHandler, getBookingsByCourtHandler, rescheduleCourtBookingHandler (+3 more)
+Cohesion: 0.06
+Nodes (45): bookedCourtsQuerySchema, cancelBookingHandler, cancelBookingSchema, getAllBookedCourtsHandler, getBookedCourtDetailHandler, getBookedCourtsSummaryHandler, getBookingsByCourtHandler, rescheduleCourtBookingHandler (+37 more)
 
-### Community 61 - "createRouter"
-Cohesion: 0.16
-Nodes (10): getAvailableBallboyHandler, getAllBannerHandler, getBannerHandler, welcomeMessageHandler, createRouter(), adminBallboyRoute, adminHomeRoute, ballboyRoute (+2 more)
+### Community 61 - "create-app.ts"
+Cohesion: 0.06
+Nodes (43): adminRoutes, app, routes, timeoutException(), getMyCoachScheduleHandler, getAvailableBallboyHandler, applyPromoCodeHandler, cancelPaymentSessionHandler (+35 more)
 
 ### Community 62 - "Daily Transactions API - Quick Reference"
 Cohesion: 0.13
@@ -503,13 +520,13 @@ Nodes (14): ApexCharts, Chart.js, Chart Library Examples, chartData Format, Comm
 Cohesion: 0.13
 Nodes (15): Application Shell, 💾 Backup & Restore, 🧹 Cleanup, 📝 Common Commands, Database, 🎯 Development, Docker Quick Reference, Logs (+7 more)
 
-### Community 64 - "analytics.handler.ts"
-Cohesion: 0.07
-Nodes (34): xlsx, db, main(), DailyTransactionsQuery, dailyTransactionsQuerySchema, dateRangeSchema, exportAnalyticsToExcelHandler, exportBulkDataHandler (+26 more)
+### Community 64 - "ballboy-cost.handler.ts"
+Cohesion: 0.29
+Nodes (8): createBallboyCostHandler, getBallboyCostHandler, overrideSingleBallboyCostHandler, updateBallboyCostHandler, CreateBallboyCostSchema, OverrideSingleBallboyCostSchema, updateBallboyCostSchema, adminBallboyCostRoute
 
 ### Community 65 - "Analytics APIs - Complete Documentation"
-Cohesion: 0.14
-Nodes (12): Analytics APIs - Complete Documentation, Authentication, Existing Endpoints (Reference), GET `/admin/analytics`, GET `/admin/analytics/daily-transactions`, GET `/admin/analytics/dashboard`, GET `/admin/analytics/export/excel`, Overview (+4 more)
+Cohesion: 0.22
+Nodes (7): Analytics APIs - Complete Documentation, Authentication, Overview, Production Deployment Checklist, Testing the APIs, Using cURL, Using Postman
 
 ### Community 66 - "3. Business Insights Analytics"
 Cohesion: 0.14
@@ -535,17 +552,17 @@ Nodes (13): assertSafePrefix(), cmdDownload(), cmdList(), cmdPrune(), cmdUploadS
 Cohesion: 0.24
 Nodes (10): createBannerHandler, deleteBannerHandler, getAllBannerHandler, getBannerHandler, existing, mocks, updateBannerHandler, CreateBannerSchema (+2 more)
 
-### Community 72 - "admin/checkout.handler.ts"
-Cohesion: 0.16
-Nodes (9): adminCheckoutSchema, ballboyCoversCourtSlot(), BallboySelectionInput, validateBallboysForTennisCourts(), isSlotAllowedForMembershipType(), formatPhone(), generateInvoiceNumber(), generateOtp() (+1 more)
+### Community 72 - "credit-card.handler.ts"
+Cohesion: 0.31
+Nodes (8): deleteCreditCardHandler, getCreditCardHandler, listCreditCardsHandler, saveCreditCardHandler, updateCreditCardHandler, SaveCreditCardSchema, UpdateCreditCardSchema, creditCardRoute
 
-### Community 73 - "membership-transaction.handler.ts"
-Cohesion: 0.24
-Nodes (11): approveMembershipTransactionHandler, exportMembershipTransactionsToExcelHandler, getAllMembershipTransactionsHandler, getMembershipTransactionDetailHandler, membershipTransactionsQuerySchema, rejectMembershipTransactionHandler, suspendMembershipTransactionHandler, unsuspendMembershipTransactionHandler (+3 more)
+### Community 73 - "recurring-booking.service.ts"
+Cohesion: 0.13
+Nodes (24): membershipTransactionStatusWhere(), dateKey, dateOnly(), dateOnlyKey(), matchingDates(), RecurringBookingInput, recurringBookingInputSchema, RecurringTemplate (+16 more)
 
-### Community 74 - "Pre-Deployment"
-Cohesion: 0.33
-Nodes (6): 1. Environment Configuration, 2. Infrastructure, 3. SSL/TLS, 4. Database, 5. Security, Pre-Deployment
+### Community 74 - "prisma.ts"
+Cohesion: 0.17
+Nodes (15): sendPhoneOtpSchema, db, prismaClient, formatPhone(), formatPhoneForFazpass(), generateInvoiceNumber(), generateOtp(), randomCode() (+7 more)
 
 ### Community 75 - "🚨 Troubleshooting"
 Cohesion: 0.33
@@ -556,8 +573,8 @@ Cohesion: 0.23
 Nodes (10): adminPushSchema, getAdminNotificationsHandler, getUserNotificationsHandler, markAdminNotificationReadHandler, markAllAdminNotificationsReadHandler, markUserNotificationReadHandler, paginationSchema, pushAdminNotificationHandler (+2 more)
 
 ### Community 77 - "xendit-webhook.handler.ts"
-Cohesion: 0.14
-Nodes (27): midtransClientConfigHandler, midtransFinishHandler, midtransWebhookHandler, handleInvoiceWebhookV2(), handlePaymentSessionWebhook(), handlePaymentWebhookV3(), XenditPaymentRequestWebhook, xenditPaymentRequestWebhookHandler (+19 more)
+Cohesion: 0.21
+Nodes (11): XenditPaymentRequestWebhook, xenditPaymentRequestWebhookHandler, XenditPaymentStatusWebhook, xenditPaymentStatusWebhookHandler, XenditPaymentTokenWebhook, xenditPaymentTokenWebhookHandler, xenditWebhookHandler, XenditWebhookPayload (+3 more)
 
 ### Community 78 - "Midtrans Core API — Foundations"
 Cohesion: 0.17
@@ -567,13 +584,13 @@ Nodes (11): 1. Getting started, 2. Authentication (HTTP Basic), 3. Base URLs and
 Cohesion: 0.17
 Nodes (11): 3DS 2 specific (recommended for flow tests), Bank-specific (installment, BIN promo, point) — Full / Attempted authentication, Bank transfer simulators, Cardless, Cards, E-wallet / QR, General, Google Pay (+3 more)
 
-### Community 80 - "booked-inventory-display.test.ts"
-Cohesion: 0.18
-Nodes (8): booking, court, item, mocks, cancelInventoryBookingHandler, getAllBookedInventoriesHandler, getBookedInventoryDetailHandler, adminBookedInventoryRoute
+### Community 80 - "booked-inventory.handler.ts"
+Cohesion: 0.13
+Nodes (10): booking, court, item, mocks, bookedInventoriesQuerySchema, cancelBookingSchema, cancelInventoryBookingHandler, getAllBookedInventoriesHandler (+2 more)
 
 ### Community 81 - "admin/inventory.handler.ts"
-Cohesion: 0.29
-Nodes (9): createInventoryHandler, deleteInventoryHandler, getAllInventoryHandler, getInventoryAvailabilityHandler, getInventoryHandler, updateInventoryHandler, CreateInventorySchema, UpdateInventorySchema (+1 more)
+Cohesion: 0.26
+Nodes (10): createInventoryHandler, deleteInventoryHandler, getAllInventoryHandler, getInventoryAvailabilityHandler, getInventoryHandler, updateInventoryHandler, CreateInventorySchema, UpdateInventorySchema (+2 more)
 
 ### Community 82 - "Midtrans Core API — Bank Transfer (VA & Bill Payment)"
 Cohesion: 0.20
@@ -591,17 +608,17 @@ Nodes (9): Checklist, Create, Disable / Cancel / Enable, Get, Implementation not
 Cohesion: 0.20
 Nodes (10): 📝 After Setup, ✅ Before Running, 🆘 Certificate Expired (ERR_CERT_DATE_INVALID), 🔄 Certificate Renewal, ⏱️ Expected Time, 📚 Full Guide, 🆘 If Setup Fails, ⚡ One-Command Setup (+2 more)
 
-### Community 86 - "credit-card.handler.ts"
-Cohesion: 0.31
-Nodes (8): deleteCreditCardHandler, getCreditCardHandler, listCreditCardsHandler, saveCreditCardHandler, updateCreditCardHandler, SaveCreditCardSchema, UpdateCreditCardSchema, creditCardRoute
-
-### Community 87 - "Implementation Logic"
+### Community 86 - "midtrans-webhook.handler.ts"
 Cohesion: 0.33
-Nodes (6): Implementation Logic, Step 1: Validate User, Step 2: Create Reset Token, Step 3: Priority 1 - Send Email, Step 4: Priority 2 - Send Phone OTP (Fallback), Step 5: Return Result
+Nodes (6): midtransClientConfigHandler, midtransFinishHandler, midtransWebhookHandler, midtransRoute, CreateNotificationInput, notificationService
+
+### Community 87 - "✨ What the Script Does"
+Cohesion: 0.25
+Nodes (8): 1. **Pre-flight Checks** ✈️, 2. **Deployment Confirmation** ⚠️, 3. **Code Update** 📥, 4. **Build Process** 🏗️, 5. **Service Startup** 🚀, 6. **Health Verification** 🏥, 7. **Post-Deployment** ✅, ✨ What the Script Does
 
 ### Community 88 - "dependencies"
-Cohesion: 0.04
-Nodes (47): argon2, axios, bullmq, dotenv, hono, @hono/node-server, hono-pino, @hono/zod-validator (+39 more)
+Cohesion: 0.22
+Nodes (9): axios, bullmq, mime-types, dependencies, axios, bullmq, mime-types, redis (+1 more)
 
 ### Community 89 - "Midtrans Core API — E-Wallet & QRIS"
 Cohesion: 0.22
@@ -611,9 +628,9 @@ Nodes (8): Checklist, Choose the method, GoPay (`payment_type: "gopay"`, non-tok
 Cohesion: 0.22
 Nodes (9): 4. Bulk Data Export to Excel, Coach Bookings Export, Courts Export, Export Types, Inventory Export, Query Parameters, Response, Usage Examples (+1 more)
 
-### Community 91 - "Core Components Verified"
-Cohesion: 0.22
-Nodes (9): ✅ Configuration, Core Components Verified, ✅ Database Schema, ✅ Dependencies Installed, ✅ Docker Configuration, ✅ Handlers Implemented, ✅ Routes Registered, ✅ Services Implemented (+1 more)
+### Community 91 - "clubTime"
+Cohesion: 0.23
+Nodes (8): apply, db, main(), db, main(), adminCheckoutHandler, previewRecurringBookingHandler, clubTime()
 
 ### Community 92 - "Data demo lokal"
 Cohesion: 0.22
@@ -627,17 +644,17 @@ Nodes (8): COMPOSE_DOCKER_CLI_BUILD, DOCKER_BUILDKIT, print_error(), print_heade
 Cohesion: 0.23
 Nodes (11): changeStaffPasswordHandler, createStaffHandler, getAllStaffHandler, getStaffCostsHandler, getStaffHandler, revokeStaffTokenHandler, updateStaffHandler, CreateStaffSchema (+3 more)
 
-### Community 95 - "membership-tracking.handler.test.ts"
-Cohesion: 0.25
+### Community 95 - "membership-tracking.handler.ts"
+Cohesion: 0.29
 Nodes (6): getMyMembershipTrackingHandler, mocks, now, state, getTrackedPackageStatus(), PackageState
 
-### Community 96 - "booking-bundle-discount.service.ts"
-Cohesion: 0.47
-Nodes (5): CoachBundleSlot, CourtBundleSlot, getCourtCoachBundleDiscount(), getCourtCoachBundleDiscountByCourtSlot(), getSlotKey()
+### Community 96 - "tariff-period.route.ts"
+Cohesion: 0.20
+Nodes (15): isSlotAllowedForMembershipType(), dateKey(), defaultTariffPeriod, resolveTariffPeriod(), tariffBand(), TariffBands, tariffPeriodSchema, TariffRule (+7 more)
 
-### Community 97 - "inventory-availability.service.ts"
-Cohesion: 0.31
-Nodes (6): getInventoryAvailability(), getInventoryAvailabilityMap(), InventoryAvailabilityItem, InventoryAvailabilityParams, sumByInventoryId(), inventory
+### Community 97 - "admin/checkout.handler.ts"
+Cohesion: 0.12
+Nodes (16): adminCheckoutSchema, ballboyCoversCourtSlot(), BallboySelectionInput, validateBallboysForTennisCourts(), assertCoachSlotsDoNotConflict(), CoachSlotLike, filterCoachSlotsWithoutBookingConflicts(), getActiveBookedCoachSlots() (+8 more)
 
 ### Community 98 - "types.d.ts"
 Cohesion: 0.22
@@ -659,17 +676,17 @@ Nodes (7): 4. Delete Credit Card, Credit Card Payment with 3DS - API Payload Exa
 Cohesion: 0.43
 Nodes (7): DOCKER_BUILDKIT, print_error(), print_header(), print_info(), print_success(), print_warning(), deploy-prod.sh script
 
-### Community 104 - "booked-coach.handler.ts"
-Cohesion: 0.36
-Nodes (6): bookedCoachesQuerySchema, cancelBookingSchema, cancelCoachBookingHandler, getAllBookedCoachesHandler, getBookedCoachDetailHandler, adminBookedCoachRoute
+### Community 104 - "🔧 Troubleshooting Commands"
+Cohesion: 0.29
+Nodes (7): Access Container Shell, Check Migrations, Check Status, Restart Services, Test Database Connection, 🔧 Troubleshooting Commands, View Logs
 
-### Community 105 - "routes/court.route.ts"
-Cohesion: 0.25
-Nodes (6): getAllCourtHandler, getAvailableCourtSlotsHandler, getCourtHandler, getCourtSlotsHandler, mocks, courtRoute
+### Community 105 - "handlers/court.handler.ts"
+Cohesion: 0.21
+Nodes (10): getAllCourtHandler, getAvailableCourtSlotsHandler, getCourtBookingWindowHandler, getCourtHandler, getCourtSlotsHandler, mocks, courtBookingRange(), now (+2 more)
 
-### Community 106 - "membership-booking.service.ts"
+### Community 106 - "password-reset.service.ts"
 Cohesion: 0.33
-Nodes (4): calculateMembershipSessionsForCourtSlots(), MembershipBookingTransaction, MembershipBookingUsage, MembershipCourtSlot
+Nodes (5): buildPasswordResetLink(), createPasswordResetToken(), generatePasswordResetToken(), getValidPasswordResetToken(), invalidatePasswordResetToken()
 
 ### Community 107 - "GoPay Tokenization (Core API) — reference"
 Cohesion: 0.29
@@ -679,6 +696,10 @@ Nodes (6): Flow, GoPay Tokenization (Core API) — reference, Notification types
 Cohesion: 0.29
 Nodes (7): 1. Income by Source, 2. Payment Methods, 3. Business Insights, 4. Bulk Data Export, Prerequisites, Test Cases, Testing the APIs
 
+### Community 109 - "phone.service.dto.ts"
+Cohesion: 0.07
+Nodes (6): GenerateOTPPayload, GenerateOTPResponse, OTPData, SendOTPPayload, SendOTPResponse, VerifyOTPPayload
+
 ### Community 110 - "Error Responses"
 Cohesion: 0.29
 Nodes (7): Amount Too Low, Card Declined, Error Responses, Expired Card, Insufficient Funds, Invalid Card Number, Invalid CVV
@@ -687,33 +708,33 @@ Nodes (7): Amount Too Low, Card Declined, Error Responses, Expired Card, Insuffi
 Cohesion: 0.52
 Nodes (6): print_error(), print_header(), print_info(), print_success(), print_warning(), setup-ssl.sh script
 
-### Community 112 - "class-booking.route.ts"
-Cohesion: 0.29
+### Community 112 - "class-booking.handler.ts"
+Cohesion: 0.43
 Nodes (6): approveClassBookingTransactionHandler, exportClassBookingTransactionsToExcelHandler, getAllClassBookingTransactionsHandler, getClassBookingTransactionDetailHandler, rejectClassBookingTransactionHandler, adminClassBookingRoute
 
-### Community 113 - "admin/class.route.ts"
-Cohesion: 0.29
-Nodes (6): createClassHandler, deleteClassHandler, getAllClassHandler, getClassHandler, updateClassHandler, adminClassRoute
+### Community 113 - "admin/class.handler.ts"
+Cohesion: 0.31
+Nodes (8): createClassHandler, deleteClassHandler, getAllClassHandler, getClassHandler, updateClassHandler, CreateClassSchema, UpdateClassSchema, adminClassRoute
 
-### Community 114 - "coach-type.route.ts"
-Cohesion: 0.29
-Nodes (6): createCoachTypeHandler, deleteCoachTypeHandler, getAllCoachTypesHandler, getCoachTypeHandler, updateCoachTypeHandler, adminCoachTypeRoute
+### Community 114 - "coach-type.handler.ts"
+Cohesion: 0.31
+Nodes (8): createCoachTypeHandler, deleteCoachTypeHandler, getAllCoachTypesHandler, getCoachTypeHandler, updateCoachTypeHandler, CreateCoachTypeSchema, UpdateCoachTypeSchema, adminCoachTypeRoute
 
-### Community 115 - "admin/partnership.route.ts"
-Cohesion: 0.29
-Nodes (6): createPartnershipHandler, deletePartnershipHandler, getAllPartnershipHandler, getPartnershipHandler, updatePartnershipHandler, adminPartnershipRoute
+### Community 115 - "admin/partnership.handler.ts"
+Cohesion: 0.31
+Nodes (8): createPartnershipHandler, deletePartnershipHandler, getAllPartnershipHandler, getPartnershipHandler, updatePartnershipHandler, CreatePartnershipSchema, UpdatePartnershipSchema, adminPartnershipRoute
 
-### Community 116 - "admin/payment-method.route.ts"
-Cohesion: 0.29
-Nodes (6): createPaymentMethodHandler, deletePaymentMethodHandler, getAllPaymentMethodsHandler, getPaymentMethodHandler, updatePaymentMethodHandler, paymentMethodRoute
+### Community 116 - "admin/payment-method.handler.ts"
+Cohesion: 0.31
+Nodes (8): createPaymentMethodHandler, deletePaymentMethodHandler, getAllPaymentMethodsHandler, getPaymentMethodHandler, updatePaymentMethodHandler, CreatePaymentMethodSchema, UpdatePaymentMethodSchema, paymentMethodRoute
 
-### Community 117 - "promo-code.route.ts"
-Cohesion: 0.29
-Nodes (6): createPromoCodeHandler, deletePromoCodeHandler, getAllPromoCodeHandler, getPromoCodeHandler, updatePromoCodeHandler, adminPromoCodeRoute
+### Community 117 - "promo-code.handler.ts"
+Cohesion: 0.27
+Nodes (8): createPromoCodeHandler, deletePromoCodeHandler, getAllPromoCodeHandler, getPromoCodeHandler, updatePromoCodeHandler, CreatePromoCodeSchema, UpdatePromoCodeSchema, adminPromoCodeRoute
 
-### Community 118 - "coach-booking-conflict.service.ts"
-Cohesion: 0.52
-Nodes (6): assertCoachSlotsDoNotConflict(), CoachSlotLike, filterCoachSlotsWithoutBookingConflicts(), getActiveBookedCoachSlots(), getSlotRange(), overlaps()
+### Community 118 - "🐛 Debugging"
+Cohesion: 0.40
+Nodes (5): Check if worker is running, Check Redis connection, 🐛 Debugging, Test email sending manually, View worker logs
 
 ### Community 119 - "dashboard-stats-verification.ts"
 Cohesion: 0.52
@@ -739,37 +760,33 @@ Nodes (6): Issue: Container keeps restarting, Issue: DB_PASSWORD not found, Issu
 Cohesion: 0.33
 Nodes (6): 1. Save a New Credit Card, Endpoint, Headers, Request Payload, Response (Error - Invalid Card), Response (Success)
 
-### Community 126 - "ballboy-cost.route.ts"
-Cohesion: 0.33
-Nodes (5): createBallboyCostHandler, getBallboyCostHandler, overrideSingleBallboyCostHandler, updateBallboyCostHandler, adminBallboyCostRoute
-
-### Community 127 - "coach-cost.route.ts"
-Cohesion: 0.33
-Nodes (5): createCoachCostHandler, getCoachCostHandler, overrideSingleCoachCostHandler, updateCoachCostHandler, adminCoachCostRoute
-
-### Community 128 - "court-cost.route.ts"
-Cohesion: 0.33
-Nodes (5): createCourtCostHandler, getCourtCostHandler, overrideSingleCourtCostHandler, updateCourtCostHandler, adminCourtCostRoute
-
-### Community 129 - "staff-cost.route.ts"
-Cohesion: 0.33
-Nodes (5): createStaffCostHandler, getStaffCostHandler, overrideSingleStaffCostHandler, updateStaffCostHandler, adminStaffCostRoute
-
-### Community 130 - "routes/coach.route.ts"
-Cohesion: 0.33
-Nodes (4): getAvailableCoachesHandler, getCoachesHandler, adminCoachRoute, coachRoute
-
-### Community 131 - "routes/invoice.route.ts"
-Cohesion: 0.33
-Nodes (5): cancelUserBookingHandler, expireInvoiceHandler, getInvoiceDetailHandler, getUserInvoicesHandler, invoiceRoute
-
-### Community 132 - "auth-cookies.ts"
-Cohesion: 0.47
-Nodes (5): baseCookieOptions(), clearAdminAuthCookies(), clearUserAuthCookies(), setAdminAccessTokenCookie(), setUserAccessTokenCookie()
-
-### Community 133 - "ongoing-schedule.ts"
+### Community 126 - "Pengaturan jam tarif"
 Cohesion: 0.40
-Nodes (3): getOngoingSchedule(), ScheduleSlot, slots
+Nodes (4): Docker, Penerapan, Pengaturan jam tarif, Verifikasi
+
+### Community 128 - "Running Services"
+Cohesion: 0.50
+Nodes (4): Option 1: Start All Services (Recommended), Option 2: Start Only App (Without Worker), Option 3: Start Individual Services, Running Services
+
+### Community 129 - "staff-cost.handler.ts"
+Cohesion: 0.29
+Nodes (8): createStaffCostHandler, getStaffCostHandler, overrideSingleStaffCostHandler, updateStaffCostHandler, CreateStaffCostSchema, OverrideSingleStaffCostSchema, updateStaffCostSchema, adminStaffCostRoute
+
+### Community 130 - "Pembelian paket baru dan saldo minus"
+Cohesion: 0.50
+Nodes (3): Pembelian paket baru dan saldo minus, Penerapan, Verifikasi
+
+### Community 131 - "Frontend Integration"
+Cohesion: 0.50
+Nodes (4): 1. Display Payment Actions, 2. Show Payment Instructions, 3. Handle Payment Result, Frontend Integration
+
+### Community 132 - "Channel-Specific Configuration"
+Cohesion: 0.50
+Nodes (4): Channel-Specific Configuration, E-Wallets (DANA, OVO, LinkAja, ShopeePay), QRIS, Virtual Accounts
+
+### Community 133 - "Booking rutin membership (admin)"
+Cohesion: 0.50
+Nodes (3): Booking rutin membership (admin), Penerapan, Verifikasi
 
 ### Community 134 - "Cabang"
 Cohesion: 0.40
@@ -791,13 +808,9 @@ Nodes (5): Bulk Export, Business Insights, Income by Source, Payment Methods, Po
 Cohesion: 0.40
 Nodes (5): Issue: Authentication Errors (401), Issue: Database Connection Errors, Issue: Empty Results, Issue: Export File Corrupted, Troubleshooting
 
-### Community 139 - "🔐 Password Reset API"
-Cohesion: 0.40
-Nodes (5): 1. Request Reset (User-initiated), 2. Verify Token, 3. Reset Password, 4. Admin-Triggered Reset, 🔐 Password Reset API
-
-### Community 140 - "Post-Deployment"
-Cohesion: 0.40
-Nodes (5): 10. Backup, 11. Documentation, 12. Testing, 9. Monitoring, Post-Deployment
+### Community 139 - "Jadwal booking berjalan"
+Cohesion: 0.50
+Nodes (3): Jadwal booking berjalan, Penerapan, Verifikasi
 
 ### Community 141 - "3DS Authentication Flow"
 Cohesion: 0.40
@@ -807,29 +820,29 @@ Nodes (5): 3DS Authentication Flow, Step 1: Initial Payment Request, Step 2: Red
 Cohesion: 0.40
 Nodes (5): Card Declined, Expired Card, Insufficient Funds, Successful Payment (Requires 3DS), Test Cards (Xendit Sandbox)
 
-### Community 143 - "Testing Workflow"
+### Community 143 - "Existing Endpoints (Reference)"
 Cohesion: 0.40
-Nodes (5): Phase 1: Service Health Check (5 min), Phase 2: Endpoint Testing (15 min), Phase 3: Token Flow Testing (20 min), Phase 4: Admin Endpoint Testing (10 min), Testing Workflow
+Nodes (5): Existing Endpoints (Reference), GET `/admin/analytics`, GET `/admin/analytics/daily-transactions`, GET `/admin/analytics/dashboard`, GET `/admin/analytics/export/excel`
 
 ### Community 144 - "package.json"
 Cohesion: 0.40
 Nodes (4): name, private, type, version
 
-### Community 145 - "🐛 Debugging"
+### Community 145 - "Queue Management"
+Cohesion: 0.67
+Nodes (3): Clear Queue (Emergency Only), Queue Management, View Queue Statistics
+
+### Community 146 - "validate-hook.ts"
+Cohesion: 0.18
+Nodes (11): requestPasswordResetHandler, resetPasswordWithTokenHandler, resetPasswordWithTokenSchema, verifyResetTokenHandler, validateHook(), zodErrorToFormErrors(), branchRoute, schema (+3 more)
+
+### Community 147 - "Production Deployment"
 Cohesion: 0.40
-Nodes (5): Check if worker is running, Check Redis connection, 🐛 Debugging, Test email sending manually, View worker logs
+Nodes (5): 1. Update docker-compose.yml, 2. Setup Monitoring, 3. Setup Logging, 4. Production Environment, Production Deployment
 
-### Community 146 - "password-reset.route.ts"
+### Community 148 - "Troubleshooting"
 Cohesion: 0.40
-Nodes (4): requestPasswordResetHandler, resetPasswordWithTokenHandler, verifyResetTokenHandler, passwordResetRoute
-
-### Community 147 - "slot-claim.service.ts"
-Cohesion: 0.50
-Nodes (3): claimSlotsAtomically(), releaseSlotsByIds(), Tx
-
-### Community 148 - "court-branch-policy.ts"
-Cohesion: 0.70
-Nodes (3): assertCourtSportAtBranch(), bookableCourtWhere, supportedCourtWhere
+Nodes (5): Email Worker Exiting, Email Worker Not Starting, Redis Connection Errors, SMTP Connection Errors, Troubleshooting
 
 ### Community 149 - "day.ts"
 Cohesion: 0.70
@@ -843,9 +856,13 @@ Nodes (4): 1. **Analytics Service** (`src/services/analytics.service.ts`), 2. **
 Cohesion: 0.50
 Nodes (4): Date Range Parameters, Defaults (if not provided), Example Requests with Date Ranges, Format
 
-### Community 153 - "Deployment"
+### Community 152 - "Testing"
+Cohesion: 0.67
+Nodes (3): Test Webhook Locally, Test with Xendit Test Mode, Testing
+
+### Community 153 - "📧 Email Queue API"
 Cohesion: 0.50
-Nodes (4): 6. Initial Deployment, 7. Verification, 8. DNS & SSL, Deployment
+Nodes (4): Available Templates, 📧 Email Queue API, Get Queue Stats, Queue Email
 
 ### Community 154 - "2. List Saved Credit Cards"
 Cohesion: 0.50
@@ -875,36 +892,40 @@ Nodes (4): 8. Membership Checkout with NEW Credit Card, Endpoint, Request Payloa
 Cohesion: 0.50
 Nodes (4): 9. Membership Checkout with SAVED Credit Card, Endpoint, Request Payload, Response
 
-### Community 166 - "admin/invoice.route.ts"
-Cohesion: 0.50
-Nodes (3): getAllInvoicesAdminHandler, getInvoiceDetailAdminHandler, adminInvoiceRoute
-
-### Community 167 - "routes/class.route.ts"
-Cohesion: 0.50
-Nodes (3): getAllClassHandler, getClassHandler, classRoute
+### Community 165 - "Health Checks"
+Cohesion: 0.67
+Nodes (3): Automated Health Check Script, Health Checks, Verify Worker Health
 
 ### Community 170 - "Response Format"
 Cohesion: 0.67
 Nodes (3): Error Response (4xx/5xx), Response Format, Success Response (200 OK)
 
+### Community 171 - "tariff-period.route.test.ts"
+Cohesion: 0.25
+Nodes (7): hono, hono, app(), route, input, mocks, request()
+
+### Community 219 - "setup-branches.ts"
+Cohesion: 0.33
+Nodes (3): apply, db, preserved
+
 ## Knowledge Gaps
-- **1258 isolated node(s):** `handler`, `name`, `private`, `version`, `type` (+1253 more)
+- **1308 isolated node(s):** `handler`, `name`, `private`, `version`, `type` (+1303 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **47 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **63 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `dependencies` connect `dependencies` to `package.json`, `costing.service.ts`, `analytics.handler.ts`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `dependencies` to `package.json`, `costing.service.ts`, `argon2`, `@prisma/client`, `dotenv`, `tariff-period.route.test.ts`, `@hono/node-server`, `booking.handler.ts`, `hono-pino`, `@hono/zod-validator`, `http-status`, `ioredis`, `nodemailer`, `pino`, `pino-http`, `pino-pretty`, `sharp`, `slugify`, `@types/xlsx`, `@vercel/blob`, `xendit-node`, `zod`?**
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **Why does `dayjs` connect `costing.service.ts` to `dependencies`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `devDependencies` connect `devDependencies` to `package.json`, `vitest`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
-- **Are the 44 inferred relationships involving `validateHook()` (e.g. with `analytics.handler.ts` and `admin/auth.handler.ts`) actually correct?**
-  _`validateHook()` has 44 INFERRED edges - model-reasoned connections that need verification._
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **Why does `devDependencies` connect `devDependencies` to `package.json`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **Are the 48 inferred relationships involving `validateHook()` (e.g. with `analytics.handler.ts` and `admin/auth.handler.ts`) actually correct?**
+  _`validateHook()` has 48 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `handler`, `name`, `private` to the rest of the system?**
-  _1258 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1308 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `common.sh` be split into smaller, more focused modules?**
   _Cohesion score 0.09497882637628555 - nodes in this community are weakly interconnected._
 - **Should `BullMQ Setup & Integration Guide` be split into smaller, more focused modules?**

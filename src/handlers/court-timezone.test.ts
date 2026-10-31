@@ -1,3 +1,4 @@
+vi.mock('@/services/rolling-court-schedule.service', () => ({ ensureRollingCourtSchedules: vi.fn() }))
 import { expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ slots: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({ db: { slot: { findMany: mocks.slots } } }))

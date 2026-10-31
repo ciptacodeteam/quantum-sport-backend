@@ -1,8 +1,14 @@
 import { CourtSport } from '@prisma/client'
-import dayjs from 'dayjs'
+import {
+  resolveTariffPeriod,
+  tariffBand,
+  type TariffRule,
+} from '@/lib/tariff-period'
+import { branchContext } from '@/lib/branch-context'
 
 type CourtBundleSlot = {
   id: string
+  branchId?: string
   startAt: Date
   endAt: Date
   court?: { sport: CourtSport } | null
@@ -16,19 +22,32 @@ type CoachBundleSlot = {
 const getSlotKey = (slot: { startAt: Date; endAt: Date }) =>
   `${slot.startAt.toISOString()}|${slot.endAt.toISOString()}`
 
-export function getCourtCoachBundleDiscount(courtSlot: CourtBundleSlot) {
+export function getCourtCoachBundleDiscount(
+  courtSlot: CourtBundleSlot,
+  rules: TariffRule[] = [],
+) {
   const sport = courtSlot.court?.sport
   if (sport === CourtSport.TENNIS) return 100_000
 
-  const hour = dayjs(courtSlot.startAt).hour()
-  if (hour >= 6 && hour <= 14) return 100_000
-  if (hour >= 15 && hour <= 23) return 70_000
+  const band = tariffBand(
+    courtSlot.startAt,
+    resolveTariffPeriod(
+      rules,
+      courtSlot.startAt,
+      courtSlot.branchId ?? branchContext.getStore()?.branchId ?? '',
+      sport ?? 'PADEL',
+    ),
+    courtSlot.endAt,
+  )
+  if (band === 'happyHour') return 100_000
+  if (band === 'peakHour') return 70_000
   return 0
 }
 
 export function getCourtCoachBundleDiscountByCourtSlot(
   courtSlots: CourtBundleSlot[],
   coachSlots: CoachBundleSlot[],
+  rules: TariffRule[] = [],
 ) {
   const coachKeys = new Set(coachSlots.map(getSlotKey))
   const discountByCourtSlotId = new Map<string, number>()
@@ -36,7 +55,7 @@ export function getCourtCoachBundleDiscountByCourtSlot(
   for (const courtSlot of courtSlots) {
     if (!coachKeys.has(getSlotKey(courtSlot))) continue
 
-    const discount = getCourtCoachBundleDiscount(courtSlot)
+    const discount = getCourtCoachBundleDiscount(courtSlot, rules)
     if (discount > 0) {
       discountByCourtSlotId.set(courtSlot.id, discount)
     }

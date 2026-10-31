@@ -198,7 +198,7 @@ run('branch isolation against PostgreSQL', () => {
     )
     expect(invoice.branchId).toBe(b)
   })
-  it('shares a paid membership balance across its two eligible branches', async () => {
+  it('shares the paid membership wallet across playing branches independent of legacy eligibility mappings', async () => {
     await asBranch(b, async () => {
       const eligible = await db.membershipUser.findFirst({
         where: { id: walletId, invoice: { status: 'PAID' } },
@@ -217,10 +217,12 @@ run('branch isolation against PostgreSQL', () => {
       )?.remainingSessions,
     ).toBe(8)
     expect(
-      await asBranch(third, () =>
-        db.membershipUser.findUnique({ where: { id: walletId } }),
-      ),
-    ).toBeNull()
+      (
+        await asBranch(third, () =>
+          db.membershipUser.findUnique({ where: { id: walletId } }),
+        )
+      )?.remainingSessions,
+    ).toBe(8)
   })
   it('reports membership sales only at the selling branch while keeping the wallet shared', async () => {
     for (const branchId of [a, b]) {

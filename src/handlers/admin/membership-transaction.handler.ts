@@ -1,3 +1,5 @@
+import { withCustomerWallet } from '@/services/membership-renewal.service'
+import { activateMembershipAfterPayment } from '@/services/membership-activation.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -30,6 +32,7 @@ const membershipTransactionsQuerySchema = searchQuerySchema.extend({
     .describe('Filter by transaction source: cashier or online'),
   sport: z.nativeEnum(CourtSport).optional(),
   status: z.enum(membershipTransactionStatuses).optional(),
+  balance: z.enum(['nonnegative', 'negative']).default('nonnegative'),
 })
 
 export const getAllMembershipTransactionsHandler = factory.createHandlers(
@@ -66,53 +69,65 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
         }
       }
 
-      const membershipTransactions = await db.membershipUser.findMany({
-        ...queryOptions,
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              phone: true,
-            },
+      const loadTransactions = () =>
+        db.membershipUser.findMany({
+          ...queryOptions,
+          where: {
+            AND: [
+              where,
+              {
+                remainingSessions:
+                  query.balance === 'negative' ? { lt: 0 } : { gte: 0 },
+              },
+            ],
           },
-          membership: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              price: true,
-              sport: true,
-              sessions: true,
-              duration: true,
-              benefits: {
-                select: {
-                  id: true,
-                  benefit: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+            membership: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                price: true,
+                sport: true,
+                sessions: true,
+                duration: true,
+                benefits: {
+                  select: {
+                    id: true,
+                    benefit: true,
+                  },
                 },
               },
             },
-          },
-          invoice: {
-            include: {
-              payment: {
-                include: {
-                  method: {
-                    select: {
-                      id: true,
-                      name: true,
-                      logo: true,
+            invoice: {
+              include: {
+                payment: {
+                  include: {
+                    method: {
+                      select: {
+                        id: true,
+                        name: true,
+                        logo: true,
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
-      })
+        })
 
+      const membershipTransactions = await (query.balance === 'negative'
+        ? withCustomerWallet(loadTransactions)
+        : loadTransactions())
       return c.json(ok(membershipTransactions), status.OK)
     } catch (error) {
       c.var.logger.fatal(
@@ -251,7 +266,11 @@ export const approveMembershipTransactionHandler = factory.createHandlers(
           }
         }
 
-        return membershipTransaction
+        await activateMembershipAfterPayment(tx, membershipTransaction.id)
+        return tx.membershipUser.findUnique({
+          where: { id: membershipTransaction.id },
+          include: { membership: true, invoice: true },
+        })
       })
 
       return c.json(
@@ -440,6 +459,7 @@ export const exportMembershipTransactionsToExcelHandler =
         const query = c.req.valid('query') as SearchQuerySchema & {
           sport?: CourtSport
           status?: string
+          balance?: 'negative' | 'nonnegative'
         }
         const queryOptions = buildFindManyOptions(query, {
           defaultOrderBy: { createdAt: 'desc' },
@@ -458,52 +478,64 @@ export const exportMembershipTransactionsToExcelHandler =
           }
         }
 
-        const membershipTransactions = await db.membershipUser.findMany({
-          ...queryOptions,
-          where,
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-              },
+        const loadTransactions = () =>
+          db.membershipUser.findMany({
+            ...queryOptions,
+            where: {
+              AND: [
+                where,
+                {
+                  remainingSessions:
+                    query.balance === 'negative' ? { lt: 0 } : { gte: 0 },
+                },
+              ],
             },
-            membership: {
-              select: {
-                id: true,
-                name: true,
-                description: true,
-                sport: true,
-                price: true,
-                sessions: true,
-                duration: true,
-                benefits: {
-                  select: {
-                    id: true,
-                    benefit: true,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true,
+                },
+              },
+              membership: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                  sport: true,
+                  price: true,
+                  sessions: true,
+                  duration: true,
+                  benefits: {
+                    select: {
+                      id: true,
+                      benefit: true,
+                    },
                   },
                 },
               },
-            },
-            invoice: {
-              include: {
-                payment: {
-                  include: {
-                    method: {
-                      select: {
-                        id: true,
-                        name: true,
+              invoice: {
+                include: {
+                  payment: {
+                    include: {
+                      method: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
                       },
                     },
                   },
                 },
               },
             },
-          },
-        })
+          })
 
+        const membershipTransactions = await (query.balance === 'negative'
+          ? withCustomerWallet(loadTransactions)
+          : loadTransactions())
         // Transform membership transactions data to Excel format
         const excelData = membershipTransactions.map((transaction) => {
           // Get benefits

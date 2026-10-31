@@ -1,3 +1,8 @@
+import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
+import {
+  ensureRollingCourtSchedules,
+  saveRollingCourtSlotRule,
+} from '@/services/rolling-court-schedule.service'
 import { branchContext } from '@/lib/branch-context'
 import {
   supportedCourtWhere,
@@ -16,6 +21,7 @@ import {
   availableCourtSlotsQuerySchema,
   BulkUpdateCourtSlotPricingSchema,
   bulkUpdateCourtSlotPricingSchema,
+  bulkDisableCourtSlotsSchema,
   CreateCourtSchema,
   createCourtSchema,
   IdSchema,
@@ -30,6 +36,7 @@ import {
   updateSlotPricingSchema,
 } from '@/lib/validation'
 import { getCourtSlotStatus } from '@/services/court-slot-status'
+import { bulkDisableCourtSlots } from '@/services/bulk-disable-court-slots.service'
 import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import {
   bulkUpdateCourtSlotPricing,
@@ -278,12 +285,14 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules()
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
         courtSport?: 'PADEL' | 'TENNIS'
       }
 
       const where: any = {
+        ...rollingBookingWindowWhere(),
         type: SlotType.COURT,
         isAvailable: true,
         bookingDetails: {
@@ -379,6 +388,7 @@ export const getCostHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   async (c) => {
     try {
+      await ensureRollingCourtSchedules(c.req.valid('param').id)
       const { id } = c.req.valid('param') as IdSchema
 
       if (!(await db.court.findUnique({ where: { id } })))
@@ -394,7 +404,8 @@ export const getCostHandler = factory.createHandlers(
               'endAt', s."endAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
               'price', s.price,
               'discountPrice', s."discountPrice",
-              'isAvailable', s."isAvailable",
+              'isAvailable', (s."isAvailable" AND NOT s."scheduleClosed"),
+              'scheduleClosed', s."scheduleClosed",
               'createdAt', s."createdAt",
               'updatedAt', s."updatedAt"
             )
@@ -451,21 +462,39 @@ export const updateCourtSlotAvailabilityHandler = factory.createHandlers(
         throw new BadRequestException('Slot is not a court slot')
       }
 
-      // Prevent disabling slots that have active bookings
-      if (!isAvailable && slot.bookingDetails.length > 0) {
+      if (isAvailable && slot.scheduleClosed) {
         throw new BadRequestException(
-          'Cannot disable court slot with active bookings',
+          'Slot ditutup oleh aturan jadwal. Ubah hari atau jam pada pengaturan jadwal otomatis.',
         )
       }
 
-      const updatedSlot = await db.slot.update({
-        where: { id },
-        data: {
-          isAvailable,
-        },
-        include: {
-          court: true,
-        },
+      // Active bookings must never be released via the manual availability toggle.
+      if (slot.bookingDetails.length > 0) {
+        throw new BadRequestException(
+          'Cannot change availability of court slot with active bookings',
+        )
+      }
+
+      const updatedSlot = await db.$transaction(async (tx) => {
+        const changed = await tx.slot.updateMany({
+          where: {
+            id,
+            isAvailable: slot.isAvailable,
+            ...(isAvailable ? { scheduleClosed: false } : {}),
+            bookingDetails: {
+              none: { booking: { status: { not: BookingStatus.CANCELLED } } },
+            },
+          },
+          data: { isAvailable },
+        })
+        if (changed.count !== 1)
+          throw new BadRequestException(
+            'Status slot sudah berubah. Muat ulang jadwal terlebih dahulu.',
+          )
+        return tx.slot.findUniqueOrThrow({
+          where: { id },
+          include: { court: true },
+        })
       })
 
       // Transform court image if exists
@@ -558,6 +587,33 @@ export const updateSlotPricingHandler = factory.createHandlers(
   },
 )
 
+export const bulkDisableCourtSlotsHandler = factory.createHandlers(
+  zValidator('param', idSchema, validateHook),
+  zValidator('json', bulkDisableCourtSlotsSchema, validateHook),
+  async (c) => {
+    const { id: courtId } = c.req.valid('param')
+    const court = await db.court.findUnique({
+      where: { id: courtId },
+      select: { id: true },
+    })
+    if (!court) throw new NotFoundException('Court item not found')
+    const payload = c.req.valid('json')
+    const result = payload.followRollingWindow
+      ? await saveRollingCourtSlotRule(courtId, {
+          kind: 'disable',
+          fromDate: dayjs().format('YYYY-MM-DD'),
+          days: payload.days,
+          startHour: payload.startHour,
+          endHour: payload.endHour,
+        })
+      : await bulkDisableCourtSlots({
+          courtId,
+          ...payload,
+        })
+    return c.json(ok(result, 'Court slots disabled successfully'), status.OK)
+  },
+)
+
 export const bulkUpdateCourtSlotPricingHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   zValidator('json', bulkUpdateCourtSlotPricingSchema, validateHook),
@@ -575,10 +631,20 @@ export const bulkUpdateCourtSlotPricingHandler = factory.createHandlers(
         throw new NotFoundException('Court item not found')
       }
 
-      const result = await bulkUpdateCourtSlotPricing({
-        courtId,
-        ...payload,
-      })
+      const result = payload.followRollingWindow
+        ? await saveRollingCourtSlotRule(courtId, {
+            kind: 'pricing',
+            fromDate: dayjs().format('YYYY-MM-DD'),
+            days: payload.days,
+            startHour: payload.startHour,
+            endHour: payload.endHour,
+            price: payload.price,
+            discountPrice: payload.discountPrice ?? 0,
+          })
+        : await bulkUpdateCourtSlotPricing({
+            courtId,
+            ...payload,
+          })
 
       return c.json(
         ok(result, 'Bulk court slot pricing updated successfully'),

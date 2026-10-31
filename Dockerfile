@@ -86,6 +86,7 @@ COPY --from=deps --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/prisma.config.ts ./
 
 # Copy entrypoint script and make it executable (must be done as root)
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh

@@ -5,6 +5,9 @@ FROM oven/bun:1.3-alpine
 
 WORKDIR /app
 
+# Build-time value only; Compose overrides it with the development database URL.
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
+
 # Install system dependencies
 RUN apk add --no-cache postgresql-client git
 
@@ -13,6 +16,7 @@ COPY package.json ./
 
 # Copy prisma schema BEFORE bun install (needed for postinstall script)
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 # Install dependencies (postinstall will run prisma generate)
 RUN bun install 

@@ -1,4 +1,12 @@
+import type { Prisma } from '@prisma/client'
+import {
+  creditMembershipIncludingTransferredDebt,
+  lockCustomerWallet,
+  restoreRecurringMembershipDebits,
+  withCustomerWallet,
+} from './membership-renewal.service'
 type MembershipBookingUsage = {
+  id?: string
   membershipUserId?: string | null
   membershipSessionsUsed?: number | null
 }
@@ -8,7 +16,15 @@ type MembershipCourtSlot = {
   endAt: Date
 }
 
-type MembershipBookingTransaction = {
+type MembershipBookingTransaction = Partial<
+  Pick<
+    Prisma.TransactionClient,
+    | 'membershipSessionDebit'
+    | 'membershipDebtTransfer'
+    | 'booking'
+    | '$queryRaw'
+  >
+> & {
   membershipUser: {
     findUnique: (args: {
       where: { id: string }
@@ -30,7 +46,7 @@ type MembershipBookingTransaction = {
     update: (args: {
       where: { id: string }
       data: {
-        remainingSessions: number
+        remainingSessions: { increment: number }
         isExpired: boolean
       }
     }) => Promise<unknown>
@@ -69,6 +85,21 @@ export async function restoreMembershipSessionsForCancelledBooking(
     return 0
   }
 
+  if (booking.id && tx.membershipSessionDebit && tx.booking && tx.$queryRaw) {
+    const restored = await restoreRecurringMembershipDebits(
+      tx as unknown as Prisma.TransactionClient,
+      booking.id,
+    )
+    if (restored !== null) return restored
+  }
+
+  // Hold expiry can refund a normal booking while a new package is being paid.
+  if (tx.$queryRaw) {
+    const walletTx = tx as unknown as Prisma.TransactionClient
+    const identity = await withCustomerWallet(() => walletTx.membershipUser.findUnique({ where: { id: booking.membershipUserId! }, select: { userId: true } }))
+    if (identity) await lockCustomerWallet(walletTx, identity.userId)
+  }
+
   const membershipUser = await tx.membershipUser.findUnique({
     where: { id: booking.membershipUserId },
     include: {
@@ -84,11 +115,24 @@ export async function restoreMembershipSessionsForCancelledBooking(
     return 0
   }
 
+  const transferredDebt = tx.membershipDebtTransfer
+    ? await withCustomerWallet(() =>
+        tx.membershipDebtTransfer!.findMany({
+          where: { fromMembershipUserId: membershipUser.id },
+        }),
+      )
+    : []
+  const outstandingDebt = transferredDebt.reduce(
+    (sum, transfer) => sum + transfer.sessions - transfer.restoredSessions,
+    0,
+  )
   const restoredSessions = Math.min(
     sessionsToRestore,
     Math.max(
       0,
-      membershipUser.membership.sessions - membershipUser.remainingSessions,
+      membershipUser.membership.sessions -
+        membershipUser.remainingSessions +
+        outstandingDebt,
     ),
   )
 
@@ -96,10 +140,21 @@ export async function restoreMembershipSessionsForCancelledBooking(
     return 0
   }
 
+  if (transferredDebt.length && tx.membershipDebtTransfer) {
+    await withCustomerWallet(() =>
+      creditMembershipIncludingTransferredDebt(
+        tx as unknown as Prisma.TransactionClient,
+        membershipUser.id,
+        restoredSessions,
+      ),
+    )
+    return restoredSessions
+  }
+
   await tx.membershipUser.update({
     where: { id: membershipUser.id },
     data: {
-      remainingSessions: membershipUser.remainingSessions + restoredSessions,
+      remainingSessions: { increment: restoredSessions },
       isExpired: membershipUser.endDate <= new Date(),
     },
   })

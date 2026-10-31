@@ -1,13 +1,13 @@
 BEGIN;
 
 -- AlterEnum
-ALTER TYPE "Role" ADD VALUE 'SUPER_ADMIN';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
 
 -- DropIndex
-DROP INDEX "courts_name_key";
+DROP INDEX IF EXISTS "courts_name_key";
 
 -- DropIndex
-DROP INDEX "inventories_name_key";
+DROP INDEX IF EXISTS "inventories_name_key";
 
 -- AlterTable
 ALTER TABLE "staff" ADD COLUMN     "branchId" TEXT NOT NULL DEFAULT 'cemara';
@@ -125,9 +125,10 @@ CREATE INDEX "tournaments_branchId_idx" ON "tournaments"("branchId");
 CREATE INDEX "notifications_branchId_idx" ON "notifications"("branchId");
 
 -- Preserve all existing operational records at Cemara and enable the two initial branches.
-INSERT INTO "branches" ("id", "name", "address", "mapsUrl", "sequence") VALUES
-('cemara', 'Black Padel Cemara', 'Jl. Cemara No. 51, Pulo Brayan Bengkel Baru, Medan Timur, Kota Medan, Sumatera Utara 20237, Indonesia.', 'https://maps.app.goo.gl/a5b6EUoXWiCnqQVj8', 0),
-('s-parman', 'Black Padel S. Parman', 'Jl. S. Parman No.269-283, Petisah Hulu, Kec. Medan Baru, Kota Medan, Sumatera Utara 20152', 'https://maps.google.com/maps?ftid=0x3031310010a25ae9:0x14bf370c5ed5f418', 1);
+-- Cemara stays the only bookable club. S. Parman is created inactive so existing customers cannot land on an empty branch.
+INSERT INTO "branches" ("id", "name", "address", "mapsUrl", "sequence", "isActive") VALUES
+('cemara', 'Black Padel Cemara', 'Jl. Cemara No. 51, Pulo Brayan Bengkel Baru, Medan Timur, Kota Medan, Sumatera Utara 20237, Indonesia.', 'https://maps.app.goo.gl/a5b6EUoXWiCnqQVj8', 0, true),
+('s-parman', 'Black Padel S. Parman', 'Jl. S. Parman No.269-283, Petisah Hulu, Kec. Medan Baru, Kota Medan, Sumatera Utara 20152', 'https://maps.google.com/maps?ftid=0x3031310010a25ae9:0x14bf370c5ed5f418', 1, false);
 
 INSERT INTO "membership_branches" ("membershipId", "branchId")
 SELECT m.id, b.id FROM "memberships" m CROSS JOIN "branches" b;
