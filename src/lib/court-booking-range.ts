@@ -8,9 +8,7 @@ export function courtBookingRange(
   const startDate = dayjs(now).format('YYYY-MM-DD')
   const endDate = courts.reduce((latest, court) => {
     const date = court.bookingWindowMonths
-      ? dayjs(bookingWindowEnd(court.bookingWindowMonths, now)).format(
-          'YYYY-MM-DD',
-        )
+      ? clubWallDateString(bookingWindowEnd(court.bookingWindowMonths, now))
       : court.slot[0]
         ? clubWallDateString(court.slot[0].startAt)
         : startDate

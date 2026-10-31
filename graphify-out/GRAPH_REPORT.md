@@ -1,7 +1,7 @@
 # Graph Report - quantum-sport-backend  (2026-11-01)
 
 ## Corpus Check
-- 370 files · ~196,046 words
+- 370 files · ~196,044 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0eaa8756`
+- Built from commit: `71a7b16a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -101,7 +101,7 @@
 - Midtrans Core API — Notifications (Webhook)
 - Midtrans Subscription / Recurring API (v1)
 - SSL Quick Setup for api.quantumsocialclub.id
-- midtrans-webhook.handler.ts
+- scheduler.service.ts
 - ✨ What the Script Does
 - dependencies
 - Midtrans Core API — E-Wallet & QRIS
@@ -156,8 +156,9 @@
 - Court Performance
 - 3DS Authentication Flow
 - Test Cards (Xendit Sandbox)
-- argon2
+- Existing Endpoints (Reference)
 - package.json
+- @hono/node-server
 - admin/checkout.handler.ts
 - day.ts
 - What Was Added
@@ -206,7 +207,6 @@
 - http-status
 - nodemailer
 - pino
-- Implementation Details
 - pino-pretty
 - sharp
 - slugify
@@ -416,8 +416,8 @@ Cohesion: 0.08
 Nodes (22): BadRequestException, NotFoundException, applyPromoCodeHandler, ballboyCoversCourtSlot(), BallboySelectionInput, cancelPaymentSessionHandler, cancelPaymentSessionSchema, checkoutHandler (+14 more)
 
 ### Community 39 - "ok"
-Cohesion: 0.19
-Nodes (21): handleInvoiceWebhookV2(), handlePaymentSessionWebhook(), handlePaymentWebhookV3(), getRedisConnection(), ok(), cancelHoldBookingAndReleaseResources(), cancelHoldClassBookingAndRestoreCapacity(), Tx (+13 more)
+Cohesion: 0.26
+Nodes (16): midtransClientConfigHandler, midtransFinishHandler, midtransWebhookHandler, handleInvoiceWebhookV2(), handlePaymentSessionWebhook(), handlePaymentWebhookV3(), ok(), midtransRoute (+8 more)
 
 ### Community 40 - "Prisma Studio in Production"
 Cohesion: 0.10
@@ -433,11 +433,11 @@ Nodes (18): changePasswordAdminHandler, checkAdminAccountHandler, getAdminProfil
 
 ### Community 43 - "payment-reconcile.service.ts"
 Cohesion: 0.18
-Nodes (16): isPaidStatus(), midtransService, asMeta(), extractGatewayPaymentRequestId(), FinalizePaymentResult, GATEWAY_PAID_STATUSES, isGatewayPaymentCompleted(), PaymentMeta (+8 more)
+Nodes (15): midtransService, asMeta(), extractGatewayPaymentRequestId(), FinalizePaymentResult, GATEWAY_PAID_STATUSES, isGatewayPaymentCompleted(), PaymentMeta, reapplyInventoryForRevivedBooking() (+7 more)
 
 ### Community 44 - "midtrans.service.ts"
 Cohesion: 0.13
-Nodes (21): amountsMatch(), buildChargeBody(), ChargeInput, CheckoutPaymentInit, isSandboxKey(), isSupportedChannel(), midtransBaseUrl(), MidtransBody (+13 more)
+Nodes (22): amountsMatch(), buildChargeBody(), ChargeInput, CheckoutPaymentInit, isPaidStatus(), isSandboxKey(), isSupportedChannel(), midtransBaseUrl() (+14 more)
 
 ### Community 45 - "Midtrans Core API — JSON Objects"
 Cohesion: 0.11
@@ -476,8 +476,8 @@ Cohesion: 0.11
 Nodes (27): db, apply, args, argument(), at(), batches(), customers, db (+19 more)
 
 ### Community 55 - "xendit-webhook.handler.ts"
-Cohesion: 0.08
-Nodes (27): XenditPaymentRequestWebhook, xenditPaymentRequestWebhookHandler, XenditPaymentStatusWebhook, xenditPaymentStatusWebhookHandler, XenditPaymentTokenWebhook, xenditPaymentTokenWebhookHandler, xenditWebhookHandler, XenditWebhookPayload (+19 more)
+Cohesion: 0.07
+Nodes (29): XenditPaymentRequestWebhook, xenditPaymentRequestWebhookHandler, XenditPaymentStatusWebhook, xenditPaymentStatusWebhookHandler, XenditPaymentTokenWebhook, xenditPaymentTokenWebhookHandler, xenditWebhookHandler, XenditWebhookPayload (+21 more)
 
 ### Community 56 - "4. Features (all use the same `/v2/charge`; extra fields in `credit_card`)"
 Cohesion: 0.12
@@ -517,7 +517,7 @@ Nodes (6): approveClassBookingTransactionHandler, exportClassBookingTransactions
 
 ### Community 65 - "Analytics APIs - Complete Documentation"
 Cohesion: 0.14
-Nodes (12): Analytics APIs - Complete Documentation, Authentication, Existing Endpoints (Reference), GET `/admin/analytics`, GET `/admin/analytics/daily-transactions`, GET `/admin/analytics/dashboard`, GET `/admin/analytics/export/excel`, Overview (+4 more)
+Nodes (12): Analytics APIs - Complete Documentation, Authentication, Authentication, Date Range Defaults, Error Handling, Implementation Details, Overview, Performance Considerations (+4 more)
 
 ### Community 66 - "3. Business Insights Analytics"
 Cohesion: 0.14
@@ -595,9 +595,9 @@ Nodes (9): Checklist, Create, Disable / Cancel / Enable, Get, Implementation not
 Cohesion: 0.20
 Nodes (10): 📝 After Setup, ✅ Before Running, 🆘 Certificate Expired (ERR_CERT_DATE_INVALID), 🔄 Certificate Renewal, ⏱️ Expected Time, 📚 Full Guide, 🆘 If Setup Fails, ⚡ One-Command Setup (+2 more)
 
-### Community 86 - "midtrans-webhook.handler.ts"
+### Community 86 - "scheduler.service.ts"
 Cohesion: 0.33
-Nodes (6): midtransClientConfigHandler, midtransFinishHandler, midtransWebhookHandler, midtransRoute, CreateNotificationInput, notificationService
+Nodes (9): getRedisConnection(), reconnectRedis(), redisConnection, restoreCompletedInventorySessions(), scheduleExpiryCheck(), schedulerQueue, startSchedulerWorker(), UNPAID_PAYMENT_STATUSES (+1 more)
 
 ### Community 87 - "✨ What the Script Does"
 Cohesion: 0.25
@@ -605,7 +605,7 @@ Nodes (8): 1. **Pre-flight Checks** ✈️, 2. **Deployment Confirmation** ⚠�
 
 ### Community 88 - "dependencies"
 Cohesion: 0.18
-Nodes (11): axios, @hono/node-server, hono-pino, ioredis, dependencies, axios, @hono/node-server, hono-pino (+3 more)
+Nodes (11): argon2, axios, hono-pino, ioredis, dependencies, argon2, axios, hono-pino (+3 more)
 
 ### Community 89 - "Midtrans Core API — E-Wallet & QRIS"
 Cohesion: 0.22
@@ -807,6 +807,10 @@ Nodes (5): 3DS Authentication Flow, Step 1: Initial Payment Request, Step 2: Red
 Cohesion: 0.40
 Nodes (5): Card Declined, Expired Card, Insufficient Funds, Successful Payment (Requires 3DS), Test Cards (Xendit Sandbox)
 
+### Community 143 - "Existing Endpoints (Reference)"
+Cohesion: 0.40
+Nodes (5): Existing Endpoints (Reference), GET `/admin/analytics`, GET `/admin/analytics/daily-transactions`, GET `/admin/analytics/dashboard`, GET `/admin/analytics/export/excel`
+
 ### Community 144 - "package.json"
 Cohesion: 0.40
 Nodes (4): name, private, type, version
@@ -863,10 +867,6 @@ Nodes (3): Error Response (4xx/5xx), Response Format, Success Response (200 OK)
 Cohesion: 0.25
 Nodes (7): hono, hono, app(), route, input, mocks, request()
 
-### Community 204 - "Implementation Details"
-Cohesion: 0.40
-Nodes (5): Authentication, Date Range Defaults, Error Handling, Implementation Details, Performance Considerations
-
 ### Community 219 - "setup-branches.ts"
 Cohesion: 0.33
 Nodes (3): apply, db, preserved
@@ -879,7 +879,7 @@ Nodes (3): apply, db, preserved
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `dependencies` connect `dependencies` to `xlsx`, `argon2`, `package.json`, `admin/court.handler.ts`, `@prisma/client`, `bullmq`, `dotenv`, `tariff-period.route.test.ts`, `@hono/zod-validator`, `http-status`, `nodemailer`, `pino`, `mime-types`, `pino-pretty`, `sharp`, `slugify`, `@types/xlsx`, `@vercel/blob`, `xendit-node`, `zod`, `redis`?**
+- **Why does `dependencies` connect `dependencies` to `xlsx`, `package.json`, `@hono/node-server`, `admin/court.handler.ts`, `@prisma/client`, `bullmq`, `dotenv`, `tariff-period.route.test.ts`, `@hono/zod-validator`, `http-status`, `nodemailer`, `pino`, `mime-types`, `pino-pretty`, `sharp`, `slugify`, `@types/xlsx`, `@vercel/blob`, `xendit-node`, `zod`, `redis`?**
   _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Why does `dayjs` connect `admin/court.handler.ts` to `dependencies`?**
   _High betweenness centrality (0.029) - this node is a cross-community bridge._
