@@ -3,7 +3,7 @@ import type { Court } from '@prisma/client'
 const mocks = vi.hoisted(() => ({ rules: vi.fn() }))
 vi.mock('./tariff-policy.service', () => ({ getTariffPeriods: mocks.rules }))
 import { planRecurringSessions, recurringEnd } from './recurring-plan.service'
-import dayjs from '@/lib/club-time'
+import dayjs, { toClubWallDate } from '@/lib/club-time'
 const now = new Date('2026-10-30T03:00:00Z')
 const court = {
   id: 'a',
@@ -45,7 +45,7 @@ it('previews a full requested duration beyond the one-month public schedule in W
     now,
   )
   expect(plan.length).toBeGreaterThan(10)
-  expect(plan.at(-1)!.slots[0].startAt.getUTCHours()).toBe(12)
+  expect(plan.at(-1)!.slots[0].startAt.getUTCHours()).toBe(19)
   expect(plan.at(-1)!.slots[0].id).toBeUndefined()
 })
 it('preserves manual closures and stale occupied slots instead of reopening them', async () => {
@@ -53,8 +53,8 @@ it('preserves manual closures and stale occupied slots instead of reopening them
     id: 'closed',
     courtId: 'a',
     branchId: 'cemara',
-    startAt: dayjs('2026-11-03 19:00').toDate(),
-    endAt: dayjs('2026-11-03 20:00').toDate(),
+    startAt: toClubWallDate('2026-11-03 19:00'),
+    endAt: toClubWallDate('2026-11-03 20:00'),
     isAvailable: false,
     scheduleClosed: false,
     bookingDetails: [],
@@ -141,8 +141,8 @@ it('rejects overlapping published intervals rather than manufacturing a second r
   const overlap = {
     id: 'overlap',
     courtId: 'a',
-    startAt: dayjs('2026-11-03 18:30').toDate(),
-    endAt: dayjs('2026-11-03 19:30').toDate(),
+    startAt: toClubWallDate('2026-11-03 18:30'),
+    endAt: toClubWallDate('2026-11-03 19:30'),
     isAvailable: true,
     scheduleClosed: false,
     bookingDetails: [],
@@ -163,8 +163,8 @@ it('keeps legacy manually published rolling reservations valid without inventing
   const slot = {
     id: 'manual',
     courtId: 'a',
-    startAt: dayjs('2026-11-03 19:00').toDate(),
-    endAt: dayjs('2026-11-03 20:00').toDate(),
+    startAt: toClubWallDate('2026-11-03 19:00'),
+    endAt: toClubWallDate('2026-11-03 20:00'),
     price: 200,
     discountPrice: 0,
     isAvailable: true,

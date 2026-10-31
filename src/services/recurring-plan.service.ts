@@ -1,5 +1,10 @@
 import type { Court, Prisma, MembershipType } from '@prisma/client'
-import dayjs from '@/lib/club-time'
+import dayjs, {
+  clubNowAsWallDate,
+  clubWallDayEnd,
+  clubWallDayStart,
+  toClubWallDate,
+} from '@/lib/club-time'
 import { BadRequestException } from '@/exceptions'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
 import {
@@ -113,8 +118,8 @@ export async function planRecurringSessions(
       branchId,
       type: 'COURT',
       courtId: { in: courts.map((c) => c.id) },
-      startAt: { lt: dayjs(end).add(1, 'day').startOf('day').toDate() },
-      endAt: { gt: dayjs(start).startOf('day').toDate() },
+      startAt: { lt: clubWallDayStart(dayjs(end).add(1, 'day').format('YYYY-MM-DD')) },
+      endAt: { gt: clubWallDayStart(start) },
     },
     include: {
       bookingDetails: {
@@ -124,6 +129,7 @@ export async function planRecurringSessions(
       },
     },
   })
+  const nowWall = clubNowAsWallDate(now)
   const candidates = new Map<string, PlannedSlot>()
   for (const court of courts) {
     const config = rollingCourtPricingSchema.safeParse({
@@ -137,7 +143,7 @@ export async function planRecurringSessions(
       for (const slot of existing.filter(
         (slot) =>
           slot.courtId === court.id &&
-          slot.startAt > now &&
+          slot.startAt > nowWall &&
           !slot.scheduleClosed,
       )) {
         if (
@@ -163,10 +169,10 @@ export async function planRecurringSessions(
     for (const slot of buildRollingCourtSlots(
       { ...config.data, sport: court.sport },
       branchId,
-      dayjs(start).toDate(),
+      clubWallDayStart(start),
       now,
       rules,
-      dayjs(end).endOf('day').toDate(),
+      clubWallDayEnd(end),
     )) {
       if (
         config.data.bulkRules?.some(
@@ -190,7 +196,7 @@ export async function planRecurringSessions(
     const slots: PlannedSlot[] = [],
       conflicts: string[] = []
     for (const template of templates) {
-      const startAt = dayjs(`${date} ${template.time}`).toDate(),
+      const startAt = toClubWallDate(`${date} ${template.time}`),
         endAt = new Date(+startAt + template.durationMinutes * 60000)
       const draft = candidates.get(`${template.courtId}|${+startAt}`)
       const found = existing.find(

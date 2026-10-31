@@ -255,8 +255,9 @@ it('rejects a target outside the membership package hours', async () => {
   })
   mocks.slot.mockResolvedValue({
     ...target,
-    startAt: new Date('2040-01-06T16:00:00+07:00'),
-    endAt: new Date('2040-01-06T17:00:00+07:00'),
+    // Wall-clock peak hour (outside HAPPY_HOUR 06:00–15:00)
+    startAt: new Date('2040-01-06T16:00:00Z'),
+    endAt: new Date('2040-01-06T17:00:00Z'),
   })
   await expect(execute()).rejects.toThrow('ketentuan membership')
   expect(mocks.claimSlot).not.toHaveBeenCalled()
