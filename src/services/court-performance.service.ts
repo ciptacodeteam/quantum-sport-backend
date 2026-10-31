@@ -1,5 +1,9 @@
 import { db } from '@/lib/prisma'
-import clubTime from '@/lib/club-time'
+import {
+  clubNowAsWallDate,
+  clubWallDayStart,
+  clubWallNextDayStart,
+} from '@/lib/club-time'
 import { bookingWindowEnd } from '@/lib/rolling-booking-window'
 import { resolveTariffPeriod, tariffBand } from '@/lib/tariff-period'
 import { getTariffPeriods } from './tariff-policy.service'
@@ -70,8 +74,8 @@ export async function getCourtPerformance(
   endDate: string,
   courtId?: string,
 ) {
-  const start = clubTime(startDate).startOf('day').toDate()
-  const end = clubTime(endDate).add(1, 'day').startOf('day').toDate()
+  const start = clubWallDayStart(startDate)
+  const end = clubWallNextDayStart(endDate)
   const window = { startAt: { lt: end }, endAt: { gt: start } }
   const [courts, slots, bookings, rules, packages] = await Promise.all([
     db.court.findMany({
@@ -106,7 +110,7 @@ export async function getCourtPerformance(
     getTariffPeriods(),
     db.membership.findMany({ orderBy: { sequence: 'asc' } }),
   ])
-  const now = new Date()
+  const now = clubNowAsWallDate()
   const rows = bookings
     .flatMap((booking) => {
       const regularDetails = booking.details.filter(

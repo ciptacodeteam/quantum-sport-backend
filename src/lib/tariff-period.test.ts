@@ -11,7 +11,7 @@ import {
   buildRollingCourtSlots,
   rollingCourtPricingSchema,
 } from './rolling-booking-window'
-import dayjs from './club-time'
+import { formatClubWallClock } from './club-time'
 
 const rule: TariffRule = {
   branchId: 'cemara',
@@ -51,15 +51,15 @@ describe('effective-dated tariff periods', () => {
       resolveTariffPeriod(rules, '2026-12-01', 'cemara', 'TENNIS'),
     ).toEqual(defaultTariffPeriod)
   })
-  it('uses Jakarta dates at midnight and handles slot end boundaries', () => {
+  it('uses Jakarta wall dates and handles slot end boundaries', () => {
     expect(
-      resolveTariffPeriod([rule], '2026-10-31T17:00:00Z', 'cemara', 'PADEL')
+      resolveTariffPeriod([rule], '2026-11-01T00:00:00Z', 'cemara', 'PADEL')
         .happyEnd,
     ).toBe(17)
     expect(
       tariffBand('2026-11-01T09:00:00Z', rule, '2026-11-01T10:00:00Z'),
     ).toBe('happyHour')
-    expect(tariffBand('2026-11-01T10:00:00Z', rule)).toBe('peakHour')
+    expect(tariffBand('2026-11-01T17:00:00Z', rule)).toBe('peakHour')
     expect(
       tariffBand(
         '2026-11-01T16:30:00+07:00',
@@ -131,7 +131,7 @@ describe('effective-dated tariff periods', () => {
     const slots = buildRollingCourtSlots(config, 'cemara', now, now, [rule])
     const at = (date: string) =>
       slots.find(
-        (slot) => dayjs(slot.startAt).format('YYYY-MM-DD HH:mm') === date,
+        (slot) => formatClubWallClock(slot.startAt, 'YYYY-MM-DD HH:mm') === date,
       )
     expect(at('2026-10-31 16:00')?.price).toBe(200)
     expect(at('2026-11-01 16:00')?.price).toBe(100)
@@ -160,8 +160,10 @@ describe('effective-dated tariff periods', () => {
     expect(
       bulk.find(
         (slot) =>
-          dayjs(slot.startAt).format('YYYY-MM-DD HH:mm') === '2026-11-01 16:00',
+          formatClubWallClock(slot.startAt, 'YYYY-MM-DD HH:mm') ===
+          '2026-11-01 16:00',
       ),
     ).toMatchObject({ price: 500, discountPrice: 400 })
   })
 })
+

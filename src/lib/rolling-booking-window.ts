@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import dayjs from '@/lib/club-time'
+import dayjs, {
+  clubNowAsWallDate,
+  clubWallDayEnd,
+  clubWallTime,
+  toClubWallDate,
+} from '@/lib/club-time'
 import type { Prisma } from '@prisma/client'
 import {
   resolveTariffPeriod,
@@ -37,7 +42,11 @@ export const rollingCourtPricingSchema = z
 export type RollingCourtPricing = z.infer<typeof rollingCourtPricingSchema>
 
 export function bookingWindowEnd(months: number, now = new Date()) {
-  return dayjs(now).startOf('day').add(months, 'month').endOf('day').toDate()
+  const endDay = dayjs(now)
+    .startOf('day')
+    .add(months, 'month')
+    .format('YYYY-MM-DD')
+  return clubWallDayEnd(endDay)
 }
 
 /** Enforce the horizon inside the same UPDATE that claims a slot. */
@@ -64,7 +73,8 @@ export function buildRollingCourtSlots(
   tariffRules: TariffRule[] = [],
   through?: Date,
 ) {
-  const end = dayjs(through ?? bookingWindowEnd(config.months, now))
+  const end = clubWallTime(through ?? bookingWindowEnd(config.months, now))
+  const nowWall = clubNowAsWallDate(now)
   const slots: (Prisma.SlotCreateManyInput & { startAt: Date; endAt: Date })[] =
     []
   for (
@@ -73,33 +83,32 @@ export function buildRollingCourtSlots(
     date = date.add(1, 'day')
   ) {
     if (!config.days.includes(date.day() || 7)) continue
+    const dayKey = date.format('YYYY-MM-DD')
     const bands = resolveTariffPeriod(
       tariffRules,
-      date.toDate(),
+      toClubWallDate(`${dayKey} 00:00:00`),
       branchId,
       config.sport ?? 'PADEL',
     )
     for (let hour = 0; hour < 24; hour++) {
       if (config.closedHours.includes(hour)) continue
-      const start = date.hour(hour)
-      const band = tariffBand(
-        start.toDate(),
-        bands,
-        start.add(1, 'hour').toDate(),
+      const startAt = toClubWallDate(
+        `${dayKey} ${String(hour).padStart(2, '0')}:00:00`,
       )
+      const endAt = new Date(startAt.getTime() + 3_600_000)
+      const band = tariffBand(startAt, bands, endAt)
       if (!band) continue
-      if (!start.isAfter(dayjs(now))) continue
+      if (!(startAt > nowWall)) continue
       const priceRule = config.bulkRules?.findLast(
         (rule) =>
-          rule.kind === 'pricing' &&
-          matchesRollingSlotRule(start.toDate(), rule),
+          rule.kind === 'pricing' && matchesRollingSlotRule(startAt, rule),
       )
       slots.push({
         branchId,
         courtId: config.courtId,
         type: 'COURT',
-        startAt: start.toDate(),
-        endAt: start.add(1, 'hour').toDate(),
+        startAt,
+        endAt,
         price:
           priceRule?.kind === 'pricing'
             ? priceRule.price

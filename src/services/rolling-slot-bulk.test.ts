@@ -2,7 +2,10 @@ vi.mock('@/services/tariff-policy.service', () => ({
   getTariffPeriods: vi.fn().mockResolvedValue([]),
 }))
 import { beforeEach, expect, it, vi } from 'vitest'
-import dayjs from '@/lib/club-time'
+import dayjs, {
+  clubWallTime,
+  formatClubWallClock,
+} from '@/lib/club-time'
 import {
   bookingWindowEnd,
   rollingCourtPricingSchema,
@@ -77,13 +80,13 @@ beforeEach(() => {
     branchId: 'branch',
     isActive: true,
     bookingWindowMonths: 1,
-    slotsGeneratedThrough: new Date('2026-11-30T00:00:00Z'),
+    slotsGeneratedThrough: new Date('2026-11-30T23:59:59.999Z'),
     rollingPricing: config,
   }
   mocks.slotRows = [
-    { id: 'match', startAt: new Date('2026-10-30T10:00:00Z') },
-    { id: 'booked', startAt: new Date('2026-10-30T11:00:00Z') },
-    { id: 'outside', startAt: new Date('2026-10-30T12:00:00Z') },
+    { id: 'match', startAt: new Date('2026-10-30T17:00:00Z') },
+    { id: 'booked', startAt: new Date('2026-10-30T18:00:00Z') },
+    { id: 'outside', startAt: new Date('2026-10-30T19:00:00Z') },
   ]
   mocks.updateSlots.mockResolvedValue({ count: 1 })
   mocks.updatePrices.mockResolvedValue([{ startAt: mocks.slotRows[0].startAt }])
@@ -126,14 +129,15 @@ it('keeps pricing and disable rules when extending the window into new dates', a
   expect(slots.length).toBeGreaterThan(0)
   expect(
     slots.every(
-      (slot: any) => dayjs(slot.startAt).format('YYYY-MM-DD') > '2026-11-30',
+      (slot: any) =>
+        formatClubWallClock(slot.startAt, 'YYYY-MM-DD') > '2026-11-30',
     ),
   ).toBe(true)
   expect(
-    slots.find((slot: any) => dayjs(slot.startAt).hour() === 17),
+    slots.find((slot: any) => clubWallTime(slot.startAt).hour() === 17),
   ).toMatchObject({ price: 500, discountPrice: 400 })
   expect(
-    slots.find((slot: any) => dayjs(slot.startAt).hour() === 19).price,
+    slots.find((slot: any) => clubWallTime(slot.startAt).hour() === 19).price,
   ).toBe(200)
   const disable = mocks.updateSlots.mock.calls.find(
     ([args]) => args.data.isAvailable === false,
@@ -144,12 +148,12 @@ it('keeps pricing and disable rules when extending the window into new dates', a
   })
   expect(
     disable.where.startAt.in.every((time: Date) =>
-      [17, 18].includes(dayjs(time).hour()),
+      [17, 18].includes(clubWallTime(time).hour()),
     ),
   ).toBe(true)
   expect(mocks.createSlots.mock.calls[0][0].skipDuplicates).toBe(true)
-  expect(mocks.court.slotsGeneratedThrough.toISOString().slice(0, 10)).toBe(
-    dayjs(bookingWindowEnd(1, later)).format('YYYY-MM-DD'),
+  expect(formatClubWallClock(mocks.court.slotsGeneratedThrough, 'YYYY-MM-DD')).toBe(
+    formatClubWallClock(bookingWindowEnd(1, later), 'YYYY-MM-DD'),
   )
 })
 
@@ -162,10 +166,10 @@ it('preserves bulk rules when changing the main duration and base prices', async
   expect(mocks.court.rollingPricing.bulkRules).toEqual([rule])
   const slots = mocks.createSlots.mock.calls[0][0].data
   expect(
-    slots.find((slot: any) => dayjs(slot.startAt).hour() === 17).price,
+    slots.find((slot: any) => clubWallTime(slot.startAt).hour() === 17).price,
   ).toBe(500)
   expect(
-    slots.find((slot: any) => dayjs(slot.startAt).hour() === 19).price,
+    slots.find((slot: any) => clubWallTime(slot.startAt).hour() === 19).price,
   ).toBe(300)
 })
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import dayjs from '@/lib/club-time'
+import dayjs, { clubWallTime } from '@/lib/club-time'
 
 export const defaultTariffPeriod = {
   happyStart: 6,
@@ -65,7 +65,7 @@ export function resolveTariffPeriod(
   branchId: string,
   sport: string,
 ): TariffBands {
-  const date = dayjs(startAt).format('YYYY-MM-DD')
+  const date = clubWallTime(startAt).format('YYYY-MM-DD')
   return (
     rules
       .filter(
@@ -84,9 +84,11 @@ export function tariffBand(
   bands: TariffBands,
   endAt?: Date | string,
 ): 'happyHour' | 'peakHour' | null {
-  const start = dayjs(startAt)
+  const start = clubWallTime(startAt)
   const minutes = start.hour() * 60 + start.minute()
-  const duration = endAt ? dayjs(endAt).diff(start, 'minute', true) : 0
+  const duration = endAt
+    ? clubWallTime(endAt).diff(start, 'minute', true)
+    : 0
   for (const band of ['happy', 'peak'] as const) {
     if (
       minutes >= bands[`${band}Start`] * 60 &&

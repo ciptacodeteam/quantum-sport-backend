@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import dayjs from '@/lib/club-time'
+import {
+  clubWallTime,
+  formatClubWallClock,
+} from '@/lib/club-time'
 import {
   bookingWindowEnd,
   buildRollingCourtSlots,
@@ -26,7 +29,8 @@ describe('rolling booking window', () => {
     'uses calendar months and Jakarta midnight (%s)',
     (now, months, expected) => {
       expect(
-        dayjs(bookingWindowEnd(months, new Date(now))).format(
+        formatClubWallClock(
+          bookingWindowEnd(months, new Date(now)),
           'YYYY-MM-DD HH:mm:ss.SSS',
         ),
       ).toBe(`${expected} 23:59:59.999`)
@@ -43,13 +47,15 @@ describe('rolling booking window', () => {
     expect(
       slots.every((s) => s.startAt > now && s.branchId === 'branch-b'),
     ).toBe(true)
-    expect(slots.some((s) => dayjs(s.startAt).hour() === 15)).toBe(false)
-    expect(dayjs(slots[0].startAt).format('HH:mm')).toBe('16:00')
+    expect(slots.some((s) => clubWallTime(s.startAt).hour() === 15)).toBe(
+      false,
+    )
+    expect(formatClubWallClock(slots[0].startAt, 'HH:mm')).toBe('16:00')
     const last = slots.at(-1)!
-    expect(dayjs(last.startAt).format('YYYY-MM-DD HH:mm')).toBe(
+    expect(formatClubWallClock(last.startAt, 'YYYY-MM-DD HH:mm')).toBe(
       '2026-11-29 23:00',
     )
-    expect(dayjs(last.endAt).format('YYYY-MM-DD HH:mm')).toBe(
+    expect(formatClubWallClock(last.endAt, 'YYYY-MM-DD HH:mm')).toBe(
       '2026-11-30 00:00',
     )
     expect(last.price).toBe(200)
@@ -63,7 +69,7 @@ describe('rolling booking window', () => {
       now,
     )
     expect(slots.length).toBeGreaterThan(0)
-    expect(slots.every((s) => dayjs(s.startAt).day() === 0)).toBe(true)
+    expect(slots.every((s) => clubWallTime(s.startAt).day() === 0)).toBe(true)
   })
   it.each([
     { months: 0 },
@@ -112,7 +118,8 @@ describe('rolling booking window', () => {
     )
     const at = (time: string) =>
       slots.find(
-        (slot) => dayjs(slot.startAt).format('YYYY-MM-DD HH:mm') === time,
+        (slot) =>
+          formatClubWallClock(slot.startAt, 'YYYY-MM-DD HH:mm') === time,
       )!
     expect(at('2026-10-30 17:00').price).toBe(200)
     expect(at('2026-11-01 17:00')).toMatchObject({

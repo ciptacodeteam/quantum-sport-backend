@@ -1,7 +1,12 @@
 import { ensureRecurringBookings } from '@/services/recurring-booking.service'
 import { branchContext, withBranchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
-import dayjs from '@/lib/club-time'
+import dayjs, {
+  clubNowAsWallDate,
+  clubWallDateString,
+  clubWallTime,
+  toClubWallDate,
+} from '@/lib/club-time'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import {
   matchesRollingSlotRule,
@@ -31,19 +36,25 @@ async function generate(
     months: court.bookingWindowMonths,
   })
   const end = bookingWindowEnd(config.months, now)
+  const nowWall = clubNowAsWallDate(now)
   if (
     !reconfigure &&
     court.slotsGeneratedThrough &&
-    !dayjs(court.slotsGeneratedThrough).isBefore(dayjs(end), 'day')
+    !clubWallTime(court.slotsGeneratedThrough).isBefore(clubWallTime(end), 'day')
   )
     return
   let from =
     reconfigure || !court.slotsGeneratedThrough
-      ? dayjs(now).startOf('day').toDate()
-      : dayjs(court.slotsGeneratedThrough.toISOString().slice(0, 10))
-          .add(1, 'day')
-          .toDate()
-  if (notBefore && notBefore > from) from = notBefore
+      ? toClubWallDate(`${dayjs(now).format('YYYY-MM-DD')} 00:00:00`)
+      : toClubWallDate(
+          `${clubWallTime(court.slotsGeneratedThrough)
+            .add(1, 'day')
+            .format('YYYY-MM-DD')} 00:00:00`,
+        )
+  if (notBefore) {
+    const floor = toClubWallDate(notBefore)
+    if (floor > from) from = floor
+  }
   const tariffRules = await getTariffPeriods(tx, court.branchId)
   const slots = buildRollingCourtSlots(
     { ...config, sport: court.sport },
@@ -71,7 +82,7 @@ async function generate(
   const future = {
     courtId: court.id,
     type: 'COURT' as const,
-    startAt: { gt: now },
+    startAt: { gt: nowWall },
     bookingDetails: {
       none: { booking: { status: { not: 'CANCELLED' as const } } },
     },
@@ -81,7 +92,10 @@ async function generate(
   const segment = {
     courtId: court.id,
     type: 'COURT' as const,
-    startAt: { gt: new Date(Math.max(+now, +from - 1)), lte: end },
+    startAt: {
+      gt: new Date(Math.max(+nowWall, +from - 1)),
+      lte: end,
+    },
   }
   await tx.slot.updateMany({
     where: {
@@ -144,7 +158,7 @@ async function generate(
     where: { id: court.id },
     data: {
       slotsGeneratedThrough: new Date(
-        `${dayjs(end).format('YYYY-MM-DD')}T00:00:00Z`,
+        `${clubWallDateString(end)}T23:59:59.999Z`,
       ),
     },
   })
@@ -232,7 +246,7 @@ export async function saveRollingCourtSlotRule(
       tx,
       courtId,
       rule,
-      now,
+      clubNowAsWallDate(now),
       bookingWindowEnd(config.months, now),
     )
   })
@@ -254,8 +268,8 @@ export async function ensureRollingCourtSchedules(
     const end = bookingWindowEnd(court.bookingWindowMonths!, now)
     if (
       court.slotsGeneratedThrough &&
-      court.slotsGeneratedThrough.toISOString().slice(0, 10) >=
-        dayjs(end).format('YYYY-MM-DD')
+      clubWallDateString(court.slotsGeneratedThrough) >=
+        clubWallDateString(end)
     )
       continue
     const extend = () =>

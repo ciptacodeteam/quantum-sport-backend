@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import dayjs from '@/lib/club-time'
+import { clubWallTime } from '@/lib/club-time'
 
 const filter = {
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -34,7 +34,7 @@ export const rollingSlotRuleSchema = z
 export type RollingSlotRule = z.infer<typeof rollingSlotRuleSchema>
 
 export function matchesRollingSlotRule(startAt: Date, rule: RollingSlotRule) {
-  const start = dayjs(startAt)
+  const start = clubWallTime(startAt)
   return (
     start.format('YYYY-MM-DD') >= rule.fromDate &&
     rule.days.includes(start.day() || 7) &&

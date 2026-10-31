@@ -45,7 +45,11 @@ import {
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { BookingStatus, SlotType } from '@prisma/client'
-import dayjs from '@/lib/club-time'
+import dayjs, {
+  clubWallDayEnd,
+  clubWallDayStart,
+  formatClubWallClock,
+} from '@/lib/club-time'
 import z from 'zod'
 
 export const getAllCourtHandler = factory.createHandlers(
@@ -323,8 +327,8 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
       }
 
       if (query.startAt && query.endAt) {
-        const startAt = dayjs(query.startAt).startOf('day').toDate()
-        const endAt = dayjs(query.endAt).endOf('day').toDate()
+        const startAt = clubWallDayStart(query.startAt)
+        const endAt = clubWallDayEnd(query.endAt)
 
         where.AND = [
           {
@@ -370,8 +374,8 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         isAvailable: slot.isAvailable && bookingDetails.length === 0,
         normalPrice: slot.price,
         discountPrice: slot.discountPrice,
-        startAt: dayjs(slot.startAt).format(DATETIME_FORMAT),
-        endAt: dayjs(slot.endAt).format(DATETIME_FORMAT),
+        startAt: formatClubWallClock(slot.startAt, DATETIME_FORMAT),
+        endAt: formatClubWallClock(slot.endAt, DATETIME_FORMAT),
         createdAt: dayjs(slot.createdAt).format(DATETIME_FORMAT),
         updatedAt: dayjs(slot.updatedAt).format(DATETIME_FORMAT),
       }))
@@ -504,8 +508,8 @@ export const updateCourtSlotAvailabilityHandler = factory.createHandlers(
 
       const formattedSlot = {
         ...updatedSlot,
-        startAt: dayjs(updatedSlot.startAt).format(DATETIME_FORMAT),
-        endAt: dayjs(updatedSlot.endAt).format(DATETIME_FORMAT),
+        startAt: formatClubWallClock(updatedSlot.startAt, DATETIME_FORMAT),
+        endAt: formatClubWallClock(updatedSlot.endAt, DATETIME_FORMAT),
         createdAt: dayjs(updatedSlot.createdAt).format(DATETIME_FORMAT),
         updatedAt: dayjs(updatedSlot.updatedAt).format(DATETIME_FORMAT),
       }
@@ -570,8 +574,8 @@ export const updateSlotPricingHandler = factory.createHandlers(
 
       const formattedSlot = {
         ...updatedSlot,
-        startAt: dayjs(updatedSlot?.startAt).format(DATETIME_FORMAT),
-        endAt: dayjs(updatedSlot?.endAt).format(DATETIME_FORMAT),
+        startAt: formatClubWallClock(updatedSlot?.startAt, DATETIME_FORMAT),
+        endAt: formatClubWallClock(updatedSlot?.endAt, DATETIME_FORMAT),
         createdAt: dayjs(updatedSlot?.createdAt).format(DATETIME_FORMAT),
         updatedAt: dayjs(updatedSlot?.updatedAt).format(DATETIME_FORMAT),
       }

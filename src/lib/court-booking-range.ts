@@ -1,4 +1,4 @@
-import dayjs from '@/lib/club-time'
+import dayjs, { clubWallDateString } from '@/lib/club-time'
 import { bookingWindowEnd } from '@/lib/rolling-booking-window'
 
 export function courtBookingRange(
@@ -12,7 +12,7 @@ export function courtBookingRange(
           'YYYY-MM-DD',
         )
       : court.slot[0]
-        ? dayjs(court.slot[0].startAt).format('YYYY-MM-DD')
+        ? clubWallDateString(court.slot[0].startAt)
         : startDate
     return date > latest ? date : latest
   }, startDate)

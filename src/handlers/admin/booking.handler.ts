@@ -2,7 +2,7 @@ import {
   bookingCheckoutTypes,
   bookingCheckoutWhere,
 } from '@/lib/booking-checkout'
-import clubTime from '@/lib/club-time'
+import clubTime, { formatClubWallClock } from '@/lib/club-time'
 import { getOngoingSchedule } from '@/lib/ongoing-schedule'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -551,13 +551,13 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
 
         for (const inventory of booking.inventories) {
           if (inventory.slot?.startAt) {
-            inventory.slot.startAt = clubTime(inventory.slot.startAt).format(
-              'YYYY-MM-DD HH:mm:ss',
+            inventory.slot.startAt = formatClubWallClock(
+              inventory.slot.startAt,
             ) as any
           }
           if (inventory.slot?.endAt) {
-            inventory.slot.endAt = clubTime(inventory.slot.endAt).format(
-              'YYYY-MM-DD HH:mm:ss',
+            inventory.slot.endAt = formatClubWallClock(
+              inventory.slot.endAt,
             ) as any
           }
         }
@@ -568,51 +568,41 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         // Format booking detail slots
         for (const detail of booking.details) {
           if (detail.slot?.startAt) {
-            detail.slot.startAt = clubTime(detail.slot.startAt).format(
-              'YYYY-MM-DD HH:mm:ss',
-            ) as any
+            detail.slot.startAt = formatClubWallClock(detail.slot.startAt) as any
           }
           if (detail.slot?.endAt) {
-            detail.slot.endAt = clubTime(detail.slot.endAt).format(
-              'YYYY-MM-DD HH:mm:ss',
-            ) as any
+            detail.slot.endAt = formatClubWallClock(detail.slot.endAt) as any
           }
         }
 
         // Format coach slots
         for (const coach of booking.coaches) {
           if (coach.slot?.startAt) {
-            coach.slot.startAt = clubTime(coach.slot.startAt).format(
-              'YYYY-MM-DD HH:mm:ss',
-            ) as any
+            coach.slot.startAt = formatClubWallClock(coach.slot.startAt) as any
           }
           if (coach.slot?.endAt) {
-            coach.slot.endAt = clubTime(coach.slot.endAt).format(
-              'YYYY-MM-DD HH:mm:ss',
-            ) as any
+            coach.slot.endAt = formatClubWallClock(coach.slot.endAt) as any
           }
         }
 
         // Format ballboy slots
         for (const ballboy of booking.ballboys) {
           if (ballboy.slot?.startAt) {
-            ballboy.slot.startAt = clubTime(ballboy.slot.startAt).format(
-              'YYYY-MM-DD HH:mm:ss',
+            ballboy.slot.startAt = formatClubWallClock(
+              ballboy.slot.startAt,
             ) as any
           }
           if (ballboy.slot?.endAt) {
-            ballboy.slot.endAt = clubTime(ballboy.slot.endAt).format(
-              'YYYY-MM-DD HH:mm:ss',
-            ) as any
+            ballboy.slot.endAt = formatClubWallClock(ballboy.slot.endAt) as any
           }
           if (ballboy.courtSlot?.startAt) {
-            ballboy.courtSlot.startAt = clubTime(
+            ballboy.courtSlot.startAt = formatClubWallClock(
               ballboy.courtSlot.startAt,
-            ).format('YYYY-MM-DD HH:mm:ss') as any
+            ) as any
           }
           if (ballboy.courtSlot?.endAt) {
-            ballboy.courtSlot.endAt = clubTime(ballboy.courtSlot.endAt).format(
-              'YYYY-MM-DD HH:mm:ss',
+            ballboy.courtSlot.endAt = formatClubWallClock(
+              ballboy.courtSlot.endAt,
             ) as any
           }
         }

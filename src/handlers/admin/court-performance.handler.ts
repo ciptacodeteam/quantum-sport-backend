@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { validateHook } from '@/helpers/validate-hook'
 import { ok } from '@/lib/response'
-import clubTime from '@/lib/club-time'
+import clubTime, { clubWallTime } from '@/lib/club-time'
 import { getCourtPerformance } from '@/services/court-performance.service'
 import * as XLSX from 'xlsx'
 import { requireAnyAdminRole } from '@/middlewares/auth'
@@ -61,9 +61,9 @@ export const courtPerformanceExportHandler = factory.createHandlers(
         Lapangan: r.court,
         Cabang: r.branch,
         Kategori: r.category,
-        'Tanggal main (WIB)': clubTime(r.startAt).format('DD/MM/YYYY'),
-        Mulai: clubTime(r.startAt).format('HH:mm'),
-        Selesai: clubTime(r.endAt).format('HH:mm'),
+        'Tanggal main (WIB)': clubWallTime(r.startAt).format('DD/MM/YYYY'),
+        Mulai: clubWallTime(r.startAt).format('HH:mm'),
+        Selesai: clubWallTime(r.endAt).format('HH:mm'),
         'Jam dipesan': r.hours,
         'Jam berlalu': r.pastHours,
         'Jam mendatang': r.upcomingHours,

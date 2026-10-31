@@ -33,9 +33,10 @@ const slot = (id: string, hour: number, available = false) => ({
   id,
   courtId: court.id,
   court,
-  startAt: new Date(`2026-10-01T${String(hour).padStart(2, '0')}:00:00+07:00`),
+  // Wall-clock hours stored as UTC components (timestamp without time zone)
+  startAt: new Date(`2026-10-01T${String(hour).padStart(2, '0')}:00:00Z`),
   endAt: new Date(
-    `2026-10-01T${String(hour + 1).padStart(2, '0')}:00:00+07:00`,
+    `2026-10-01T${String(hour + 1).padStart(2, '0')}:00:00Z`,
   ),
   isAvailable: available,
   scheduleClosed: false,
@@ -105,7 +106,7 @@ it('uses WIB playing dates, excludes closures, counts occupied slots even when u
   const report = await getCourtPerformance('2026-10-01', '2026-10-01')
   expect(mocks.bookings.mock.calls[0][0].where.status).toBe('CONFIRMED')
   expect(mocks.slots.mock.calls[0][0].where.startAt.lt).toEqual(
-    new Date('2026-10-01T17:00:00Z'),
+    new Date('2026-10-02T00:00:00Z'),
   )
   expect(report.summary).toMatchObject({
     hours: 1,

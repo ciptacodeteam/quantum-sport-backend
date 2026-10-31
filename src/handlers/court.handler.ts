@@ -24,7 +24,12 @@ import {
 import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import { BookingStatus, SlotType } from '@prisma/client'
-import dayjs from '@/lib/club-time'
+import dayjs, {
+  clubWallDayEnd,
+  clubWallDayStart,
+  formatClubWallClock,
+  toClubWallDate,
+} from '@/lib/club-time'
 import status from 'http-status'
 import z from 'zod'
 
@@ -86,8 +91,8 @@ export const getAllCourtHandler = factory.createHandlers(
 
       // Add date range filter if provided
       if (query.startAt && query.endAt) {
-        const startAt = dayjs(query.startAt).startOf('day').toDate()
-        const endAt = dayjs(query.endAt).endOf('day').toDate()
+        const startAt = clubWallDayStart(query.startAt)
+        const endAt = clubWallDayEnd(query.endAt)
 
         slotWhere.AND = [
           {
@@ -201,8 +206,8 @@ export const getCourtSlotsHandler = factory.createHandlers(
 
       // Add date range filter if provided
       if (query.startAt && query.endAt) {
-        const startAt = dayjs(query.startAt).toDate()
-        const endAt = dayjs(query.endAt).toDate()
+        const startAt = toClubWallDate(query.startAt)
+        const endAt = toClubWallDate(query.endAt)
 
         // Find slots that overlap with the requested time range
         // A slot overlaps if: slot.startAt < query.endAt AND slot.endAt > query.startAt
@@ -233,12 +238,11 @@ export const getCourtSlotsHandler = factory.createHandlers(
         ...slot,
         normalPrice: slot.price,
         discountPrice: slot.discountPrice,
-        startAt: dayjs(slot.startAt).format(DATETIME_FORMAT),
-        endAt: dayjs(slot.endAt).format(DATETIME_FORMAT),
+        startAt: formatClubWallClock(slot.startAt, DATETIME_FORMAT),
+        endAt: formatClubWallClock(slot.endAt, DATETIME_FORMAT),
         createdAt: dayjs(slot.createdAt).format(DATETIME_FORMAT),
         updatedAt: dayjs(slot.updatedAt).format(DATETIME_FORMAT),
       }))
-      console.log(formattedSlots)
 
       return c.json(ok(formattedSlots), status.OK)
     } catch (error) {
@@ -290,8 +294,8 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
       }
 
       if (query.startAt && query.endAt) {
-        const startAt = dayjs(query.startAt).startOf('day').toDate()
-        const endAt = dayjs(query.endAt).endOf('day').toDate()
+        const startAt = clubWallDayStart(query.startAt)
+        const endAt = clubWallDayEnd(query.endAt)
 
         where.AND = [
           {
@@ -337,8 +341,8 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         isAvailable: slot.isAvailable && bookingDetails.length === 0,
         normalPrice: slot.price,
         discountPrice: slot.discountPrice,
-        startAt: dayjs(slot.startAt).format(DATETIME_FORMAT),
-        endAt: dayjs(slot.endAt).format(DATETIME_FORMAT),
+        startAt: formatClubWallClock(slot.startAt, DATETIME_FORMAT),
+        endAt: formatClubWallClock(slot.endAt, DATETIME_FORMAT),
         createdAt: dayjs(slot.createdAt).format(DATETIME_FORMAT),
         updatedAt: dayjs(slot.updatedAt).format(DATETIME_FORMAT),
       }))
@@ -371,7 +375,7 @@ export const getCourtBookingWindowHandler = factory.createHandlers(
           where: {
             type: 'COURT',
             scheduleClosed: false,
-            startAt: { gte: dayjs().startOf('day').toDate() },
+            startAt: { gte: clubWallDayStart(dayjs().format('YYYY-MM-DD')) },
           },
           orderBy: { startAt: 'desc' },
           take: 1,
