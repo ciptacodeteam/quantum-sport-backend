@@ -101,6 +101,29 @@ it('allows the actual super admin to select a branch or read combined data despi
     ).json(),
   ).toMatchObject({ branchId: 's-parman', superAdmin: true })
 })
+it('lets admin scope an inactive branch while public clients cannot', async () => {
+  mocks.branch.mockImplementation(async ({ where }) => {
+    if (where.id !== 'closed') return null
+    if (where.isActive === true) return null
+    return { id: 'closed', isActive: false }
+  })
+  mocks.staff.mockResolvedValue({
+    role: 'SUPER_ADMIN',
+    branchId: 'cemara',
+    isActive: true,
+  })
+  expect(
+    await (
+      await app.request('/admin/analytics/court-performance', {
+        headers: { 'X-Branch-ID': 'closed' },
+      })
+    ).json(),
+  ).toMatchObject({ branchId: 'closed', superAdmin: true })
+  expect(
+    (await app.request('/courts', { headers: { 'X-Branch-ID': 'closed' } }))
+      .status,
+  ).toBe(400)
+})
 it('keeps the entire customer Value Pack flow branch-independent', async () => {
   expect((await app.request('/memberships/my/tracking')).status).toBe(200)
   expect((await app.request('/memberships/my')).status).toBe(200)

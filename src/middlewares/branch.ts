@@ -46,10 +46,9 @@ export const branchMiddleware: MiddlewareHandler = async (c, next) => {
       : staff.branchId
     if (branchId) {
       const branch = await db.branch.findFirst({
-        where: { id: branchId, isActive: true },
+        where: { id: branchId },
       })
-      if (!branch)
-        throw new ForbiddenException('Cabang tidak aktif atau tidak ditemukan.')
+      if (!branch) throw new ForbiddenException('Cabang tidak ditemukan.')
     }
     c.set('branchId', branchId)
     return withBranchContext(
