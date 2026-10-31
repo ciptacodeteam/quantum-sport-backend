@@ -13,7 +13,7 @@ import { requireAuth } from '@/middlewares/auth'
 import { midtransService } from '@/services/midtrans.service'
 import { AWAITING_PAYMENT_SUSPENSION_REASON } from '@/services/membership-activation.service'
 import { zValidator } from '@hono/zod-validator'
-import { PaymentStatus } from '@prisma/client'
+import { PaymentStatus, type Prisma } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
@@ -183,7 +183,9 @@ export const membershipCheckoutHandler = factory.createHandlers(
                 : paymentInit?.mode === 'snap'
                   ? paymentInit.orderId
                   : null,
-            meta: paymentInit?.meta,
+            meta: paymentInit?.meta
+              ? (paymentInit.meta as Prisma.InputJsonValue)
+              : undefined,
           },
         })
 
@@ -242,8 +244,8 @@ export const membershipCheckoutHandler = factory.createHandlers(
             total: result.invoice.total,
             paymentStatus,
             paymentActions,
-            ...(snapToken && { snapToken }),
-            ...(snapRedirectUrl && { snapRedirectUrl }),
+            ...(snapToken ? { snapToken } : {}),
+            ...(snapRedirectUrl ? { snapRedirectUrl } : {}),
             paymentUrl: redirectUrl,
             membership: {
               id: membership.id,

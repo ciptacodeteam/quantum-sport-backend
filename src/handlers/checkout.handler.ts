@@ -41,7 +41,7 @@ import {
   PaymentStatus,
   SlotType,
 } from '@prisma/client'
-import type { Membership, MembershipUser } from '@prisma/client'
+import type { Membership, MembershipUser, Prisma } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
@@ -1541,7 +1541,9 @@ export const checkoutHandler = factory.createHandlers(
                 : paymentInit?.mode === 'snap'
                   ? paymentInit.orderId
                   : null,
-            meta: paymentInit?.meta,
+            meta: paymentInit?.meta
+              ? (paymentInit.meta as Prisma.InputJsonValue)
+              : undefined,
           },
         })
 
@@ -1626,10 +1628,10 @@ export const checkoutHandler = factory.createHandlers(
               result.invoice.status === PaymentStatus.PAID
                 ? 'PAID'
                 : paymentStatus,
-            ...(paymentSessionId && { paymentSessionId }),
-            ...(paymentActions && { paymentActions }),
-            ...(snapToken && { snapToken }),
-            ...(snapRedirectUrl && { snapRedirectUrl }),
+            ...(paymentSessionId ? { paymentSessionId } : {}),
+            ...(paymentActions ? { paymentActions } : {}),
+            ...(snapToken ? { snapToken } : {}),
+            ...(snapRedirectUrl ? { snapRedirectUrl } : {}),
             paymentUrl: redirectUrl,
           },
           'Checkout successful',
