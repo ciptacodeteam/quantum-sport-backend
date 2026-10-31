@@ -10,7 +10,9 @@ const dateKey = z
   )
 export const recurringBookingInputSchema = z
   .object({
-    mode: z.enum(['ROLLING', 'MONTHS']),
+    mode: z.enum(['ROLLING', 'MONTHS', 'DATES']),
+    endDate: dateKey.optional(),
+    skipConflicts: z.boolean().optional(),
     months: z.number().int().min(1).max(12).optional(),
     weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
     startDate: dateKey,
@@ -20,6 +22,15 @@ export const recurringBookingInputSchema = z
   .refine((value) => value.mode !== 'MONTHS' || value.months !== undefined, {
     message: 'Pilih durasi bulan.',
   })
+  .refine(
+    (value) =>
+      value.mode !== 'DATES' ||
+      (!!value.endDate &&
+        value.endDate >= value.startDate &&
+        value.endDate <=
+          dayjs(value.startDate).add(12, 'month').format('YYYY-MM-DD')),
+    { message: 'Pilih rentang tanggal yang valid, maksimal 12 bulan.' },
+  )
 export type RecurringBookingInput = z.infer<typeof recurringBookingInputSchema>
 export const recurringTemplatesSchema = z
   .array(

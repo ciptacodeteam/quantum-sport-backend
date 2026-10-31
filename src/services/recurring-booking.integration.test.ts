@@ -103,12 +103,24 @@ run('recurring membership reservations against PostgreSQL', () => {
       where: { id: slot.id },
       data: { isAvailable: false },
     })
+    // The new flow reserves every previewed date at checkout. Establish the
+    // conflicting date beforehand so the explicit skip consent is exercised.
+    await db.slot.updateMany({
+      where: {
+        courtId,
+        startAt: dayjs(
+          `${dayjs(start).add(7, 'day').format('YYYY-MM-DD')} 14:00`,
+        ).toDate(),
+      },
+      data: { isAvailable: false },
+    })
     const series = await asBranch(() =>
       db.$transaction((tx) =>
         createRecurringBooking(
           tx,
           {
             mode: 'ROLLING',
+            skipConflicts: true,
             weekdays: [dayjs(start).day()],
             startDate: start,
             previewThrough: start,
@@ -172,7 +184,7 @@ run('recurring membership reservations against PostgreSQL', () => {
       }),
     )
     expect(response.status).toBe(200)
-    const body = await response.json() as { data: { bookingId: string } }
+    const body = (await response.json()) as { data: { bookingId: string } }
     const booking = await db.booking.findUniqueOrThrow({
       where: { id: body.data.bookingId },
     })

@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import dayjs from '@/lib/club-time'
 import { db } from './prisma'
 import crypto from 'crypto'
 

@@ -1,4 +1,8 @@
-import { listRecurringBookingsHandler, stopRecurringBookingHandler } from '@/handlers/admin/recurring-booking.handler'
+import {
+  previewRecurringBookingHandler,
+  listRecurringBookingsHandler,
+  stopRecurringBookingHandler,
+} from '@/handlers/admin/recurring-booking.handler'
 import { createRouter } from '@/lib/create-app'
 import {
   approveBookingTransactionHandler,
@@ -19,6 +23,7 @@ const adminBookingRoute = createRouter()
   .get('/ongoing-schedule', ...getOngoingBookingScheduleHandler)
   .get('/export', ...exportBookingsHandler)
   .get('/export/excel', ...exportBookingTransactionsToExcelHandler)
+  .post('/recurring/preview', ...previewRecurringBookingHandler)
   .get('/recurring', ...listRecurringBookingsHandler)
   .put('/recurring/:id/stop', ...stopRecurringBookingHandler)
   .get('/:id', ...getBookingTransactionDetailHandler)

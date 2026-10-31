@@ -62,8 +62,9 @@ export function buildRollingCourtSlots(
   from: Date,
   now = new Date(),
   tariffRules: TariffRule[] = [],
+  through?: Date,
 ) {
-  const end = dayjs(bookingWindowEnd(config.months, now))
+  const end = dayjs(through ?? bookingWindowEnd(config.months, now))
   const slots: (Prisma.SlotCreateManyInput & { startAt: Date; endAt: Date })[] =
     []
   for (

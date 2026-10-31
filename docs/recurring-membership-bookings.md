@@ -4,17 +4,15 @@ Di Booking Lapangan, tambahkan lapangan/jam pada tanggal awal, lalu pilih Ulangi
 mingguan. Pilih hari bermain dan salah satu periode:
 
 - Ikuti rolling window: tidak memiliki tanggal berhenti; terus menambahkan sesi.
-- Durasi 1–12 bulan: akhir dihitung dari tanggal awal dengan bulan kalender.
-  Jadwal di luar window baru dibuat saat rolling membukanya.
+- Durasi 1–12 bulan: akhir dihitung dari tanggal awal dengan bulan kalender. Seluruh tanggal dalam rentang dibuat langsung saat checkout, termasuk di luar rolling window publik.
+- Sampai tanggal tertentu: admin memilih akhir rentang (maksimal 12 bulan dari jadwal awal). Seluruh pengulangan dalam rentang dibuat langsung.
 
-Pratinjau dibatasi window terpendek lapangan yang dipilih. Semua lapangan harus
-memiliki rolling window aktif. Admin meninjau dan menyetujui sesi yang dilewati.
-Aturan disimpan dalam transaksi checkout awal; pratinjau saja tidak mengaktifkan
-aturan atau menahan slot. Pelanggan harus memiliki membership berbayar yang cocok
+Pratinjau untuk durasi/tanggal tetap tidak dibatasi jadwal yang sudah terbit. Kalender booking biasa tetap mengikuti rolling window. Pengaturan hari/jam operasional, bulk nonaktifkan, tarif efektif, dan konflik booking tetap diperiksa. Semua lapangan harus memiliki rolling window aktif; membuat slot yang belum terbit membutuhkan konfigurasi harga/jadwal otomatis lengkap. Aturan lama tanpa metadata tersebut tetap bisa memakai slot manual yang sudah terbit. Admin meninjau dan menyetujui sesi yang dilewati.
+Pratinjau hanya membaca data dan tidak menerbitkan/menahan slot. Keranjang menyimpan jadwal awal saja. Saat checkout, setiap tanggal bermain mendapat booking dan invoice tersendiri (termasuk tanggal pratinjau yang sudah ada dalam keranjang versi lama). Pengulangan tidak digabung dalam satu invoice. Konflik baru membatalkan seluruh checkout kecuali admin telah menyetujui untuk melewati sesi bentrok. Perubahan ini berlaku untuk booking baru, bukan pemecahan otomatis invoice historis. Pelanggan harus memiliki membership berbayar yang cocok
 olahraga/jamnya dan masih dalam masa berlaku saat checkout awal. Tidak ada syarat
 saldo mencukupi untuk booking rutin. Booking biasa mempertahankan perilaku lama.
 
-Setiap slot booking rutin memotong saldo membership asal ketika jam mulai tiba,
+Semua tanggal dan jam memakai Asia/Jakarta (WIB). Misalnya 19.00 WIB disimpan sebagai 12.00 UTC; slot kedua 20.00 WIB memiliki waktu potong sendiri. Setiap slot booking rutin memotong saldo membership asal ketika jam mulai tiba,
 bukan ketika checkout. Satu jam lapangan = satu sesi. Scheduler berjalan setiap
 menit sehingga pemotongan terjadi pada pemeriksaan pertama sejak jam mulai.
 Akses daftar slot juga menjalankan proses ini. Ledger unik per detail booking
@@ -38,10 +36,11 @@ dibentuk tetap berlaku dan harus dibatalkan secara terpisah bila diperlukan.
 Pembatalan sebelum jam mulai tidak mengurangi kuota; pembatalan admin setelah
 pemotongan mengikuti mekanisme pengembalian kuota yang sudah ada.
 
-Filter Saldo minus tersedia di Kelola Pemesanan Value Pack dan export Excel,
-termasuk paket yang telah kedaluwarsa.
+Saldo minus ditampilkan di Kelola Pemesanan → Tunggakan Value Pack, termasuk paket yang sudah kedaluwarsa. Invoice sesi membership tetap Rp0; pengulangan tidak menagih uang otomatis.
 
 ## Penerapan
+
+Pembaruan rentang mingguan dan invoice terpisah tidak memerlukan migrasi tambahan; memakai tabel recurring/ledger yang sama. Deploy frontend, backend, dan scheduler versi baru bersama.
 
 Sebelum memulai backend/worker versi baru, jalankan pada database tujuan:
 

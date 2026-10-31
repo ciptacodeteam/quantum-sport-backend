@@ -39,3 +39,22 @@ it('negative membership filter includes expired memberships and is usable by exp
     remainingSessions: { lt: 0 },
   })
 })
+it('supports a fixed date range and rejects reversed or excessive periods', () => {
+  const input = {
+    mode: 'DATES',
+    weekdays: [6],
+    startDate: '2026-10-31',
+    endDate: '2027-04-30',
+    previewThrough: '2027-04-30',
+    sourceSlotIds: ['slot'],
+  }
+  expect(recurringBookingInputSchema.safeParse(input).success).toBe(true)
+  expect(
+    recurringBookingInputSchema.safeParse({ ...input, endDate: '2026-10-30' })
+      .success,
+  ).toBe(false)
+  expect(
+    recurringBookingInputSchema.safeParse({ ...input, endDate: '2027-11-01' })
+      .success,
+  ).toBe(false)
+})
