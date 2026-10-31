@@ -2,7 +2,7 @@ import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { ok } from '@/lib/response'
 import { idSchema } from '@/lib/validation'
-import { requireAdminAuth, requireAuth } from '@/middlewares/auth'
+import { requireAuth } from '@/middlewares/auth'
 import { notificationService } from '@/services/notification.service'
 import { zValidator } from '@hono/zod-validator'
 import { NotificationAudience, NotificationType } from '@prisma/client'
@@ -69,8 +69,9 @@ export const markUserNotificationReadHandler = factory.createHandlers(
   },
 )
 
+// App-level requireAdminAuth already runs before branch context. Do not
+// re-check Staff here — branch scope would hide SUPER_ADMIN on other cabang.
 export const pushAdminNotificationHandler = factory.createHandlers(
-  requireAdminAuth,
   zValidator('json', adminPushSchema, validateHook),
   async (c) => {
     try {
@@ -92,7 +93,6 @@ export const pushAdminNotificationHandler = factory.createHandlers(
 )
 
 export const getAdminNotificationsHandler = factory.createHandlers(
-  requireAdminAuth,
   zValidator('query', paginationSchema, validateHook),
   async (c) => {
     try {
@@ -118,7 +118,6 @@ export const getAdminNotificationsHandler = factory.createHandlers(
 )
 
 export const markAdminNotificationReadHandler = factory.createHandlers(
-  requireAdminAuth,
   zValidator('param', idSchema, validateHook),
   async (c) => {
     try {
@@ -140,7 +139,6 @@ export const markAdminNotificationReadHandler = factory.createHandlers(
 )
 
 export const markAllAdminNotificationsReadHandler = factory.createHandlers(
-  requireAdminAuth,
   async (c) => {
     try {
       const admin = c.get('admin')

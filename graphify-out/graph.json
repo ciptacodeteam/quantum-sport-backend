@@ -714,8 +714,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "package_dependencies_bullmq",
-      "community": 88,
-      "community_name": "dependencies",
+      "community": 167,
+      "community_name": "bullmq",
       "norm_label": "bullmq"
     },
     {
@@ -725,8 +725,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "bullmq",
-      "community": 88,
-      "community_name": "dependencies",
+      "community": 167,
+      "community_name": "bullmq",
       "norm_label": "bullmq"
     },
     {
@@ -934,8 +934,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "package_dependencies_pino_http",
-      "community": 204,
-      "community_name": "pino-http",
+      "community": 88,
+      "community_name": "dependencies",
       "norm_label": "pino-http"
     },
     {
@@ -945,8 +945,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "pino_http",
-      "community": 204,
-      "community_name": "pino-http",
+      "community": 88,
+      "community_name": "dependencies",
       "norm_label": "pino-http"
     },
     {
@@ -4528,8 +4528,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_env_deployed_test",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 74,
+      "community_name": "prisma.ts",
       "norm_label": "env.deployed.test.ts"
     },
     {
@@ -4539,8 +4539,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_env",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 74,
+      "community_name": "prisma.ts",
       "norm_label": "env.ts"
     },
     {
@@ -4550,8 +4550,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "src_env_req",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 74,
+      "community_name": "prisma.ts",
       "norm_label": "req()"
     },
     {
@@ -4561,8 +4561,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_env_env",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "env"
     },
     {
@@ -4572,8 +4572,8 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_env_deployed_node_envs",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 74,
+      "community_name": "prisma.ts",
       "norm_label": "deployed_node_envs"
     },
     {
@@ -4583,8 +4583,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_env_isdeployedenv",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 74,
+      "community_name": "prisma.ts",
       "norm_label": "isdeployedenv()"
     },
     {
@@ -4616,7 +4616,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_exceptions_index_notfoundexception",
-      "community": 18,
+      "community": 3,
       "community_name": "NotFoundException",
       "norm_label": "notfoundexception"
     },
@@ -4627,7 +4627,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_exceptions_index_notfoundexception_constructor",
-      "community": 18,
+      "community": 3,
       "community_name": "NotFoundException",
       "norm_label": ".constructor()"
     },
@@ -5112,7 +5112,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_booked_ballboy_handler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "booked-ballboy.handler.ts"
     },
     {
@@ -5123,7 +5123,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_booked_ballboy_handler_cancelbookingschema",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "cancelbookingschema"
     },
     {
@@ -5134,7 +5134,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_booked_ballboy_handler_getallbookedballboyshandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getallbookedballboyshandler"
     },
     {
@@ -5145,7 +5145,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_booked_ballboy_handler_getbookedballboydetailhandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getbookedballboydetailhandler"
     },
     {
@@ -5156,7 +5156,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_booked_ballboy_handler_cancelballboybookinghandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "cancelballboybookinghandler"
     },
     {
@@ -5166,8 +5166,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_admin_booked_coach_handler",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "booked-coach.handler.ts"
     },
     {
@@ -5177,8 +5177,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_handlers_admin_booked_coach_handler_cancelbookingschema",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "cancelbookingschema"
     },
     {
@@ -5188,8 +5188,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_handlers_admin_booked_coach_handler_bookedcoachesqueryschema",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "bookedcoachesqueryschema"
     },
     {
@@ -5199,8 +5199,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_handlers_admin_booked_coach_handler_getallbookedcoacheshandler",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "getallbookedcoacheshandler"
     },
     {
@@ -5210,8 +5210,8 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "src_handlers_admin_booked_coach_handler_getbookedcoachdetailhandler",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "getbookedcoachdetailhandler"
     },
     {
@@ -5221,8 +5221,8 @@
       "source_location": "L243",
       "_origin": "ast",
       "id": "src_handlers_admin_booked_coach_handler_cancelcoachbookinghandler",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "cancelcoachbookinghandler"
     },
     {
@@ -5804,8 +5804,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_admin_class_booking_handler",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "class-booking.handler.ts"
     },
     {
@@ -5815,8 +5815,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_handlers_admin_class_booking_handler_getallclassbookingtransactionshandler",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "getallclassbookingtransactionshandler"
     },
     {
@@ -5826,8 +5826,8 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_handlers_admin_class_booking_handler_getclassbookingtransactiondetailhandler",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "getclassbookingtransactiondetailhandler"
     },
     {
@@ -5837,8 +5837,8 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "src_handlers_admin_class_booking_handler_approveclassbookingtransactionhandler",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "approveclassbookingtransactionhandler"
     },
     {
@@ -5848,8 +5848,8 @@
       "source_location": "L261",
       "_origin": "ast",
       "id": "src_handlers_admin_class_booking_handler_rejectclassbookingtransactionhandler",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "rejectclassbookingtransactionhandler"
     },
     {
@@ -5859,8 +5859,8 @@
       "source_location": "L343",
       "_origin": "ast",
       "id": "src_handlers_admin_class_booking_handler_exportclassbookingtransactionstoexcelhandler",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "exportclassbookingtransactionstoexcelhandler"
     },
     {
@@ -5936,8 +5936,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_admin_coach_cost_handler",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "coach-cost.handler.ts"
     },
     {
@@ -5947,8 +5947,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_handlers_admin_coach_cost_handler_getcoachcosthandler",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "getcoachcosthandler"
     },
     {
@@ -5958,8 +5958,8 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "src_handlers_admin_coach_cost_handler_createcoachcosthandler",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "createcoachcosthandler"
     },
     {
@@ -5969,8 +5969,8 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "src_handlers_admin_coach_cost_handler_updatecoachcosthandler",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "updatecoachcosthandler"
     },
     {
@@ -5980,8 +5980,8 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "src_handlers_admin_coach_cost_handler_overridesinglecoachcosthandler",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "overridesinglecoachcosthandler"
     },
     {
@@ -6487,7 +6487,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_invoice_handler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "admin/invoice.handler.ts"
     },
     {
@@ -6498,7 +6498,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_invoice_handler_idschema",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "idschema"
     },
     {
@@ -6509,7 +6509,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_invoice_handler_getallinvoicesadminhandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getallinvoicesadminhandler"
     },
     {
@@ -6520,7 +6520,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_invoice_handler_getinvoicedetailadminhandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getinvoicedetailadminhandler"
     },
     {
@@ -6663,7 +6663,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "admin/membership.handler.ts"
     },
     {
@@ -6674,7 +6674,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_membershipqueryschema",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "membershipqueryschema"
     },
     {
@@ -6685,7 +6685,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_getallmembershiphandler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "getallmembershiphandler"
     },
     {
@@ -6696,7 +6696,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_getmembershiphandler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "getmembershiphandler"
     },
     {
@@ -6707,7 +6707,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_createmembershiphandler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "createmembershiphandler"
     },
     {
@@ -6718,7 +6718,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_updatemembershiphandler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "updatemembershiphandler"
     },
     {
@@ -6729,7 +6729,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_deletemembershiphandler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "deletemembershiphandler"
     },
     {
@@ -6740,7 +6740,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_adminmembershipcheckoutschema",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "adminmembershipcheckoutschema"
     },
     {
@@ -6751,7 +6751,7 @@
       "_origin": "ast",
       "id": "src_handlers_admin_membership_handler_adminmembershipcheckouthandler",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "adminmembershipcheckouthandler"
     },
     {
@@ -7499,7 +7499,7 @@
       "_origin": "ast",
       "id": "src_handlers_auth_password_reset_handler",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "password-reset.handler.ts"
     },
     {
@@ -7510,7 +7510,7 @@
       "_origin": "ast",
       "id": "src_handlers_auth_password_reset_handler_resetpasswordwithtokenschema",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "resetpasswordwithtokenschema"
     },
     {
@@ -7521,7 +7521,7 @@
       "_origin": "ast",
       "id": "src_handlers_auth_password_reset_handler_resetpasswordwithtokenhandler",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "resetpasswordwithtokenhandler"
     },
     {
@@ -7532,7 +7532,7 @@
       "_origin": "ast",
       "id": "src_handlers_auth_password_reset_handler_verifyresettokenhandler",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "verifyresettokenhandler"
     },
     {
@@ -7543,7 +7543,7 @@
       "_origin": "ast",
       "id": "src_handlers_auth_password_reset_handler_requestpasswordresethandler",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "requestpasswordresethandler"
     },
     {
@@ -7553,8 +7553,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_ballboy_handler",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "ballboy.handler.ts"
     },
     {
@@ -7576,7 +7576,7 @@
       "_origin": "ast",
       "id": "src_handlers_banner_handler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "handlers/banner.handler.ts"
     },
     {
@@ -7587,7 +7587,7 @@
       "_origin": "ast",
       "id": "src_handlers_banner_handler_getallbannerhandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getallbannerhandler"
     },
     {
@@ -7598,7 +7598,7 @@
       "_origin": "ast",
       "id": "src_handlers_banner_handler_getbannerhandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getbannerhandler"
     },
     {
@@ -7818,7 +7818,7 @@
       "_origin": "ast",
       "id": "src_handlers_class_handler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "handlers/class.handler.ts"
     },
     {
@@ -7829,7 +7829,7 @@
       "_origin": "ast",
       "id": "src_handlers_class_handler_getallclasshandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getallclasshandler"
     },
     {
@@ -7840,7 +7840,7 @@
       "_origin": "ast",
       "id": "src_handlers_class_handler_getclasshandler",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "getclasshandler"
     },
     {
@@ -7850,8 +7850,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_coach_handler",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "coach.handler.ts"
     },
     {
@@ -7971,8 +7971,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_credit_card_handler",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "credit-card.handler.ts"
     },
     {
@@ -7982,8 +7982,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_handlers_credit_card_handler_listcreditcardshandler",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "listcreditcardshandler"
     },
     {
@@ -7993,8 +7993,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "src_handlers_credit_card_handler_getcreditcardhandler",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "getcreditcardhandler"
     },
     {
@@ -8004,8 +8004,8 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_handlers_credit_card_handler_savecreditcardhandler",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "savecreditcardhandler"
     },
     {
@@ -8015,8 +8015,8 @@
       "source_location": "L255",
       "_origin": "ast",
       "id": "src_handlers_credit_card_handler_updatecreditcardhandler",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "updatecreditcardhandler"
     },
     {
@@ -8026,8 +8026,8 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "src_handlers_credit_card_handler_deletecreditcardhandler",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "deletecreditcardhandler"
     },
     {
@@ -8081,8 +8081,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_inventory_handler",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "handlers/inventory.handler.ts"
     },
     {
@@ -8213,8 +8213,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_membership_renewal_handler_test",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "membership-renewal.handler.test.ts"
     },
     {
@@ -8224,8 +8224,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "src_handlers_membership_renewal_handler_test_mocks",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "mocks"
     },
     {
@@ -8235,8 +8235,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_handlers_membership_renewal_handler_test_previewhandler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "previewhandler"
     },
     {
@@ -8246,8 +8246,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_membership_renewal_handler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "membership-renewal.handler.ts"
     },
     {
@@ -8257,8 +8257,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_handlers_membership_renewal_handler_membershiprenewalpreviewhandler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "membershiprenewalpreviewhandler"
     },
     {
@@ -8345,8 +8345,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_membership_handler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "handlers/membership.handler.ts"
     },
     {
@@ -8356,8 +8356,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_handlers_membership_handler_membershipqueryschema",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "membershipqueryschema"
     },
     {
@@ -8367,8 +8367,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_handlers_membership_handler_getallmembershiphandler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "getallmembershiphandler"
     },
     {
@@ -8378,8 +8378,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_handlers_membership_handler_getmembershiphandler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "getmembershiphandler"
     },
     {
@@ -8389,8 +8389,8 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "src_handlers_membership_handler_getusermembershipshandler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "getusermembershipshandler"
     },
     {
@@ -8400,8 +8400,8 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "src_handlers_membership_handler_getmyactivemembershiphandler",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "getmyactivemembershiphandler"
     },
     {
@@ -8507,7 +8507,7 @@
       "label": "pushAdminNotificationHandler",
       "file_type": "code",
       "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L72",
+      "source_location": "L74",
       "_origin": "ast",
       "id": "src_handlers_notification_handler_pushadminnotificationhandler",
       "community": 76,
@@ -8518,7 +8518,7 @@
       "label": "getAdminNotificationsHandler",
       "file_type": "code",
       "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L94",
+      "source_location": "L95",
       "_origin": "ast",
       "id": "src_handlers_notification_handler_getadminnotificationshandler",
       "community": 76,
@@ -8540,7 +8540,7 @@
       "label": "markAllAdminNotificationsReadHandler",
       "file_type": "code",
       "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L142",
+      "source_location": "L141",
       "_origin": "ast",
       "id": "src_handlers_notification_handler_markalladminnotificationsreadhandler",
       "community": 76,
@@ -8554,8 +8554,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_partnership_handler",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "handlers/partnership.handler.ts"
     },
     {
@@ -8565,8 +8565,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_handlers_partnership_handler_getpublicpartnershiplogoshandler",
-      "community": 3,
-      "community_name": "factory",
+      "community": 61,
+      "community_name": "create-app.ts",
       "norm_label": "getpublicpartnershiplogoshandler"
     },
     {
@@ -8675,8 +8675,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_handlers_xendit_test_handler",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 74,
+      "community_name": "prisma.ts",
       "norm_label": "xendit-test.handler.ts"
     },
     {
@@ -8874,7 +8874,7 @@
       "_origin": "ast",
       "id": "src_helpers_validate_hook",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "validate-hook.ts"
     },
     {
@@ -8885,7 +8885,7 @@
       "_origin": "ast",
       "id": "src_helpers_validate_hook_zoderrortoformerrors",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "zoderrortoformerrors()"
     },
     {
@@ -8896,7 +8896,7 @@
       "_origin": "ast",
       "id": "src_helpers_validate_hook_validatehook",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "validatehook()"
     },
     {
@@ -8907,7 +8907,7 @@
       "_origin": "ast",
       "id": "src_lib_auth_cookies",
       "community": 48,
-      "community_name": "env.ts",
+      "community_name": "auth-cookies.ts",
       "norm_label": "auth-cookies.ts"
     },
     {
@@ -8918,7 +8918,7 @@
       "_origin": "ast",
       "id": "src_lib_auth_cookies_basecookieoptions",
       "community": 48,
-      "community_name": "env.ts",
+      "community_name": "auth-cookies.ts",
       "norm_label": "basecookieoptions()"
     },
     {
@@ -8929,7 +8929,7 @@
       "_origin": "ast",
       "id": "src_lib_auth_cookies_setuseraccesstokencookie",
       "community": 48,
-      "community_name": "env.ts",
+      "community_name": "auth-cookies.ts",
       "norm_label": "setuseraccesstokencookie()"
     },
     {
@@ -8940,7 +8940,7 @@
       "_origin": "ast",
       "id": "src_lib_auth_cookies_setadminaccesstokencookie",
       "community": 48,
-      "community_name": "env.ts",
+      "community_name": "auth-cookies.ts",
       "norm_label": "setadminaccesstokencookie()"
     },
     {
@@ -8951,7 +8951,7 @@
       "_origin": "ast",
       "id": "src_lib_auth_cookies_clearuserauthcookies",
       "community": 48,
-      "community_name": "env.ts",
+      "community_name": "auth-cookies.ts",
       "norm_label": "clearuserauthcookies()"
     },
     {
@@ -8962,7 +8962,7 @@
       "_origin": "ast",
       "id": "src_lib_auth_cookies_clearadminauthcookies",
       "community": 48,
-      "community_name": "env.ts",
+      "community_name": "auth-cookies.ts",
       "norm_label": "clearadminauthcookies()"
     },
     {
@@ -9511,8 +9511,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_lib_create_app_factory",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "factory"
     },
     {
@@ -9984,8 +9984,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_lib_password",
-      "community": 42,
-      "community_name": "admin/auth.handler.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "password.ts"
     },
     {
@@ -9995,8 +9995,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_lib_password_argon2_opts",
-      "community": 42,
-      "community_name": "admin/auth.handler.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "argon2_opts"
     },
     {
@@ -10017,8 +10017,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_lib_password_verifypassword",
-      "community": 42,
-      "community_name": "admin/auth.handler.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "verifypassword()"
     },
     {
@@ -10028,8 +10028,8 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_lib_password_needsrehash",
-      "community": 42,
-      "community_name": "admin/auth.handler.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "needsrehash()"
     },
     {
@@ -10073,7 +10073,7 @@
       "_origin": "ast",
       "id": "src_lib_query",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "query.ts"
     },
     {
@@ -10084,7 +10084,7 @@
       "_origin": "ast",
       "id": "src_lib_query_findmanyoptions",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "findmanyoptions"
     },
     {
@@ -10095,7 +10095,7 @@
       "_origin": "ast",
       "id": "src_lib_query_buildfindmanyoptions",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "buildfindmanyoptions()"
     },
     {
@@ -10270,8 +10270,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_lib_response",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "response.ts"
     },
     {
@@ -10281,8 +10281,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_lib_response_responsesuccess",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "responsesuccess"
     },
     {
@@ -10292,8 +10292,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_lib_response_responseerror",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "responseerror"
     },
     {
@@ -10314,8 +10314,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_lib_response_err",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "err()"
     },
     {
@@ -10743,7 +10743,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_lib_validation_idschema",
-      "community": 18,
+      "community": 3,
       "community_name": "NotFoundException",
       "norm_label": "idschema"
     },
@@ -10754,8 +10754,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_lib_validation_phoneschema",
-      "community": 74,
-      "community_name": "prisma.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "phoneschema"
     },
     {
@@ -10831,8 +10831,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_lib_validation_resetpasswordschema",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 36,
+      "community_name": "handlers/auth.handler.ts",
       "norm_label": "resetpasswordschema"
     },
     {
@@ -10909,7 +10909,7 @@
       "_origin": "ast",
       "id": "src_lib_validation_searchqueryschema",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "searchqueryschema"
     },
     {
@@ -11095,8 +11095,8 @@
       "source_location": "L370",
       "_origin": "ast",
       "id": "src_lib_validation_createcoachcostschema",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "createcoachcostschema"
     },
     {
@@ -11106,8 +11106,8 @@
       "source_location": "L372",
       "_origin": "ast",
       "id": "src_lib_validation_updatecoachcostschema",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "updatecoachcostschema"
     },
     {
@@ -11117,8 +11117,8 @@
       "source_location": "L382",
       "_origin": "ast",
       "id": "src_lib_validation_overridesinglecoachcostschema",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "overridesinglecoachcostschema"
     },
     {
@@ -11228,7 +11228,7 @@
       "_origin": "ast",
       "id": "src_lib_validation_createmembershipschema",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "createmembershipschema"
     },
     {
@@ -11239,7 +11239,7 @@
       "_origin": "ast",
       "id": "src_lib_validation_updatemembershipschema",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "updatemembershipschema"
     },
     {
@@ -11315,8 +11315,8 @@
       "source_location": "L713",
       "_origin": "ast",
       "id": "src_lib_validation_availablecoachesqueryschema",
-      "community": 61,
-      "community_name": "create-app.ts",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "availablecoachesqueryschema"
     },
     {
@@ -11392,8 +11392,8 @@
       "source_location": "L810",
       "_origin": "ast",
       "id": "src_lib_validation_requestemailchangeschema",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 36,
+      "community_name": "handlers/auth.handler.ts",
       "norm_label": "requestemailchangeschema"
     },
     {
@@ -11447,8 +11447,8 @@
       "source_location": "L886",
       "_origin": "ast",
       "id": "src_lib_validation_savecreditcardschema",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "savecreditcardschema"
     },
     {
@@ -11458,8 +11458,8 @@
       "source_location": "L892",
       "_origin": "ast",
       "id": "src_lib_validation_updatecreditcardschema",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "updatecreditcardschema"
     },
     {
@@ -11744,8 +11744,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_middlewares_error_test",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "error.test.ts"
     },
     {
@@ -11755,8 +11755,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_middlewares_error",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "error.ts"
     },
     {
@@ -11766,8 +11766,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "src_middlewares_error_onerror",
-      "community": 48,
-      "community_name": "env.ts",
+      "community": 136,
+      "community_name": "env",
       "norm_label": "onerror()"
     },
     {
@@ -11932,7 +11932,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_booked_ballboy_route",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "booked-ballboy.route.ts"
     },
     {
@@ -11943,7 +11943,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_booked_ballboy_route_adminbookedballboyroute",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "adminbookedballboyroute"
     },
     {
@@ -11953,8 +11953,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_routes_admin_booked_coach_route",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "booked-coach.route.ts"
     },
     {
@@ -11964,8 +11964,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "src_routes_admin_booked_coach_route_adminbookedcoachroute",
-      "community": 3,
-      "community_name": "factory",
+      "community": 146,
+      "community_name": "response.ts",
       "norm_label": "adminbookedcoachroute"
     },
     {
@@ -12042,7 +12042,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_branch_route",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "admin/branch.route.ts"
     },
     {
@@ -12053,7 +12053,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_branch_route_schema",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "schema"
     },
     {
@@ -12063,8 +12063,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_routes_admin_branch_route_branchroute",
-      "community": 146,
-      "community_name": "validate-hook.ts",
+      "community": 61,
+      "community_name": "create-app.ts",
       "norm_label": "branchroute"
     },
     {
@@ -12096,8 +12096,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_routes_admin_class_booking_route",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "class-booking.route.ts"
     },
     {
@@ -12107,8 +12107,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_routes_admin_class_booking_route_adminclassbookingroute",
-      "community": 112,
-      "community_name": "class-booking.handler.ts",
+      "community": 3,
+      "community_name": "NotFoundException",
       "norm_label": "adminclassbookingroute"
     },
     {
@@ -12140,8 +12140,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_routes_admin_coach_cost_route",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "coach-cost.route.ts"
     },
     {
@@ -12151,8 +12151,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_routes_admin_coach_cost_route_admincoachcostroute",
-      "community": 16,
-      "community_name": "validation.ts",
+      "community": 112,
+      "community_name": "coach-cost.handler.ts",
       "norm_label": "admincoachcostroute"
     },
     {
@@ -12317,7 +12317,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_invoice_route",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "admin/invoice.route.ts"
     },
     {
@@ -12328,7 +12328,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_invoice_route_admininvoiceroute",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "admininvoiceroute"
     },
     {
@@ -12361,7 +12361,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_membership_route",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "admin/membership.route.ts"
     },
     {
@@ -12372,7 +12372,7 @@
       "_origin": "ast",
       "id": "src_routes_admin_membership_route_adminmembershiproute",
       "community": 18,
-      "community_name": "NotFoundException",
+      "community_name": "admin/membership.handler.ts",
       "norm_label": "adminmembershiproute"
     },
     {
@@ -12669,7 +12669,7 @@
       "_origin": "ast",
       "id": "src_routes_banner_route",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "routes/banner.route.ts"
     },
     {
@@ -12680,7 +12680,7 @@
       "_origin": "ast",
       "id": "src_routes_banner_route_bannerroute",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "bannerroute"
     },
     {
@@ -12691,7 +12691,7 @@
       "_origin": "ast",
       "id": "src_routes_branch_route",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "routes/branch.route.ts"
     },
     {
@@ -12702,7 +12702,7 @@
       "_origin": "ast",
       "id": "src_routes_branch_route_branchfields",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "branchfields"
     },
     {
@@ -12712,8 +12712,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_routes_branch_route_branchroute",
-      "community": 146,
-      "community_name": "validate-hook.ts",
+      "community": 61,
+      "community_name": "create-app.ts",
       "norm_label": "branchroute"
     },
     {
@@ -12746,7 +12746,7 @@
       "_origin": "ast",
       "id": "src_routes_class_route",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "routes/class.route.ts"
     },
     {
@@ -12757,7 +12757,7 @@
       "_origin": "ast",
       "id": "src_routes_class_route_classroute",
       "community": 3,
-      "community_name": "factory",
+      "community_name": "NotFoundException",
       "norm_label": "classroute"
     },
     {
@@ -12811,8 +12811,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_routes_credit_card_route",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "credit-card.route.ts"
     },
     {
@@ -12822,8 +12822,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_routes_credit_card_route_creditcardroute",
-      "community": 72,
-      "community_name": "credit-card.handler.ts",
+      "community": 16,
+      "community_name": "validation.ts",
       "norm_label": "creditcardroute"
     },
     {
@@ -12921,8 +12921,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_routes_membership_route",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "routes/membership.route.ts"
     },
     {
@@ -12932,8 +12932,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_routes_membership_route_membershiproute",
-      "community": 18,
-      "community_name": "NotFoundException",
+      "community": 72,
+      "community_name": "handlers/membership.handler.ts",
       "norm_label": "membershiproute"
     },
     {
@@ -12987,8 +12987,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_routes_partnership_route",
-      "community": 3,
-      "community_name": "factory",
+      "community": 61,
+      "community_name": "create-app.ts",
       "norm_label": "routes/partnership.route.ts"
     },
     {
@@ -12998,8 +12998,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_routes_partnership_route_partnershiproute",
-      "community": 3,
-      "community_name": "factory",
+      "community": 61,
+      "community_name": "create-app.ts",
       "norm_label": "partnershiproute"
     },
     {
@@ -13010,7 +13010,7 @@
       "_origin": "ast",
       "id": "src_routes_password_reset_route",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "password-reset.route.ts"
     },
     {
@@ -13021,7 +13021,7 @@
       "_origin": "ast",
       "id": "src_routes_password_reset_route_passwordresetroute",
       "community": 146,
-      "community_name": "validate-hook.ts",
+      "community_name": "response.ts",
       "norm_label": "passwordresetroute"
     },
     {
@@ -19895,8 +19895,8 @@
       "source_location": "L367",
       "_origin": "ast",
       "id": "docs_analytics_apis_implementation_details",
-      "community": 136,
-      "community_name": "Implementation Details",
+      "community": 65,
+      "community_name": "Analytics APIs - Complete Documentation",
       "norm_label": "implementation details"
     },
     {
@@ -19906,8 +19906,8 @@
       "source_location": "L369",
       "_origin": "ast",
       "id": "docs_analytics_apis_date_range_defaults",
-      "community": 136,
-      "community_name": "Implementation Details",
+      "community": 65,
+      "community_name": "Analytics APIs - Complete Documentation",
       "norm_label": "date range defaults"
     },
     {
@@ -19917,8 +19917,8 @@
       "source_location": "L376",
       "_origin": "ast",
       "id": "docs_analytics_apis_error_handling",
-      "community": 136,
-      "community_name": "Implementation Details",
+      "community": 65,
+      "community_name": "Analytics APIs - Complete Documentation",
       "norm_label": "error handling"
     },
     {
@@ -19928,8 +19928,8 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "docs_analytics_apis_performance_considerations",
-      "community": 136,
-      "community_name": "Implementation Details",
+      "community": 65,
+      "community_name": "Analytics APIs - Complete Documentation",
       "norm_label": "performance considerations"
     },
     {
@@ -19939,8 +19939,8 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "docs_analytics_apis_authentication_395",
-      "community": 136,
-      "community_name": "Implementation Details",
+      "community": 65,
+      "community_name": "Analytics APIs - Complete Documentation",
       "norm_label": "authentication"
     },
     {
@@ -25175,8 +25175,8 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "docs_docker_email_worker_queue_management",
-      "community": 145,
-      "community_name": "Queue Management",
+      "community": 8,
+      "community_name": "Email Worker Docker Guide",
       "norm_label": "queue management"
     },
     {
@@ -25186,8 +25186,8 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "docs_docker_email_worker_view_queue_statistics",
-      "community": 145,
-      "community_name": "Queue Management",
+      "community": 8,
+      "community_name": "Email Worker Docker Guide",
       "norm_label": "view queue statistics"
     },
     {
@@ -25197,8 +25197,8 @@
       "source_location": "L213",
       "_origin": "ast",
       "id": "docs_docker_email_worker_clear_queue_emergency_only",
-      "community": 145,
-      "community_name": "Queue Management",
+      "community": 8,
+      "community_name": "Email Worker Docker Guide",
       "norm_label": "clear queue (emergency only)"
     },
     {
@@ -25296,8 +25296,8 @@
       "source_location": "L293",
       "_origin": "ast",
       "id": "docs_docker_email_worker_environment_variables",
-      "community": 8,
-      "community_name": "Email Worker Docker Guide",
+      "community": 145,
+      "community_name": "Environment Variables",
       "norm_label": "environment variables"
     },
     {
@@ -25307,8 +25307,8 @@
       "source_location": "L295",
       "_origin": "ast",
       "id": "docs_docker_email_worker_required_for_email_worker",
-      "community": 8,
-      "community_name": "Email Worker Docker Guide",
+      "community": 145,
+      "community_name": "Environment Variables",
       "norm_label": "required for email worker"
     },
     {
@@ -25318,8 +25318,8 @@
       "source_location": "L315",
       "_origin": "ast",
       "id": "docs_docker_email_worker_optional",
-      "community": 8,
-      "community_name": "Email Worker Docker Guide",
+      "community": 145,
+      "community_name": "Environment Variables",
       "norm_label": "optional"
     },
     {
@@ -59239,7 +59239,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L94",
+      "source_location": "L95",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_handlers_notification_handler",
@@ -59272,7 +59272,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L142",
+      "source_location": "L141",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_handlers_notification_handler",
@@ -59305,7 +59305,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L72",
+      "source_location": "L74",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_handlers_notification_handler",
@@ -59419,18 +59419,6 @@
       "source": "src_handlers_notification_handler",
       "target": "src_middlewares_auth",
       "confidence_score": 1.0
-    },
-    {
-      "relation": "indirect_call",
-      "context": "argument",
-      "confidence": "INFERRED",
-      "source_file": "src/handlers/notification.handler.ts",
-      "source_location": "L73",
-      "weight": 1.0,
-      "_origin": "ast",
-      "confidence_score": 0.8,
-      "source": "src_handlers_notification_handler",
-      "target": "src_middlewares_auth_requireadminauth"
     },
     {
       "relation": "indirect_call",
@@ -92615,5 +92603,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d211cbf1ced1d5bf58eff29eb98a7a1e7b3cdfba"
+  "built_at_commit": "f920c7c1215b8cb8265518828b9cea5e48e2368a"
 }
