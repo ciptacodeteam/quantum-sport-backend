@@ -48,6 +48,7 @@ import { BookingStatus, SlotType } from '@prisma/client'
 import dayjs, {
   clubWallDayEnd,
   clubWallDayStart,
+  clubWallTime,
   formatClubWallClock,
 } from '@/lib/club-time'
 import z from 'zod'
@@ -358,14 +359,23 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         },
       })
 
+      // Drop stale slots whose wall hour is configured as closed on the court
+      const openSlots = slots.filter((slot) => {
+        const closedHours = (
+          slot.court?.rollingPricing as { closedHours?: number[] } | null
+        )?.closedHours
+        if (!closedHours?.length) return true
+        return !closedHours.includes(clubWallTime(slot.startAt).hour())
+      })
+
       // Transform court images
-      for (const slot of slots) {
+      for (const slot of openSlots) {
         if (slot.court?.image) {
           slot.court.image = await getFileUrl(slot.court.image)
         }
       }
 
-      const formattedSlots = slots.map(({ bookingDetails, ...slot }) => ({
+      const formattedSlots = openSlots.map(({ bookingDetails, ...slot }) => ({
         ...slot,
         availabilityStatus: getCourtSlotStatus(
           slot.isAvailable,
