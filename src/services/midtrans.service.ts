@@ -60,6 +60,33 @@ export function midtransBaseUrl(serverKey = env.midtrans.serverKey) {
     : 'https://api.midtrans.com'
 }
 
+export function midtransSnapBaseUrl(serverKey = env.midtrans.serverKey) {
+  return isSandboxKey(serverKey)
+    ? 'https://app.sandbox.midtrans.com'
+    : 'https://app.midtrans.com'
+}
+
+/** Master-data channel → Snap enabled_payments value. */
+const SNAP_ENABLED_PAYMENTS: Record<string, string> = {
+  BCA_VIRTUAL_ACCOUNT: 'bca_va',
+  BNI_VIRTUAL_ACCOUNT: 'bni_va',
+  BRI_VIRTUAL_ACCOUNT: 'bri_va',
+  CIMB_VIRTUAL_ACCOUNT: 'cimb_va',
+  PERMATA_VIRTUAL_ACCOUNT: 'permata_va',
+  MANDIRI_VIRTUAL_ACCOUNT: 'echannel',
+  QRIS: 'other_qris',
+  QR: 'other_qris',
+  CARDS: 'credit_card',
+}
+
+export function snapEnabledPayments(channelCode: string): string[] {
+  const mapped = SNAP_ENABLED_PAYMENTS[channelCode.toUpperCase()]
+  if (!mapped) {
+    throw new Error('Metode pembayaran ini belum tersedia di Snap.')
+  }
+  return [mapped]
+}
+
 export function isSupportedChannel(channelCode: string) {
   const channel = channelCode.toUpperCase()
   return (
@@ -70,6 +97,32 @@ export function isSupportedChannel(channelCode: string) {
     channel === 'CARDS'
   )
 }
+
+export type SnapTransaction = {
+  token: string
+  redirect_url: string
+  order_id: string
+  channel_code: string
+  request_amount: number
+  gateway: 'midtrans'
+  checkout_mode: 'snap'
+}
+
+export type CheckoutPaymentInit =
+  | {
+      mode: 'snap'
+      snapToken: string
+      snapRedirectUrl: string
+      orderId: string
+      channelCode: string
+      amount: number
+      meta: Record<string, unknown>
+    }
+  | {
+      mode: 'core'
+      charge: NormalizedCharge
+      meta: Record<string, unknown>
+    }
 
 export function isPaidStatus(status?: string, fraud?: string) {
   const normalized = String(status || '').toLowerCase()
@@ -285,12 +338,48 @@ function assertChargeOk(json: MidtransBody) {
   throw new Error(String(json.status_message || 'Payment gateway error'))
 }
 
+async function snapRequest(body: MidtransBody) {
+  if (!env.midtrans.serverKey) {
+    throw new Error(
+      'Payment gateway unavailable. Please try again later (missing API key).',
+    )
+  }
+  const response = await fetch(`${midtransSnapBaseUrl()}/snap/v1/transactions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Basic ${Buffer.from(`${env.midtrans.serverKey}:`).toString('base64')}`,
+    },
+    body: JSON.stringify(body),
+  })
+  const json = (await response.json().catch(() => ({}))) as MidtransBody & {
+    token?: string
+    redirect_url?: string
+    error_messages?: string[]
+  }
+  if (!response.ok || !json.token) {
+    const detail =
+      (Array.isArray(json.error_messages) && json.error_messages[0]) ||
+      String(json.status_message || 'Unable to create Snap transaction')
+    throw new Error(detail)
+  }
+  return json as { token: string; redirect_url: string }
+}
+
 export const midtransService = {
   isSupported: isSupportedChannel,
+  checkoutMode() {
+    return env.midtrans.checkoutMode
+  },
   clientConfig() {
     return {
       clientKey: env.midtrans.clientKey,
       sandbox: isSandboxKey(),
+      checkoutMode: env.midtrans.checkoutMode,
+      snapJsUrl: isSandboxKey()
+        ? 'https://app.sandbox.midtrans.com/snap/snap.js'
+        : 'https://app.midtrans.com/snap/snap.js',
     }
   },
   async charge(input: ChargeInput) {
@@ -299,6 +388,105 @@ export const midtransService = {
     const json = await midtransRequest('POST', '/v2/charge', body)
     assertChargeOk(json)
     return normalizeCharge(channel, json, input.amount)
+  },
+  async createSnapTransaction(input: ChargeInput): Promise<SnapTransaction> {
+    const channel = input.channelCode.toUpperCase()
+    if (!isSupportedChannel(channel)) {
+      throw new Error('Metode pembayaran ini belum tersedia.')
+    }
+    if (!Number.isInteger(input.amount) || input.amount <= 0) {
+      throw new Error('Payment amount must be a positive whole number.')
+    }
+    if (!/^[A-Za-z0-9_~.-]{1,50}$/.test(input.orderId)) {
+      throw new Error('Invalid payment reference.')
+    }
+    const customer = splitName(input.customer?.name)
+    const phone = phoneForCharge(input.customer?.phone)
+    const body: MidtransBody = {
+      transaction_details: {
+        order_id: input.orderId,
+        gross_amount: input.amount,
+      },
+      item_details: [
+        {
+          id: '1',
+          price: input.amount,
+          quantity: 1,
+          name: (input.description || 'Payment').slice(0, 50),
+        },
+      ],
+      customer_details: {
+        ...customer,
+        ...(input.customer?.email ? { email: input.customer.email } : {}),
+        ...(phone ? { phone } : {}),
+      },
+      enabled_payments: snapEnabledPayments(channel),
+    }
+    if (input.expiryMinutes) {
+      body.expiry = {
+        unit: 'minutes',
+        duration: input.expiryMinutes,
+      }
+    }
+    const json = await snapRequest(body)
+    return {
+      token: json.token,
+      redirect_url: json.redirect_url,
+      order_id: input.orderId,
+      channel_code: channel,
+      request_amount: input.amount,
+      gateway: 'midtrans',
+      checkout_mode: 'snap',
+    }
+  },
+  /** Creates Snap or Core payment based on MIDTRANS_CHECKOUT_MODE. */
+  async initiateCheckoutPayment(
+    input: ChargeInput,
+  ): Promise<CheckoutPaymentInit> {
+    if (env.midtrans.checkoutMode === 'snap') {
+      const snap = await this.createSnapTransaction(input)
+      return {
+        mode: 'snap',
+        snapToken: snap.token,
+        snapRedirectUrl: snap.redirect_url,
+        orderId: snap.order_id,
+        channelCode: snap.channel_code,
+        amount: snap.request_amount,
+        meta: {
+          gateway: 'midtrans',
+          checkout_mode: 'snap',
+          order_id: snap.order_id,
+          reference_id: snap.order_id,
+          status: 'PENDING',
+          channel_code: snap.channel_code,
+          snap_token: snap.token,
+          redirect_url: snap.redirect_url,
+          request_amount: snap.request_amount,
+          currency: 'IDR',
+        },
+      }
+    }
+    const charge = await this.charge(input)
+    return {
+      mode: 'core',
+      charge,
+      meta: {
+        gateway: 'midtrans',
+        checkout_mode: 'core',
+        payment_request_id: charge.transaction_id,
+        transaction_id: charge.transaction_id,
+        order_id: charge.order_id,
+        reference_id: charge.reference_id,
+        status: charge.status,
+        channel_code: charge.channel_code,
+        channel_properties: charge.channel_properties,
+        actions: charge.actions,
+        request_amount: charge.request_amount,
+        currency: charge.currency,
+        created: charge.created,
+        redirect_url: charge.redirect_url,
+      },
+    }
   },
   async getStatus(orderId: string) {
     const json = await midtransRequest(
