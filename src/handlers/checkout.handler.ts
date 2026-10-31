@@ -1583,7 +1583,7 @@ export const checkoutHandler = factory.createHandlers(
       }
 
       // Extract payment session or payment actions for frontend
-      let paymentSessionId: string | null = null
+      const paymentSessionId: string | null = null
       let paymentActions: any = null
       let redirectUrl: string | null = null
       let snapToken: string | null = null
