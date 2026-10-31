@@ -102,15 +102,23 @@ else
 fi
 
 # Additive feature schema is also needed by databases managed without a Prisma
-# migration history. Stop startup if this required table cannot be prepared.
-echo "🔄 Preparing tariff period schema..."
-TARIFF_PSQL_URL="$(bun -e '
+# migration history. These scripts only ADD columns/tables (IF NOT EXISTS).
+echo "🔄 Preparing additive feature schemas..."
+FEATURE_PSQL_URL="$(bun -e '
   const url = new URL(process.env.DATABASE_URL);
   for (const key of ["schema", "connection_limit", "pool_timeout", "pgbouncer", "statement_cache_size", "socket_timeout", "sslaccept"]) url.searchParams.delete(key);
   process.stdout.write(url.toString());
 ')"
-psql "$TARIFF_PSQL_URL" -v ON_ERROR_STOP=1 -f /app/prisma/tariff-periods.sql
-unset TARIFF_PSQL_URL
+for sql in \
+  /app/prisma/tariff-periods.sql \
+  /app/prisma/rolling-booking-window.sql \
+  /app/prisma/recurring-bookings.sql \
+  /app/prisma/membership-renewal.sql
+do
+  echo "   Applying $(basename "$sql")..."
+  psql "$FEATURE_PSQL_URL" -v ON_ERROR_STOP=1 -f "$sql"
+done
+unset FEATURE_PSQL_URL
 
 # Generate Prisma Client (should already be generated during build)
 echo "🔧 Ensuring Prisma Client is up to date..."
