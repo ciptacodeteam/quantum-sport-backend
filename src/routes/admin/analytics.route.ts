@@ -1,3 +1,7 @@
+import {
+  courtPerformanceHandler,
+  courtPerformanceExportHandler,
+} from '@/handlers/admin/court-performance.handler'
 import { createRouter } from '@/lib/create-app'
 import {
   exportAnalyticsToExcelHandler,
@@ -13,6 +17,8 @@ import {
 const adminAnalyticsRoute = createRouter()
   .basePath('/analytics')
   .get('/', ...getAnalyticsHandler)
+  .get('/court-performance', ...courtPerformanceHandler)
+  .get('/court-performance/export', ...courtPerformanceExportHandler)
   .get('/dashboard', ...getDashboardStatsHandler)
   .get('/daily-transactions', ...getDailyTransactionsHandler)
   .get('/income-by-source', ...getIncomeBySourceHandler)

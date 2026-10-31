@@ -113,3 +113,45 @@ it('distinguishes depleted hours, expiration, suspension and upcoming packages',
     ),
   ).toBe('UPCOMING')
 })
+it('reports recurring usage per charged package, separately from debt paid by a new package', async () => {
+  const booking = {
+    id: 'routine-booking',
+    status: 'CONFIRMED',
+    createdAt: now,
+    invoice: { number: 'INV-ROUTINE' },
+    branch: { id: 'cemara', name: 'Cemara', address: '' },
+  }
+  mocks.findMany.mockResolvedValue([
+    {
+      ...state,
+      id: 'new-package',
+      debtSettledSessions: 2,
+      membership: {
+        name: 'New pack',
+        sport: 'PADEL',
+        type: 'ALL_HOUR',
+        sessions: 10,
+      },
+      invoice: { number: 'NEW', status: 'PAID' },
+      usedBookings: [],
+      sessionDebits: [
+        {
+          sessions: 1,
+          detail: {
+            court: null,
+            slot: { courtId: 'court', startAt: now, endAt: now, court: null },
+            booking,
+          },
+        },
+      ],
+      debtsTransferred: [],
+    },
+  ])
+  const response = await read({ id: 'customer' })
+  expect(response.body.data.packages[0]).toMatchObject({
+    usedHours: 1,
+    debtSettledHours: 2,
+  })
+  expect(response.body.data.packages[0].usage).toHaveLength(1)
+  expect(response.body.data.packages[0].usage[0].hours).toBe(1)
+})

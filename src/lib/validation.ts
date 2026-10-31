@@ -245,21 +245,49 @@ export const updateSlotPricingSchema = z.object({
 
 export type UpdateSlotPricingSchema = z.infer<typeof updateSlotPricingSchema>
 
-export const bulkUpdateCourtSlotPricingSchema = z
-  .object({
-    fromDate: z
-      .string()
-      .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+const bulkCourtSlotFilterSchema = z.object({
+  followRollingWindow: z.boolean().optional(),
+  fromDate: z
+    .string()
+    .refine(
+      (val) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(val) &&
+        dayjs(val).format('YYYY-MM-DD') === val,
+      {
         message: 'Invalid date format, expected YYYY-MM-DD',
-      }),
-    toDate: z
-      .string()
-      .refine((val) => dayjs(val, 'YYYY-MM-DD', true).isValid(), {
+      },
+    ),
+  toDate: z
+    .string()
+    .refine(
+      (val) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(val) &&
+        dayjs(val).format('YYYY-MM-DD') === val,
+      {
         message: 'Invalid date format, expected YYYY-MM-DD',
-      }),
-    days: z.array(z.number().min(1).max(7)).min(1),
-    startHour: z.number().min(0).max(23),
-    endHour: z.number().min(1).max(24),
+      },
+    ),
+  days: z.array(z.number().int().min(1).max(7)).min(1),
+  startHour: z.number().int().min(0).max(23),
+  endHour: z.number().int().min(1).max(24),
+})
+
+export const bulkDisableCourtSlotsSchema = bulkCourtSlotFilterSchema
+  .refine((data) => !dayjs(data.toDate).isBefore(dayjs(data.fromDate)), {
+    message: 'toDate must be the same as or after fromDate',
+    path: ['toDate'],
+  })
+  .refine((data) => data.endHour > data.startHour, {
+    message: 'endHour must be greater than startHour',
+    path: ['endHour'],
+  })
+
+export type BulkDisableCourtSlotsSchema = z.infer<
+  typeof bulkDisableCourtSlotsSchema
+>
+
+export const bulkUpdateCourtSlotPricingSchema = bulkCourtSlotFilterSchema
+  .extend({
     price: z.number().min(0),
     discountPrice: z.number().min(0).optional(),
   })

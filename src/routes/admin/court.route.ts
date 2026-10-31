@@ -1,4 +1,5 @@
 import {
+  bulkDisableCourtSlotsHandler,
   bulkUpdateCourtSlotPricingHandler,
   createCourtHandler,
   deleteCourtHandler,
@@ -19,6 +20,7 @@ const adminCourtRoute = createRouter()
   .get('/:id', ...getCourtHandler)
   .get('/:id/costing', ...getCostHandler)
   .put('/:id/slots/bulk-pricing', ...bulkUpdateCourtSlotPricingHandler)
+  .put('/:id/slots/bulk-disable', ...bulkDisableCourtSlotsHandler)
   .put('/:id', ...updateCourtHandler)
   .put('/slots/:id/pricing', ...updateSlotPricingHandler)
   .post('/', ...createCourtHandler)

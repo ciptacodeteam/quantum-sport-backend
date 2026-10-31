@@ -1,3 +1,4 @@
+import { membershipRenewalPreviewHandler } from '@/handlers/membership-renewal.handler'
 import { getMyMembershipTrackingHandler } from '@/handlers/membership-tracking.handler'
 import { createRouter } from '@/lib/create-app'
 import {
@@ -15,6 +16,7 @@ const membershipRoute = createRouter()
   .get('/my', requireAuth, ...getUserMembershipsHandler)
   .get('/my/tracking', requireAuth, ...getMyMembershipTrackingHandler)
   .get('/my/active', requireAuth, ...getMyActiveMembershipHandler)
+  .get('/:id/renewal-preview', requireAuth, ...membershipRenewalPreviewHandler)
   .get('/:id', ...getMembershipHandler)
   .post('/checkout', ...membershipCheckoutHandler)
 

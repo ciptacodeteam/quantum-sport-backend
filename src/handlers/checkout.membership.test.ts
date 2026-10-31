@@ -1,3 +1,6 @@
+vi.mock('@/services/tariff-policy.service', () => ({
+  getTariffPeriods: vi.fn().mockResolvedValue([]),
+}))
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   db: { paymentMethod: { findUnique: vi.fn() }, $transaction: vi.fn() },
@@ -35,6 +38,7 @@ vi.mock('@/services/inventory-availability.service', () => ({
 }))
 import { checkoutHandler } from './checkout.handler'
 import { extendedCheckoutSchema } from '@/lib/validation'
+import { getTariffPeriods } from '@/services/tariff-policy.service'
 let tx: any
 let booking: any
 const membership = {
@@ -433,6 +437,41 @@ it('requires a payment method for a mixed membership and cash order', async () =
       membershipCourtSlotIds: ['slot-0'],
     }),
   ).rejects.toThrow('Pilih metode pembayaran')
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+
+it('uses the effective branch tariff instead of the old 15:00 boundary at customer checkout', async () => {
+  const slots = await tx.slot.findMany()
+  tx.slot.findMany.mockResolvedValue(
+    slots.map((slot: any) => ({ ...slot, branchId: 'cemara' })),
+  )
+  tx.membershipUser.findMany.mockResolvedValue([
+    {
+      ...membership,
+      membership: { ...membership.membership, type: 'HAPPY_HOUR' },
+    },
+  ])
+  vi.mocked(getTariffPeriods).mockResolvedValueOnce([
+    {
+      id: 'rule',
+      branchId: 'cemara',
+      sport: 'PADEL',
+      effectiveFrom: new Date('2029-01-01T00:00:00Z'),
+      happyStart: 6,
+      happyEnd: 17,
+      peakStart: 17,
+      peakEnd: 24,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ])
+  await checkout({
+    courtSlots: ['court-slot'],
+    useMembership: true,
+    membershipCourtSlotIds: ['court-slot'],
+  })
+  expect(booking.status).toBe('CONFIRMED')
+  expect(booking.membershipSessionsUsed).toBe(1)
   expect(mocks.gateway.charge).not.toHaveBeenCalled()
 })
 

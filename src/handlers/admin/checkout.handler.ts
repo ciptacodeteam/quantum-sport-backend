@@ -1,3 +1,7 @@
+import { getTariffPeriods } from '@/services/tariff-policy.service'
+import { lockCustomerWallet } from '@/services/membership-renewal.service'
+import { recurringBookingInputSchema } from '@/lib/recurring-booking'
+import { createRecurringBooking } from '@/services/recurring-booking.service'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -36,6 +40,7 @@ const adminCheckoutSchema = z
     // Optional description for coach booking – e.g. names of up to 4 members
     coachDescription: z.string().max(500).optional(),
     adminNote: z.string().max(1000).optional(),
+    recurringBooking: recurringBookingInputSchema.optional(),
     useMembership: z.boolean().optional().default(true),
     ballboySlots: z
       .array(
@@ -235,6 +240,7 @@ export const adminCheckoutHandler = factory.createHandlers(
       coachDescription,
       adminNote,
       useMembership,
+      recurringBooking,
       ballboySlots: rawBallboySlots,
       inventories,
     } = c.req.valid('json') as AdminCheckoutSchema
@@ -304,6 +310,7 @@ export const adminCheckoutHandler = factory.createHandlers(
           }
         }
 
+        await lockCustomerWallet(tx, resolvedUserId!)
         let courtSportForMembership: CourtSport | null = null
         if (courtSlots && courtSlots.length > 0) {
           const courtSlotSports = await tx.slot.findMany({
@@ -342,16 +349,22 @@ export const adminCheckoutHandler = factory.createHandlers(
         let activeMembershipCandidates: Array<
           MembershipUser & { membership: Membership }
         > = []
-        if (useMembership && totalHours > 0 && courtSportForMembership) {
+        if (
+          (useMembership || recurringBooking) &&
+          totalHours > 0 &&
+          courtSportForMembership
+        ) {
           const now = new Date()
           activeMembershipCandidates = await tx.membershipUser.findMany({
             where: {
               userId: resolvedUserId!,
-              isExpired: false,
+              ...(!recurringBooking ? { isExpired: false } : {}),
               isSuspended: false,
               startDate: { lte: now }, // Membership must have started
               endDate: { gt: now }, // Membership must not have expired
-              remainingSessions: { gte: totalHours }, // Must have enough sessions
+              ...(!recurringBooking
+                ? { remainingSessions: { gte: totalHours } }
+                : { invoice: { status: PaymentStatus.PAID } }),
               membership: {
                 sport: courtSportForMembership,
               },
@@ -359,9 +372,12 @@ export const adminCheckoutHandler = factory.createHandlers(
             include: {
               membership: true,
             },
-            orderBy: {
-              endDate: 'asc', // Use membership that expires first
-            },
+            orderBy: recurringBooking
+              ? [
+                  { renewalAppliedAt: { sort: 'desc', nulls: 'last' } },
+                  { endDate: 'asc' },
+                ]
+              : { endDate: 'asc' },
           })
         }
 
@@ -438,15 +454,27 @@ export const adminCheckoutHandler = factory.createHandlers(
             )
           }
           selectedCourtSlots = slotData
+          const membershipTariffRules = await getTariffPeriods(tx)
           activeMembership =
             activeMembershipCandidates.find((candidate) =>
               slotData.every((slot) =>
                 isSlotAllowedForMembershipType(
                   candidate.membership.type,
                   slot.startAt,
+                  {
+                    rules: membershipTariffRules,
+                    branchId: slot.branchId,
+                    sport: slot.court?.sport,
+                    endAt: slot.endAt,
+                  },
                 ),
               ),
             ) ?? null
+
+          if (recurringBooking && !activeMembership)
+            throw new BadRequestException(
+              'Booking rutin hanya untuk pelanggan dengan membership yang sesuai dan sudah dibayar.',
+            )
 
           // If the user's package does not match these slot hours, continue as a normal paid booking.
           for (const slot of slotData) {
@@ -622,6 +650,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             getCourtCoachBundleDiscountByCourtSlot(
               selectedCourtSlots,
               selectedCoachSlots,
+              await getTariffPeriods(tx),
             )
 
           for (const slot of selectedCourtSlots) {
@@ -911,7 +940,7 @@ export const adminCheckoutHandler = factory.createHandlers(
 
         // Deduct totalHours from user's active membership sessions
         // (Membership was already checked earlier if it exists)
-        if (activeMembership && totalHours > 0) {
+        if (activeMembership && totalHours > 0 && !recurringBooking) {
           const newRemainingSessions = Math.max(
             0,
             activeMembership.remainingSessions - totalHours,
@@ -932,7 +961,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               `Court cost covered: ${courtCostCoveredByMembership}. ` +
               `Remaining: ${newRemainingSessions} sessions`,
           )
-        } else if (totalHours > 0) {
+        } else if (totalHours > 0 && !activeMembership) {
           // No active membership with available sessions
           c.var.logger.warn(
             `User ${resolvedUserId} has no active membership with available sessions for ${totalHours} hours`,
@@ -954,7 +983,8 @@ export const adminCheckoutHandler = factory.createHandlers(
             courtNormalPrice,
             courtDiscountPrice,
             membershipUserId: activeMembership?.id,
-            membershipSessionsUsed: activeMembership ? totalHours : 0,
+            membershipSessionsUsed:
+              activeMembership && !recurringBooking ? totalHours : 0,
           },
         })
 
@@ -974,6 +1004,16 @@ export const adminCheckoutHandler = factory.createHandlers(
             paidAt: new Date(),
           },
         })
+
+        if (recurringBooking)
+          await createRecurringBooking(
+            tx,
+            recurringBooking,
+            resolvedUserId!,
+            booking.id,
+            courtSlots ?? [],
+            activeMembership?.id,
+          )
 
         return {
           bookingId: booking.id,

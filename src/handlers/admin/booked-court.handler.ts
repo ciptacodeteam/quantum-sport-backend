@@ -1,3 +1,5 @@
+import { getTariffPeriods } from '@/services/tariff-policy.service'
+import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import { canRescheduleAt } from '@/lib/reschedule-policy'
 import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
@@ -727,6 +729,13 @@ export const cancelBookingHandler = factory.createHandlers(
       const { reason } = c.req.valid('json') as CancelBookingSchema
 
       const result = await db.$transaction(async (tx) => {
+        // Lock wallet before booking, matching renewal and the scheduled debit.
+        const identity = await tx.booking.findUnique({
+          where: { id: bookingId },
+          select: { userId: true },
+        })
+        if (identity) await lockCustomerWallet(tx, identity.userId)
+        await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${bookingId} FOR UPDATE`
         // 1. Fetch the booking with all related data
         const booking = await tx.booking.findUnique({
           where: { id: bookingId },
@@ -1063,12 +1072,21 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             !!bookingDetail.booking.membershipUserId &&
             (bookingDetail.booking.courtDiscountPrice === 0 ||
               bookingDetail.discountPrice === 0)
+          const membershipTariffRules = usesMembership
+            ? await getTariffPeriods(tx)
+            : []
           if (
             usesMembership &&
             (!bookingDetail.booking.membershipUser ||
               !isSlotAllowedForMembershipType(
                 bookingDetail.booking.membershipUser.membership.type,
                 newSlot.startAt,
+                {
+                  rules: membershipTariffRules,
+                  branchId: newSlot.branchId,
+                  sport: newSlot.court?.sport,
+                  endAt: newSlot.endAt,
+                },
               ))
           ) {
             throw new BadRequestException(

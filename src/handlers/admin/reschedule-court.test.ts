@@ -1,3 +1,6 @@
+vi.mock('@/services/tariff-policy.service', () => ({
+  getTariffPeriods: vi.fn().mockResolvedValue([]),
+}))
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   detail: vi.fn(),

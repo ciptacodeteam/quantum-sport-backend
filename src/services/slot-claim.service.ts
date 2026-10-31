@@ -14,11 +14,13 @@ export async function claimSlotsAtomically(
     slotIds,
     type,
     startsAfter,
+    windowAt,
     unavailableMessage = 'One or more slots not found or unavailable',
   }: {
     slotIds: string[]
     type: SlotType
     startsAfter?: Date
+    windowAt?: Date
     unavailableMessage?: string
   },
 ): Promise<void> {
@@ -33,7 +35,7 @@ export async function claimSlotsAtomically(
       type,
       isAvailable: true,
       ...(type === 'COURT' ? {
-        ...rollingBookingWindowWhere(),
+        ...rollingBookingWindowWhere(windowAt),
         bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } },
       } : {}),
       ...(startsAfter ? { startAt: { gt: startsAfter } } : {}),

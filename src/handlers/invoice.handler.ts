@@ -1,3 +1,4 @@
+import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -598,6 +599,7 @@ export const cancelUserBookingHandler = factory.createHandlers(
       const { reason } = c.req.valid('json') as CancelBookingSchema
 
       const result = await db.$transaction(async (tx) => {
+        await lockCustomerWallet(tx, user.id)
         // 1. Fetch invoice with all related data
         const invoice = await tx.invoice.findFirst({
           where: {

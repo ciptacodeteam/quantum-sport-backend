@@ -138,6 +138,7 @@ model User {
   updatedAt DateTime @default(now()) @updatedAt
 
   authTokens          AuthToken[]
+  recurringBookings   RecurringBooking[]
   bookings            Booking[]
   membershipUser      MembershipUser[]
   classBookings       ClassBooking[]
@@ -514,6 +515,7 @@ model Booking {
   cashier        Staff?             @relation(fields: [cashierId], references: [id])
   promoCode      PromoCode?         @relation(fields: [promoCodeId], references: [id])
   membershipUser MembershipUser?    @relation("BookingMembershipUsage", fields: [membershipUserId], references: [id], onDelete: SetNull)
+  recurringOccurrences RecurringBookingOccurrence[]
   details        BookingDetail[]
   inventories    BookingInventory[]
   ballboys       BookingBallboy[]
@@ -542,6 +544,7 @@ model Booking {
  */
 
 model BookingDetail {
+  membershipDebit MembershipSessionDebit?
   id            String @id @default(cuid())
   bookingId     String
   slotId        String // COURT slot
@@ -695,6 +698,10 @@ model MembershipBenefit {
 }
 
 model MembershipUser {
+  renewalAppliedAt DateTime?
+  debtSettledSessions Int @default(0)
+  debtsTransferred MembershipDebtTransfer[] @relation("DebtSource")
+  debtsReceived MembershipDebtTransfer[] @relation("DebtTarget")
   id                String    @id @default(cuid())
   userId            String
   membershipId      String
@@ -712,6 +719,8 @@ model MembershipUser {
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   invoice      Invoice?
+  recurringBookings RecurringBooking[]
+  sessionDebits MembershipSessionDebit[]
   usedBookings Booking[]  @relation("BookingMembershipUsage")
 
   @@index([userId, isExpired, isSuspended])
@@ -952,6 +961,7 @@ model Branch {
   inventoryRecords         Inventory[]
   slotRecords              Slot[]
   courtCostScheduleRecords CourtCostSchedule[]
+  recurringBookingRecords  RecurringBooking[]
   bookingRecords           Booking[]
   invoiceRecords           Invoice[]
   classRecords             Class[]
@@ -961,8 +971,27 @@ model Branch {
   partnershipRecords       Partnership[]
   notificationRecords      Notification[]
   memberships              MembershipBranch[]
+  tariffPeriods            TariffPeriod[]
 
   @@map("branches")
+}
+
+// Effective-dated court tariff bands, in whole hours of Asia/Jakarta.
+model TariffPeriod {
+  id             String    @id @default(cuid())
+  branchId       String
+  sport          CourtSport
+  effectiveFrom  DateTime  @db.Date
+  happyStart     Int
+  happyEnd       Int
+  peakStart      Int
+  peakEnd        Int
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  branch         Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, sport, effectiveFrom])
+  @@map("tariff_periods")
 }
 
 model MembershipBranch {
@@ -974,4 +1003,73 @@ model MembershipBranch {
   @@id([membershipId, branchId])
   @@index([branchId])
   @@map("membership_branches")
+}
+
+// Admin recurring reservations. A null endDate follows the rolling window until stopped.
+model RecurringBooking {
+  id String @id @default(cuid())
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id])
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  membershipUserId String
+  membershipUser MembershipUser @relation(fields: [membershipUserId], references: [id])
+  weekdays Int[]
+  templates Json
+  startDate DateTime @db.Date
+  endDate DateTime? @db.Date
+  processedThrough DateTime @db.Date
+  isActive Boolean @default(true)
+  stoppedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  occurrences RecurringBookingOccurrence[]
+
+  @@index([branchId, isActive])
+  @@map("recurring_bookings")
+}
+
+model RecurringBookingOccurrence {
+  id String @id @default(cuid())
+  branchId String
+  seriesId String
+  series RecurringBooking @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  date DateTime @db.Date
+  bookingId String?
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  reason String?
+
+  @@unique([seriesId, date])
+  @@index([branchId])
+  @@map("recurring_booking_occurrences")
+}
+
+model MembershipSessionDebit {
+  id String @id @default(cuid())
+  branchId String
+  detailId String @unique
+  detail BookingDetail @relation(fields: [detailId], references: [id])
+  membershipUserId String
+  membershipUser MembershipUser @relation(fields: [membershipUserId], references: [id])
+  sessions Int
+  chargedAt DateTime @default(now())
+  reversedAt DateTime?
+
+  @@index([branchId])
+  @@map("membership_session_debits")
+}
+
+// Audit trail for quota transferred to a newly purchased, paid package.
+model MembershipDebtTransfer {
+  id String @id @default(cuid())
+  fromMembershipUserId String
+  fromMembershipUser MembershipUser @relation("DebtSource", fields: [fromMembershipUserId], references: [id])
+  toMembershipUserId String
+  toMembershipUser MembershipUser @relation("DebtTarget", fields: [toMembershipUserId], references: [id])
+  sessions Int
+  restoredSessions Int @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([fromMembershipUserId, toMembershipUserId])
+  @@map("membership_debt_transfers")
 }

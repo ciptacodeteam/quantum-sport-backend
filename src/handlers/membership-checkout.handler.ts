@@ -104,7 +104,8 @@ export const membershipCheckoutHandler = factory.createHandlers(
           },
         })
 
-        // Create invoice
+        // Online Value Pack purchases are branch-independent. The invoice keeps
+        // its central accounting default; this never restricts playing location.
         const issuedAt = new Date()
         const invoice = await tx.invoice.create({
           data: {

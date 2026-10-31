@@ -1,3 +1,4 @@
+import { courtBookingRange } from '@/lib/court-booking-range'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
 import {
@@ -351,13 +352,33 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
 )
 
 export const getCourtBookingWindowHandler = factory.createHandlers(
-  zValidator('query', z.object({ courtSport: z.enum(['PADEL', 'TENNIS']).optional() }), validateHook),
-  async c => {
+  zValidator(
+    'query',
+    z.object({ courtSport: z.enum(['PADEL', 'TENNIS']).optional() }),
+    validateHook,
+  ),
+  async (c) => {
     const { courtSport } = c.req.valid('query')
     const courts = await db.court.findMany({
-      where: { isActive: true, ...supportedCourtWhere, ...(courtSport ? { sport: courtSport } : {}) },
-      select: { bookingWindowMonths: true },
+      where: {
+        isActive: true,
+        ...supportedCourtWhere,
+        ...(courtSport ? { sport: courtSport } : {}),
+      },
+      select: {
+        bookingWindowMonths: true,
+        slot: {
+          where: {
+            type: 'COURT',
+            scheduleClosed: false,
+            startAt: { gte: dayjs().startOf('day').toDate() },
+          },
+          orderBy: { startAt: 'desc' },
+          take: 1,
+          select: { startAt: true },
+        },
+      },
     })
-    return c.json(ok({ months: Math.max(1, ...courts.map(court => court.bookingWindowMonths ?? 3)) }), status.OK)
+    return c.json(ok(courtBookingRange(courts)), status.OK)
   },
 )

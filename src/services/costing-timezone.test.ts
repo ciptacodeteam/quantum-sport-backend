@@ -1,3 +1,6 @@
+vi.mock('@/services/tariff-policy.service', () => ({
+  getTariffPeriods: vi.fn().mockResolvedValue([]),
+}))
 import { expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createSlots: vi.fn(),
@@ -5,6 +8,9 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   db: {
+    court: {
+      findUniqueOrThrow: async () => ({ branchId: 'branch', sport: 'PADEL' }),
+    },
     $transaction: async (callback: any) =>
       callback({
         slot: {

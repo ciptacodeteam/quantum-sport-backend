@@ -6,6 +6,7 @@ export const membershipTransactionStatuses = [
   'Ditangguhkan',
   'Kedaluwarsa',
   'Sesi habis',
+  'Saldo minus',
   'Dibatalkan',
 ] as const
 
@@ -37,6 +38,8 @@ export function membershipTransactionStatusWhere(
           { invoice: { status: 'PAID' }, isExpired: true },
         ],
       }
+    case 'Saldo minus':
+      return { remainingSessions: { lt: 0 } }
     case 'Sesi habis':
       return {
         invoice: { status: 'PAID' },

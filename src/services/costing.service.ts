@@ -1,3 +1,5 @@
+import { getTariffPeriods } from './tariff-policy.service'
+import { resolveTariffPeriod } from '@/lib/tariff-period'
 import type { Dayjs } from 'dayjs'
 import { log } from '@/lib/logger'
 import { db } from '@/lib/prisma'
@@ -52,6 +54,8 @@ export async function setCourtPricing({
   closedHours = [0, 1, 2, 3, 4, 5],
 }: SetCourtPricingPayload) {
   try {
+    const court = await db.court.findUniqueOrThrow({ where: { id: courtId } })
+    const tariffRules = await getTariffPeriods(undefined, court.branchId)
     const start = dayjs(fromDate)
     const end = dayjs(toDate)
 
@@ -105,8 +109,14 @@ export async function setCourtPricing({
       })
 
       const slots: any[] = []
-      const happyHours = Array.from({ length: 9 }, (_, i) => i + 6) // 06–14
-      const peakHours = Array.from({ length: 9 }, (_, i) => i + 15) // 15–23
+      const bands = resolveTariffPeriod(
+        tariffRules,
+        d.toDate(),
+        court.branchId,
+        court.sport,
+      )
+      const happyHours = hoursForBand(bands.happyStart, bands.happyEnd)
+      const peakHours = hoursForBand(bands.peakStart, bands.peakEnd)
 
       const allHours = [
         ...happyHours.map((h) => ({
@@ -200,14 +210,22 @@ export async function updateCourtPricing({
   closedHours = [0, 1, 2, 3, 4, 5],
 }: UpdateCourtPricingPayload) {
   try {
+    const court = await db.court.findUniqueOrThrow({ where: { id: courtId } })
+    const tariffRules = await getTariffPeriods(undefined, court.branchId)
+    const bands = resolveTariffPeriod(
+      tariffRules,
+      date,
+      court.branchId,
+      court.sport,
+    )
     {
       // 1) Build target hour → price map for the day
-      const happy = hoursForBand(HAPPY_START, HAPPY_END).map((h) => ({
+      const happy = hoursForBand(bands.happyStart, bands.happyEnd).map((h) => ({
         h,
         price: happyHourPrice,
         discountPrice: happyHourDiscountPrice,
       }))
-      const peak = hoursForBand(PEAK_START, PEAK_END).map((h) => ({
+      const peak = hoursForBand(bands.peakStart, bands.peakEnd).map((h) => ({
         h,
         price: peakHourPrice,
         discountPrice: peakHourDiscountPrice,

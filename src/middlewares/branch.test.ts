@@ -101,10 +101,10 @@ it('allows the actual super admin to select a branch or read combined data despi
     ).json(),
   ).toMatchObject({ branchId: 's-parman', superAdmin: true })
 })
-it('keeps customer history shared while scoping active membership eligibility', async () => {
+it('keeps the entire customer Value Pack flow branch-independent', async () => {
   expect((await app.request('/memberships/my/tracking')).status).toBe(200)
   expect((await app.request('/memberships/my')).status).toBe(200)
-  expect((await app.request('/memberships/my/active')).status).toBe(400)
+  expect((await app.request('/memberships/my/active')).status).toBe(200)
   expect((await app.request('/invoices/INV-TEST')).status).toBe(200)
 })
 it('uses the selling branch for financial reports and membership transaction administration', async () => {
@@ -148,3 +148,22 @@ it('keeps admin banners global even when a branch header is present', async () =
     expect(mocks.branch).not.toHaveBeenCalled()
   }
 })
+it.each([
+  '/memberships',
+  '/memberships/product',
+  '/memberships/checkout',
+  '/memberships/product/renewal-preview',
+])(
+  'does not require or inherit the selected booking branch for %s',
+  async (path) => {
+    expect((await app.request(path)).status).toBe(200)
+    const response = await app.request(path, {
+      headers: { 'X-Branch-ID': 'unrelated-old-branch' },
+    })
+    expect(response.status).toBe(200)
+    expect(
+      ((await response.json()) as { branchId?: string }).branchId,
+    ).toBeUndefined()
+    expect(mocks.branch).not.toHaveBeenCalled()
+  },
+)

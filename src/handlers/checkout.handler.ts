@@ -1,3 +1,4 @@
+import { getTariffPeriods } from '@/services/tariff-policy.service'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import {
   courtBookingCutoff,
@@ -417,6 +418,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
             getCourtCoachBundleDiscountByCourtSlot(
               selectedCourtSlots,
               selectedCoachSlots,
+              await getTariffPeriods(),
             )
 
           for (const slot of selectedCourtSlots) {
@@ -831,12 +833,19 @@ export const checkoutHandler = factory.createHandlers(
               },
             })
 
+            const membershipTariffRules = await getTariffPeriods(tx)
             activeMembership =
               membershipCandidates.find((candidate) =>
                 membershipSlots.every((slot) =>
                   isSlotAllowedForMembershipType(
                     candidate.membership.type,
                     slot.startAt,
+                    {
+                      rules: membershipTariffRules,
+                      branchId: slot.branchId,
+                      sport: slot.court?.sport,
+                      endAt: slot.endAt,
+                    },
                   ),
                 ),
               ) ?? null
@@ -1027,6 +1036,7 @@ export const checkoutHandler = factory.createHandlers(
             getCourtCoachBundleDiscountByCourtSlot(
               selectedCourtSlots,
               selectedCoachSlots,
+              await getTariffPeriods(tx),
             )
 
           for (const slot of selectedCourtSlots) {

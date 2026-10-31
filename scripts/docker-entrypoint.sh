@@ -5,7 +5,11 @@ set -e
 echo "🚀 Starting application entrypoint..."
 echo "📋 Environment check:"
 echo "   NODE_ENV: ${NODE_ENV:-not set}"
-echo "   DATABASE_URL: ${DATABASE_URL:+✓ set}${DATABASE_URL:-❌ not set}"
+if [ -n "$DATABASE_URL" ]; then
+  echo "   DATABASE_URL: ✓ set"
+else
+  echo "   DATABASE_URL: ❌ not set"
+fi
 echo "   PORT: ${PORT:-not set}"
 
 # Wait for database to be ready
@@ -96,6 +100,17 @@ else
     echo "   The application may start but database schema might be incomplete"
   fi
 fi
+
+# Additive feature schema is also needed by databases managed without a Prisma
+# migration history. Stop startup if this required table cannot be prepared.
+echo "🔄 Preparing tariff period schema..."
+TARIFF_PSQL_URL="$(bun -e '
+  const url = new URL(process.env.DATABASE_URL);
+  for (const key of ["schema", "connection_limit", "pool_timeout", "pgbouncer", "statement_cache_size", "socket_timeout", "sslaccept"]) url.searchParams.delete(key);
+  process.stdout.write(url.toString());
+')"
+psql "$TARIFF_PSQL_URL" -v ON_ERROR_STOP=1 -f /app/prisma/tariff-periods.sql
+unset TARIFF_PSQL_URL
 
 # Generate Prisma Client (should already be generated during build)
 echo "🔧 Ensuring Prisma Client is up to date..."

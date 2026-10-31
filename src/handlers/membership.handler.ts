@@ -151,6 +151,7 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
       const activeMembership = await db.membershipUser.findFirst({
         where: {
           userId: user.id,
+          remainingSessions: { gt: 0 },
           isExpired: false,
           isSuspended: false,
           startDate: { lte: now }, // Membership must have started

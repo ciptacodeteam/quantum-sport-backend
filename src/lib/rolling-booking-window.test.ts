@@ -93,4 +93,33 @@ describe('rolling booking window', () => {
       startAt: { lte: bookingWindowEnd(1, new Date('2026-10-29T00:00:00Z')) },
     })
   })
+  it('uses the latest matching price rule from its effective date, leaving other hours and dates unchanged', () => {
+    const now = new Date('2026-10-30T02:00:00Z')
+    const filter = {
+      kind: 'pricing' as const,
+      fromDate: '2026-11-01',
+      days: [7],
+      startHour: 17,
+      endHour: 19,
+      price: 500,
+      discountPrice: 400,
+    }
+    const slots = buildRollingCourtSlots(
+      { ...config, bulkRules: [filter, { ...filter, price: 600 }] },
+      'branch',
+      now,
+      now,
+    )
+    const at = (time: string) =>
+      slots.find(
+        (slot) => dayjs(slot.startAt).format('YYYY-MM-DD HH:mm') === time,
+      )!
+    expect(at('2026-10-30 17:00').price).toBe(200)
+    expect(at('2026-11-01 17:00')).toMatchObject({
+      price: 600,
+      discountPrice: 400,
+    })
+    expect(at('2026-11-01 19:00').price).toBe(200)
+    expect(at('2026-11-02 17:00').price).toBe(200)
+  })
 })

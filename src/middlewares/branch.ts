@@ -11,7 +11,6 @@ const publicBranchPaths = [
   '/classes',
   '/partnerships',
   '/checkout',
-  '/memberships',
 ]
 const sharedCustomerPaths = ['/memberships/my', '/memberships/my/tracking']
 export const branchMiddleware: MiddlewareHandler = async (c, next) => {

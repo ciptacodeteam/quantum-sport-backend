@@ -1,4 +1,5 @@
 import branchRoute from './routes/branch.route'
+import adminTariffPeriodRoute from './routes/admin/tariff-period.route'
 import adminBranchRoute from './routes/admin/branch.route'
 import { branchMiddleware } from './middlewares/branch'
 import dayjs from 'dayjs'
@@ -105,6 +106,7 @@ const routes = [
 
 // ADD NEW ADMIN ROUTES HERE
 const adminRoutes = [
+  adminTariffPeriodRoute,
   adminBranchRoute,
   adminHomeRoute,
   adminAnalyticsRoute,
