@@ -31,6 +31,10 @@ export const env = {
     merchantId: process.env.MIDTRANS_MERCHANT_ID ?? '',
     serverKey: process.env.MIDTRANS_SERVER_KEY ?? '',
     clientKey: process.env.MIDTRANS_CLIENT_KEY ?? '',
+    /** `snap` for Midtrans Snap popup; `core` for Core API /v2/charge. */
+    checkoutMode: (process.env.MIDTRANS_CHECKOUT_MODE === 'core'
+      ? 'core'
+      : 'snap') as 'snap' | 'core',
   },
   webhookBaseUrl: req('WEBHOOK_BASE_URL', 'http://localhost:8787/webhooks'),
   ngrokToken: process.env.NGROK_AUTHTOKEN ?? '',

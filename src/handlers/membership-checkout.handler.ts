@@ -121,15 +121,27 @@ export const membershipCheckoutHandler = factory.createHandlers(
           },
         })
 
-        let xenditInvoiceResponse: any = null
+        let paymentInit: Awaited<
+          ReturnType<typeof midtransService.initiateCheckoutPayment>
+        > | null = null
         if (paymentMethod.channel) {
           if (!env.midtrans.serverKey) {
             throw new BadRequestException(
               'Payment gateway unavailable. Please try again later (missing API key).',
             )
           }
+          const channelCode = paymentMethod.channel || ''
+          const useSnap = midtransService.checkoutMode() === 'snap'
+          if (
+            !useSnap &&
+            channelCode === 'CARDS' &&
+            !validated.cardPayment?.tokenId
+          ) {
+            throw new BadRequestException(
+              'Card token is required for credit card payments.',
+            )
+          }
           try {
-            const channelCode = paymentMethod.channel || ''
             const userDetails = await tx.user.findUnique({
               where: { id: user.id },
               select: { name: true, email: true, phone: true },
@@ -137,14 +149,14 @@ export const membershipCheckoutHandler = factory.createHandlers(
             const expiryMinutes =
               channelCode === 'CARDS' ? undefined : PAYMENT_WINDOW_MINUTES
             c.var.logger.info(
-              `Creating Midtrans charge channel=${channelCode} amount=${finalTotal}`,
+              `Creating Midtrans ${useSnap ? 'snap' : 'charge'} channel=${channelCode} amount=${finalTotal}`,
             )
-            xenditInvoiceResponse = await midtransService.charge({
+            paymentInit = await midtransService.initiateCheckoutPayment({
               orderId: invoiceNumber,
               amount: finalTotal,
               channelCode,
               expiryMinutes,
-              tokenId: validated.cardPayment?.tokenId,
+              tokenId: useSnap ? undefined : validated.cardPayment?.tokenId,
               customer: userDetails ?? undefined,
               description: `Payment for membership ${membership.name}`,
             })
@@ -165,24 +177,13 @@ export const membershipCheckoutHandler = factory.createHandlers(
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
             dueDate: invoice.dueDate,
-            externalRef: xenditInvoiceResponse?.transaction_id || null,
-            meta: xenditInvoiceResponse
-              ? {
-                  gateway: 'midtrans',
-                  payment_request_id: xenditInvoiceResponse.transaction_id,
-                  transaction_id: xenditInvoiceResponse.transaction_id,
-                  order_id: xenditInvoiceResponse.order_id,
-                  reference_id: xenditInvoiceResponse.reference_id,
-                  status: xenditInvoiceResponse.status,
-                  channel_code: xenditInvoiceResponse.channel_code,
-                  channel_properties: xenditInvoiceResponse.channel_properties,
-                  actions: xenditInvoiceResponse.actions,
-                  request_amount: xenditInvoiceResponse.request_amount,
-                  currency: xenditInvoiceResponse.currency,
-                  created: xenditInvoiceResponse.created,
-                  redirect_url: xenditInvoiceResponse.redirect_url,
-                }
-              : undefined,
+            externalRef:
+              paymentInit?.mode === 'core'
+                ? paymentInit.charge.transaction_id
+                : paymentInit?.mode === 'snap'
+                  ? paymentInit.orderId
+                  : null,
+            meta: paymentInit?.meta,
           },
         })
 
@@ -196,31 +197,38 @@ export const membershipCheckoutHandler = factory.createHandlers(
           membershipUser,
           invoice,
           payment,
-          xenditPaymentRequest: xenditInvoiceResponse,
+          paymentInit,
         }
       })
 
       // Extract payment actions for frontend
       let paymentActions: any = null
       let redirectUrl: string | null = null
+      let snapToken: string | null = null
+      let snapRedirectUrl: string | null = null
+      let paymentStatus = 'PENDING'
 
-      if (
-        result.xenditPaymentRequest?.actions &&
-        result.xenditPaymentRequest.actions.length > 0
-      ) {
-        paymentActions = result.xenditPaymentRequest.actions.map(
-          (action: any) => ({
+      if (result.paymentInit?.mode === 'snap') {
+        snapToken = result.paymentInit.snapToken
+        snapRedirectUrl = result.paymentInit.snapRedirectUrl
+        redirectUrl = result.paymentInit.snapRedirectUrl
+        paymentStatus = 'PENDING'
+      } else if (result.paymentInit?.mode === 'core') {
+        const charge = result.paymentInit.charge
+        paymentStatus = charge.status || 'PENDING'
+        if (charge.actions?.length) {
+          paymentActions = charge.actions.map((action) => ({
             type: action.type,
             value: action.value,
             descriptor: action.descriptor,
-          }),
-        )
-
-        // Find redirect URL if available
-        const redirectAction = result.xenditPaymentRequest.actions.find(
-          (a: any) => a.type === 'REDIRECT_CUSTOMER',
-        )
-        redirectUrl = redirectAction?.value || null
+          }))
+          const redirectAction = charge.actions.find(
+            (a) => a.type === 'REDIRECT_CUSTOMER',
+          )
+          redirectUrl = redirectAction?.value || charge.redirect_url || null
+        } else if (charge.redirect_url) {
+          redirectUrl = charge.redirect_url
+        }
       }
 
       return c.json(
@@ -232,9 +240,10 @@ export const membershipCheckoutHandler = factory.createHandlers(
             subtotal: result.invoice.subtotal,
             processingFee: result.invoice.processingFee,
             total: result.invoice.total,
-            paymentStatus: result.xenditPaymentRequest?.status || 'PENDING',
+            paymentStatus,
             paymentActions,
-            // Legacy support
+            ...(snapToken && { snapToken }),
+            ...(snapRedirectUrl && { snapRedirectUrl }),
             paymentUrl: redirectUrl,
             membership: {
               id: membership.id,

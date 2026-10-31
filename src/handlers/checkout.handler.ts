@@ -1475,7 +1475,9 @@ export const checkoutHandler = factory.createHandlers(
         }
         */
 
-        let xenditInvoiceResponse: any = null
+        let paymentInit: Awaited<
+          ReturnType<typeof midtransService.initiateCheckoutPayment>
+        > | null = null
         if (paymentMethod.channel) {
           if (!env.midtrans.serverKey) {
             throw new BadRequestException(
@@ -1487,22 +1489,32 @@ export const checkoutHandler = factory.createHandlers(
               'Saved card flow is not yet implemented. Please use a new card for now.',
             )
           }
+          const channelCode = paymentMethod.channel || ''
+          const useSnap = midtransService.checkoutMode() === 'snap'
+          if (
+            !useSnap &&
+            channelCode === 'CARDS' &&
+            !validated.cardPayment?.tokenId
+          ) {
+            throw new BadRequestException(
+              'Card token is required for credit card payments.',
+            )
+          }
           try {
-            const channelCode = paymentMethod.channel || ''
             const userDetails = await tx.user.findUnique({
               where: { id: user.id },
               select: { name: true, email: true, phone: true },
             })
             c.var.logger.info(
-              `Creating Midtrans charge channel=${channelCode} amount=${finalTotal}`,
+              `Creating Midtrans ${useSnap ? 'snap' : 'charge'} channel=${channelCode} amount=${finalTotal}`,
             )
-            xenditInvoiceResponse = await midtransService.charge({
+            paymentInit = await midtransService.initiateCheckoutPayment({
               orderId: invoiceNumber,
               amount: finalTotal,
               channelCode,
               expiryMinutes:
                 channelCode === 'CARDS' ? undefined : PAYMENT_WINDOW_MINUTES,
-              tokenId: validated.cardPayment?.tokenId,
+              tokenId: useSnap ? undefined : validated.cardPayment?.tokenId,
               customer: userDetails ?? undefined,
               description: `Payment for booking ${booking.id}`,
             })
@@ -1523,24 +1535,13 @@ export const checkoutHandler = factory.createHandlers(
             fees: paymentMethod.fees,
             status: PaymentStatus.PENDING,
             dueDate: invoice.dueDate,
-            externalRef: xenditInvoiceResponse?.transaction_id || null,
-            meta: xenditInvoiceResponse
-              ? {
-                  gateway: 'midtrans',
-                  payment_request_id: xenditInvoiceResponse.transaction_id,
-                  transaction_id: xenditInvoiceResponse.transaction_id,
-                  order_id: xenditInvoiceResponse.order_id,
-                  reference_id: xenditInvoiceResponse.reference_id,
-                  status: xenditInvoiceResponse.status,
-                  channel_code: xenditInvoiceResponse.channel_code,
-                  channel_properties: xenditInvoiceResponse.channel_properties,
-                  actions: xenditInvoiceResponse.actions,
-                  request_amount: xenditInvoiceResponse.request_amount,
-                  currency: xenditInvoiceResponse.currency,
-                  created: xenditInvoiceResponse.created,
-                  redirect_url: xenditInvoiceResponse.redirect_url,
-                }
-              : undefined,
+            externalRef:
+              paymentInit?.mode === 'core'
+                ? paymentInit.charge.transaction_id
+                : paymentInit?.mode === 'snap'
+                  ? paymentInit.orderId
+                  : null,
+            meta: paymentInit?.meta,
           },
         })
 
@@ -1566,7 +1567,7 @@ export const checkoutHandler = factory.createHandlers(
           booking,
           invoice,
           payment,
-          xenditPaymentRequest: xenditInvoiceResponse,
+          paymentInit,
         }
       })
 
@@ -1583,29 +1584,31 @@ export const checkoutHandler = factory.createHandlers(
       let paymentSessionId: string | null = null
       let paymentActions: any = null
       let redirectUrl: string | null = null
+      let snapToken: string | null = null
+      let snapRedirectUrl: string | null = null
+      let paymentStatus = 'PENDING'
 
-      // For credit cards: return payment_session_id to use with card_session.js
-      if (result.xenditPaymentRequest?.payment_session_id) {
-        paymentSessionId = result.xenditPaymentRequest.payment_session_id
-      }
-      // For other payment methods: return payment actions (VA, QRIS, etc.)
-      else if (
-        result.xenditPaymentRequest?.actions &&
-        result.xenditPaymentRequest.actions.length > 0
-      ) {
-        paymentActions = result.xenditPaymentRequest.actions.map(
-          (action: any) => ({
+      if (result.paymentInit?.mode === 'snap') {
+        snapToken = result.paymentInit.snapToken
+        snapRedirectUrl = result.paymentInit.snapRedirectUrl
+        redirectUrl = result.paymentInit.snapRedirectUrl
+        paymentStatus = 'PENDING'
+      } else if (result.paymentInit?.mode === 'core') {
+        const charge = result.paymentInit.charge
+        paymentStatus = charge.status || 'PENDING'
+        if (charge.actions?.length) {
+          paymentActions = charge.actions.map((action) => ({
             type: action.type,
             value: action.value,
             descriptor: action.descriptor,
-          }),
-        )
-
-        // Find redirect URL if available
-        const redirectAction = result.xenditPaymentRequest.actions.find(
-          (a: any) => a.type === 'REDIRECT_CUSTOMER',
-        )
-        redirectUrl = redirectAction?.value || null
+          }))
+          const redirectAction = charge.actions.find(
+            (a) => a.type === 'REDIRECT_CUSTOMER',
+          )
+          redirectUrl = redirectAction?.value || charge.redirect_url || null
+        } else if (charge.redirect_url) {
+          redirectUrl = charge.redirect_url
+        }
       }
 
       return c.json(
@@ -1622,12 +1625,11 @@ export const checkoutHandler = factory.createHandlers(
             paymentStatus:
               result.invoice.status === PaymentStatus.PAID
                 ? 'PAID'
-                : result.xenditPaymentRequest?.status || 'PENDING',
-            // For credit cards: payment_session_id to use with card_session.js
+                : paymentStatus,
             ...(paymentSessionId && { paymentSessionId }),
-            // For other channels: payment actions (VA, QRIS, etc.)
             ...(paymentActions && { paymentActions }),
-            // Legacy support
+            ...(snapToken && { snapToken }),
+            ...(snapRedirectUrl && { snapRedirectUrl }),
             paymentUrl: redirectUrl,
           },
           'Checkout successful',
