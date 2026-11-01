@@ -48,6 +48,7 @@ import { BookingStatus, SlotType } from '@prisma/client'
 import dayjs, {
   clubWallDayEnd,
   clubWallDayStart,
+  clubWallDateString,
   clubWallTime,
   formatClubWallClock,
 } from '@/lib/club-time'
@@ -407,32 +408,50 @@ export const getCostHandler = factory.createHandlers(
 
       if (!(await db.court.findUnique({ where: { id } })))
         throw new NotFoundException('Court not found')
-      const courtCostSlot = await db.$queryRaw`
-        SELECT 
-          (s."startAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta')::date AS date,
-          json_agg(
-            json_build_object(
-              'id', s.id,
-              'courtId', s."courtId",
-              'startAt', s."startAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
-              'endAt', s."endAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta',
-              'price', s.price,
-              'discountPrice', s."discountPrice",
-              'isAvailable', (s."isAvailable" AND NOT s."scheduleClosed"),
-              'scheduleClosed', s."scheduleClosed",
-              'createdAt', s."createdAt",
-              'updatedAt', s."updatedAt"
-            )
-          ) AS slots
-        FROM slots AS s
-        WHERE s."courtId" = ${id}
-        GROUP BY date
-        ORDER BY date DESC
-      `
-
-      if (!courtCostSlot) {
-        throw new NotFoundException('Court cost slot not found')
+      const slots = await db.slot.findMany({
+        where: { courtId: id },
+        orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          courtId: true,
+          startAt: true,
+          endAt: true,
+          price: true,
+          discountPrice: true,
+          isAvailable: true,
+          scheduleClosed: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+      // Slot timestamps contain Jakarta wall components. Group by that same
+      // calendar date; converting them from UTC would move evening slots to tomorrow.
+      const groups = new Map<
+        string,
+        {
+          date: string
+          slots: Array<
+            Omit<(typeof slots)[number], 'startAt' | 'endAt'> & {
+              startAt: string
+              endAt: string
+            }
+          >
+        }
+      >()
+      for (const slot of slots) {
+        const date = clubWallDateString(slot.startAt)
+        if (!groups.has(date))
+          groups.set(date, { date: `${date}T00:00:00.000Z`, slots: [] })
+        groups.get(date)!.slots.push({
+          ...slot,
+          startAt: formatClubWallClock(slot.startAt, 'YYYY-MM-DDTHH:mm:ss.SSS'),
+          endAt: formatClubWallClock(slot.endAt, 'YYYY-MM-DDTHH:mm:ss.SSS'),
+          isAvailable: slot.isAvailable && !slot.scheduleClosed,
+        })
       }
+      const courtCostSlot = [...groups.values()].sort((a, b) =>
+        b.date.localeCompare(a.date),
+      )
 
       return c.json(ok(courtCostSlot), status.OK)
     } catch (error) {
