@@ -1,6 +1,8 @@
 import type { Court, Prisma, MembershipType } from '@prisma/client'
 import dayjs, {
   clubNowAsWallDate,
+  clubWallTime,
+  clubWallDateString,
   clubWallDayEnd,
   clubWallDayStart,
   toClubWallDate,
@@ -47,7 +49,7 @@ export function recurringEnd(
       .format('YYYY-MM-DD')
   return courts
     .map((c) =>
-      dayjs(bookingWindowEnd(c.bookingWindowMonths!, now)).format('YYYY-MM-DD'),
+      clubWallDateString(bookingWindowEnd(c.bookingWindowMonths!, now)),
     )
     .sort()[0]!
 }
@@ -70,8 +72,8 @@ export async function recurringSource(
     source.some(
       (s) =>
         !s.court?.bookingWindowMonths ||
-        dayjs(s.startAt).format('YYYY-MM-DD') !== input.startDate ||
-        s.startAt <= now,
+        clubWallDateString(s.startAt) !== input.startDate ||
+        s.startAt <= clubNowAsWallDate(now),
     )
   )
     throw new BadRequestException(
@@ -85,8 +87,8 @@ export async function recurringSource(
   const templates = source.map((s) => ({
     courtId: s.courtId!,
     courtName: s.court!.name,
-    time: dayjs(s.startAt).format('HH:mm'),
-    durationMinutes: dayjs(s.endAt).diff(dayjs(s.startAt), 'minute'),
+    time: clubWallTime(s.startAt).format('HH:mm'),
+    durationMinutes: (+s.endAt - +s.startAt) / 60000,
   }))
   const horizon = recurringEnd(input, courts, now)
   if (
@@ -118,7 +120,9 @@ export async function planRecurringSessions(
       branchId,
       type: 'COURT',
       courtId: { in: courts.map((c) => c.id) },
-      startAt: { lt: clubWallDayStart(dayjs(end).add(1, 'day').format('YYYY-MM-DD')) },
+      startAt: {
+        lt: clubWallDayStart(dayjs(end).add(1, 'day').format('YYYY-MM-DD')),
+      },
       endAt: { gt: clubWallDayStart(start) },
     },
     include: {

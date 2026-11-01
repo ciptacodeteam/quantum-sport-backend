@@ -2,7 +2,11 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import type { Court } from '@prisma/client'
 const mocks = vi.hoisted(() => ({ rules: vi.fn() }))
 vi.mock('./tariff-policy.service', () => ({ getTariffPeriods: mocks.rules }))
-import { planRecurringSessions, recurringEnd } from './recurring-plan.service'
+import {
+  planRecurringSessions,
+  recurringEnd,
+  recurringSource,
+} from './recurring-plan.service'
 import { toClubWallDate } from '@/lib/club-time'
 const now = new Date('2026-10-30T03:00:00Z')
 const court = {
@@ -183,4 +187,80 @@ it('keeps legacy manually published rolling reservations valid without inventing
   expect(plan[0].slots[0].id).toBe('manual')
   expect(plan[1].slots).toEqual([])
   expect(plan[1].conflicts).toHaveLength(1)
+})
+
+it('keeps evening source slots on November 4 and the rolling horizon on December 1', async () => {
+  const source = {
+    id: 'evening',
+    courtId: court.id,
+    branchId: court.branchId,
+    court,
+    startAt: toClubWallDate('2026-11-04 19:00'),
+    endAt: toClubWallDate('2026-11-04 20:00'),
+  }
+  const result = await recurringSource(
+    tx([source]),
+    {
+      mode: 'ROLLING',
+      startDate: '2026-11-04',
+      previewThrough: '2026-12-01',
+      weekdays: [3],
+      sourceSlotIds: ['evening'],
+    },
+    new Date('2026-11-01T07:00:00+07:00'),
+  )
+  expect(result.horizon).toBe('2026-12-01')
+  expect(result.templates[0]).toMatchObject({
+    time: '19:00',
+    durationMinutes: 60,
+  })
+})
+it('keeps the 23:00 source hour on its playing date even when it ends at midnight', async () => {
+  const source = {
+    id: 'late',
+    courtId: court.id,
+    branchId: court.branchId,
+    court,
+    startAt: toClubWallDate('2026-11-04 23:00'),
+    endAt: toClubWallDate('2026-11-05 00:00'),
+  }
+  const result = await recurringSource(
+    tx([source]),
+    {
+      mode: 'DATES',
+      startDate: '2026-11-04',
+      endDate: '2026-11-11',
+      previewThrough: '2026-11-11',
+      weekdays: [3],
+      sourceSlotIds: ['late'],
+    },
+    now,
+  )
+  expect(result.templates[0]).toMatchObject({
+    time: '23:00',
+    durationMinutes: 60,
+  })
+})
+it('compares elapsed source slots with the current WIB wall clock', async () => {
+  const source = {
+    id: 'elapsed',
+    courtId: court.id,
+    branchId: court.branchId,
+    court,
+    startAt: toClubWallDate('2026-11-04 19:00'),
+    endAt: toClubWallDate('2026-11-04 20:00'),
+  }
+  await expect(
+    recurringSource(
+      tx([source]),
+      {
+        mode: 'ROLLING',
+        startDate: '2026-11-04',
+        previewThrough: '2026-12-01',
+        weekdays: [3],
+        sourceSlotIds: ['elapsed'],
+      },
+      new Date('2026-11-04T19:01:00+07:00'),
+    ),
+  ).rejects.toThrow('jadwal awal mendatang')
 })

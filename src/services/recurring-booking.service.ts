@@ -5,7 +5,7 @@ import {
 import { chargeDueRecurringMembershipSessions } from './recurring-membership-usage.service'
 import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/prisma'
-import dayjs from '@/lib/club-time'
+import dayjs, { clubWallDateString, clubWallTime } from '@/lib/club-time'
 import { BadRequestException } from '@/exceptions'
 import { bookingWindowEnd } from '@/lib/rolling-booking-window'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
@@ -114,21 +114,16 @@ export async function createRecurringBooking(
   const booked = await tx.slot.findMany({
     where: { id: { in: checkedOutSlotIds }, type: 'COURT' },
   })
-  const dates = [
-    ...new Set(booked.map((s) => dayjs(s.startAt).format('YYYY-MM-DD'))),
-  ]
+  const dates = [...new Set(booked.map((s) => clubWallDateString(s.startAt)))]
   for (const date of dates) {
-    const slots = booked.filter(
-      (s) => dayjs(s.startAt).format('YYYY-MM-DD') === date,
-    )
+    const slots = booked.filter((s) => clubWallDateString(s.startAt) === date)
     if (
       !templates.every((template) =>
         slots.some(
           (slot) =>
             slot.courtId === template.courtId &&
-            dayjs(slot.startAt).format('HH:mm') === template.time &&
-            dayjs(slot.endAt).diff(dayjs(slot.startAt), 'minute') ===
-              template.durationMinutes,
+            clubWallTime(slot.startAt).format('HH:mm') === template.time &&
+            (+slot.endAt - +slot.startAt) / 60000 === template.durationMinutes,
         ),
       )
     ) {
@@ -216,9 +211,7 @@ async function extendRecurringBookingTx(
     endKey ??
     courts
       .map((c) =>
-        dayjs(bookingWindowEnd(c.bookingWindowMonths!, now)).format(
-          'YYYY-MM-DD',
-        ),
+        clubWallDateString(bookingWindowEnd(c.bookingWindowMonths!, now)),
       )
       .sort()[0]!
   const next = dayjs(dateOnlyKey(series.processedThrough))

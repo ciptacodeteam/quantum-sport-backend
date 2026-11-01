@@ -2,16 +2,18 @@ import {
   lockCustomerWallet,
   withCustomerWallet,
 } from './membership-renewal.service'
+import { clubNowAsWallDate } from '@/lib/club-time'
 import { db } from '@/lib/prisma'
 import { withBranchContext } from '@/lib/branch-context'
 import { calculateMembershipSessionsForCourtSlots } from './membership-booking.service'
 
 /** One ledger entry per slot makes retries and concurrent workers charge exactly once. */
 export async function chargeDueRecurringMembershipSessions(now = new Date()) {
+  const nowWall = clubNowAsWallDate(now)
   const due = await db.bookingDetail.findMany({
     where: {
       membershipDebit: null,
-      slot: { startAt: { lte: now } },
+      slot: { startAt: { lte: nowWall } },
       booking: {
         status: 'CONFIRMED',
         membershipUserId: { not: null },
@@ -56,7 +58,7 @@ export async function chargeDueRecurringMembershipSessions(now = new Date()) {
             detail.membershipDebit ||
             detail.booking.status !== 'CONFIRMED' ||
             !detail.booking.membershipUserId ||
-            detail.slot.startAt > now
+            detail.slot.startAt > nowWall
           )
             return
           const sessions = calculateMembershipSessionsForCourtSlots([

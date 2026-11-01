@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db } from '@/lib/prisma'
-import dayjs from '@/lib/club-time'
+import dayjs, { toClubWallDate, clubWallDateString } from '@/lib/club-time'
 import { withBranchContext } from '@/lib/branch-context'
 import { adminCheckoutHandler } from '@/handlers/admin/checkout.handler'
 import { previewRecurringBookingHandler } from '@/handlers/admin/recurring-booking.handler'
@@ -119,7 +119,7 @@ run('weekly ranges, separate invoices and Jakarta usage time', () => {
         courtId,
         startAt: {
           in: [start, second].flatMap((date) =>
-            [19, 20].map((h) => dayjs(`${date} ${h}:00`).toDate()),
+            [19, 20].map((h) => toClubWallDate(`${date} ${h}:00`)),
           ),
         },
       },
@@ -127,12 +127,12 @@ run('weekly ranges, separate invoices and Jakarta usage time', () => {
     })
     selected = slots.map((s) => s.id)
     source = slots
-      .filter((s) => dayjs(s.startAt).format('YYYY-MM-DD') === start)
+      .filter((s) => clubWallDateString(s.startAt) === start)
       .map((s) => s.id)
     expect(source).toHaveLength(2)
     expect(selected).toHaveLength(4)
     await db.slot.updateMany({
-      where: { courtId, startAt: dayjs(`${closed} 19:00`).toDate() },
+      where: { courtId, startAt: toClubWallDate(`${closed} 19:00`) },
       data: { isAvailable: false },
     })
     watermark = (await db.court.findUniqueOrThrow({ where: { id: courtId } }))
@@ -167,6 +167,13 @@ run('weekly ranges, separate invoices and Jakarta usage time', () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as any
     expect(body.data.through).toBe(end)
+    expect(
+      body.data.sessions[0].items.map((s: any) => s.timeSlot).sort(),
+    ).toEqual(['19:00', '20:00'])
+    expect(
+      body.data.sessions[0].items.find((s: any) => s.timeSlot === '19:00')
+        .startAt,
+    ).toContain('T19:00:00.000Z')
     expect(body.data.sessions.length).toBeGreaterThan(10)
     expect(
       body.data.sessions.find((s: any) => s.date === closed).items,
@@ -203,11 +210,8 @@ run('weekly ranges, separate invoices and Jakarta usage time', () => {
     for (const booking of bookings) {
       expect(booking.details).toHaveLength(2)
       expect(
-        new Set(
-          booking.details.map((d) =>
-            dayjs(d.slot.startAt).format('YYYY-MM-DD'),
-          ),
-        ).size,
+        new Set(booking.details.map((d) => clubWallDateString(d.slot.startAt)))
+          .size,
       ).toBe(1)
       expect(booking).toMatchObject({
         membershipUserId: walletId,
@@ -280,7 +284,7 @@ run('weekly ranges, separate invoices and Jakarta usage time', () => {
       where: {
         branchId,
         details: {
-          some: { slot: { startAt: dayjs(`${second} 19:00`).toDate() } },
+          some: { slot: { startAt: toClubWallDate(`${second} 19:00`) } },
         },
       },
     })

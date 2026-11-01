@@ -3,7 +3,7 @@ import {
   recurringSource,
   planRecurringSessions,
 } from '@/services/recurring-plan.service'
-import dayjs from '@/lib/club-time'
+import { formatClubWallClock } from '@/lib/club-time'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
@@ -80,8 +80,8 @@ export const previewRecurringBookingHandler = factory.createHandlers(
             courtName: courts.find((c) => c.id === slot.courtId)!.name,
             sport: courts.find((c) => c.id === slot.courtId)!.sport,
             date: session.date,
-            timeSlot: dayjs(slot.startAt).format('HH:mm'),
-            endTime: dayjs(slot.endAt).format('HH:mm'),
+            timeSlot: formatClubWallClock(slot.startAt, 'HH:mm'),
+            endTime: formatClubWallClock(slot.endAt, 'HH:mm'),
             startAt: slot.startAt.toISOString(),
             endAt: slot.endAt.toISOString(),
             price: slot.discountPrice > 0 ? slot.discountPrice : slot.price,
