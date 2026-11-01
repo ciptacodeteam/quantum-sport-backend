@@ -1,4 +1,5 @@
 import { getTariffPeriods } from '@/services/tariff-policy.service'
+import { courtBookingCutoff } from '@/lib/booking-time-policy'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { recurringBookingInputSchema } from '@/lib/recurring-booking'
 import { createRecurringBooking } from '@/services/recurring-booking.service'
@@ -273,6 +274,7 @@ export const adminCheckoutHandler = factory.createHandlers(
     }
 
     try {
+      const courtCutoff = courtBookingCutoff(new Date())
       const result = await db.$transaction(async (tx) => {
         // Resolve or create user
         let resolvedUserId = inputUserId
@@ -453,6 +455,14 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more court slots not found or unavailable',
             )
           }
+          if (
+            slotData.some(
+              (slot) => slot.startAt.getTime() <= courtCutoff.getTime(),
+            )
+          )
+            throw new BadRequestException(
+              'One or more court slots are past the 15-minute booking grace period',
+            )
           selectedCourtSlots = slotData
           const membershipTariffRules = await getTariffPeriods(tx)
           activeMembership =
@@ -488,6 +498,7 @@ export const adminCheckoutHandler = factory.createHandlers(
           await claimSlotsAtomically(tx, {
             slotIds: courtSlots,
             type: SlotType.COURT,
+            startsAfter: courtCutoff,
             unavailableMessage:
               'One or more court slots not found or unavailable',
           })

@@ -265,8 +265,8 @@ it.each([
       courtId: 'court',
       price: 200000,
       discountPrice: 0,
-      startAt: new Date('2026-10-28T15:00:00+07:00'),
-      endAt: new Date('2026-10-28T16:00:00+07:00'),
+      startAt: new Date('2026-10-28T15:00:00Z'),
+      endAt: new Date('2026-10-28T16:00:00Z'),
       court: { sport: 'PADEL' },
       bookingDetails: [],
     },
@@ -281,7 +281,9 @@ it.each([
       expect(tx.slot.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            startAt: { gt: new Date(new Date(now).getTime() - 900_000) },
+            startAt: {
+              gt: new Date(new Date(now).getTime() + 7 * 3_600_000 - 900_000),
+            },
           }),
         }),
       )
