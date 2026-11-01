@@ -5,7 +5,7 @@ import { ok } from '@/lib/response'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
-import dayjs from '@/lib/club-time'
+import { toClubWallDate, formatClubWallClock } from '@/lib/club-time'
 import { BookingStatus, CoachType, CourtSport, SlotType } from '@prisma/client'
 import { getFileUrl } from '@/services/upload.service'
 import { filterCoachSlotsWithoutBookingConflicts } from '@/services/coach-booking-conflict.service'
@@ -17,6 +17,7 @@ export const getCoachesHandler = factory.createHandlers(async (c) => {
       where: {
         role: 'COACH',
         isActive: true,
+        adminServiceOnly: false,
       },
       select: {
         id: true,
@@ -58,8 +59,8 @@ export const getAvailableCoachesHandler = factory.createHandlers(
         courtSport?: CourtSport
       }
 
-      const startDateTime = dayjs(startAt).toDate()
-      const endDateTime = dayjs(endAt).toDate()
+      const startDateTime = toClubWallDate(startAt)
+      const endDateTime = toClubWallDate(endAt)
       const coachTypes =
         courtSport === CourtSport.PADEL
           ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
@@ -72,6 +73,7 @@ export const getAvailableCoachesHandler = factory.createHandlers(
       const slots = await db.slot.findMany({
         where: {
           type: SlotType.COACH,
+          scheduleClosed: false,
           AND: [
             {
               startAt: {
@@ -85,15 +87,14 @@ export const getAvailableCoachesHandler = factory.createHandlers(
             },
           ],
           isAvailable: true,
-          ...(coachTypes
-            ? {
-                staff: {
-                  coachType: {
-                    in: coachTypes,
-                  },
-                },
-              }
-            : {}),
+          staff: {
+            role: 'COACH',
+            isActive: true,
+            ...(!c.req.path?.startsWith('/admin/')
+              ? { adminServiceOnly: false }
+              : {}),
+            ...(coachTypes ? { coachType: { in: coachTypes } } : {}),
+          },
           bookingCoaches: {
             none: {
               status: {
@@ -132,8 +133,8 @@ export const getAvailableCoachesHandler = factory.createHandlers(
         slotId: slot.id,
         coach: slot.staff,
         price: slot.price,
-        startAt: dayjs(slot.startAt).format('YYYY-MM-DD HH:mm:ss'),
-        endAt: dayjs(slot.endAt).format('YYYY-MM-DD HH:mm:ss'),
+        startAt: formatClubWallClock(slot.startAt),
+        endAt: formatClubWallClock(slot.endAt),
       }))
 
       return c.json(ok(coaches), status.OK)

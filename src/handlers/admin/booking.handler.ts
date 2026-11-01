@@ -395,6 +395,15 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
               bookingId: true,
               slotId: true,
               bookingCoachTypeId: true,
+              courtSlotId: true,
+              courtSlot: {
+                select: {
+                  id: true,
+                  startAt: true,
+                  endAt: true,
+                  court: { select: { id: true, name: true, sport: true } },
+                },
+              },
               description: true,
               price: true,
               status: true,
@@ -568,7 +577,9 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         // Format booking detail slots
         for (const detail of booking.details) {
           if (detail.slot?.startAt) {
-            detail.slot.startAt = formatClubWallClock(detail.slot.startAt) as any
+            detail.slot.startAt = formatClubWallClock(
+              detail.slot.startAt,
+            ) as any
           }
           if (detail.slot?.endAt) {
             detail.slot.endAt = formatClubWallClock(detail.slot.endAt) as any
@@ -577,6 +588,14 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
 
         // Format coach slots
         for (const coach of booking.coaches) {
+          if (coach.courtSlot) {
+            coach.courtSlot.startAt = formatClubWallClock(
+              coach.courtSlot.startAt,
+            ) as any
+            coach.courtSlot.endAt = formatClubWallClock(
+              coach.courtSlot.endAt,
+            ) as any
+          }
           if (coach.slot?.startAt) {
             coach.slot.startAt = formatClubWallClock(coach.slot.startAt) as any
           }

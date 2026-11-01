@@ -5,7 +5,7 @@ import { ok } from '@/lib/response'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
-import dayjs from '@/lib/club-time'
+import { toClubWallDate, formatClubWallClock } from '@/lib/club-time'
 import { BookingStatus, CourtSport, Role, SlotType } from '@prisma/client'
 
 // GET /ballboys/availability?startAt=YYYY-MM-DDTHH:mm&endAt=YYYY-MM-DDTHH:mm
@@ -19,8 +19,8 @@ export const getAvailableBallboyHandler = factory.createHandlers(
         courtSport?: CourtSport
       }
 
-      const startDateTime = dayjs(startAt).toDate()
-      const endDateTime = dayjs(endAt).toDate()
+      const startDateTime = toClubWallDate(startAt)
+      const endDateTime = toClubWallDate(endAt)
 
       if (courtSport && courtSport !== CourtSport.TENNIS) {
         return c.json(ok([]), status.OK)
@@ -31,9 +31,13 @@ export const getAvailableBallboyHandler = factory.createHandlers(
       const slots = await db.slot.findMany({
         where: {
           type: SlotType.BALLBOY,
+          scheduleClosed: false,
           staff: {
             role: Role.BALLBOY,
             isActive: true,
+            ...(!c.req.path?.startsWith('/admin/')
+              ? { adminServiceOnly: false }
+              : {}),
           },
           AND: [
             {
@@ -75,8 +79,8 @@ export const getAvailableBallboyHandler = factory.createHandlers(
         slotId: slot.id,
         ballboy: slot.staff,
         price: slot.price,
-        startAt: dayjs(slot.startAt).format('YYYY-MM-DD HH:mm:ss'),
-        endAt: dayjs(slot.endAt).format('YYYY-MM-DD HH:mm:ss'),
+        startAt: formatClubWallClock(slot.startAt),
+        endAt: formatClubWallClock(slot.endAt),
       }))
 
       return c.json(ok(ballboys), status.OK)

@@ -43,6 +43,7 @@
     "db:tariff-periods": "prisma db execute --schema prisma/schema.prisma --file prisma/tariff-periods.sql",
     "db:rolling-booking-window": "prisma db execute --schema prisma/schema.prisma --file prisma/rolling-booking-window.sql",
     "db:recurring-bookings": "prisma db execute --schema prisma/schema.prisma --file prisma/recurring-bookings.sql",
+    "db:coaching-admin": "prisma db execute --schema prisma/schema.prisma --file prisma/coaching-admin.sql",
     "db:membership-renewal": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-renewal.sql"
   },
   "dependencies": {

@@ -4,6 +4,8 @@ import {
   SlotType,
   type Prisma,
 } from '@prisma/client'
+import { lockStaffSlots } from './staff-slot-claim.service'
+import { BadRequestException } from '@/exceptions'
 import { log } from '@/lib/logger'
 import { activateMembershipAfterPayment } from '@/services/membership-activation.service'
 import { midtransService, isPaidStatus } from '@/services/midtrans.service'
@@ -54,6 +56,15 @@ async function tryClaimSlots(
   const uniqueSlotIds = Array.from(new Set(slotIds.filter(Boolean)))
   if (uniqueSlotIds.length === 0) {
     return true
+  }
+
+  if (type === 'COACH' || type === 'BALLBOY') {
+    try {
+      await lockStaffSlots(tx, uniqueSlotIds, type)
+    } catch (error) {
+      if (error instanceof BadRequestException) return false
+      throw error
+    }
   }
 
   const claimed = await tx.slot.updateMany({
@@ -406,7 +417,8 @@ export async function finalizeSuccessfulPayment(
   if (invoice.status === PaymentStatus.REFUNDED) {
     return {
       outcome: 'paid_needs_manual_review',
-      reason: 'Invoice already refunded; gateway paid event ignored for confirm',
+      reason:
+        'Invoice already refunded; gateway paid event ignored for confirm',
     }
   }
 
@@ -473,6 +485,14 @@ export async function finalizeSuccessfulPayment(
           cancelledAt: null,
           cancellationReason: null,
         },
+      })
+      await tx.bookingCoach.updateMany({
+        where: { bookingId: invoice.bookingId, status: BookingStatus.HOLD },
+        data: { status: BookingStatus.CONFIRMED },
+      })
+      await tx.bookingBallboy.updateMany({
+        where: { bookingId: invoice.bookingId, status: BookingStatus.HOLD },
+        data: { status: BookingStatus.CONFIRMED },
       })
     } else if (invoice.booking.status === BookingStatus.CANCELLED) {
       const result = await reviveCancelledBookingAfterLatePayment(
@@ -740,9 +760,7 @@ export async function isGatewayPaymentCompleted(payment: {
     }
     return paid
   } catch (error) {
-    log.warn(
-      `Failed checking gateway status for ${paymentRequestId}: ${error}`,
-    )
+    log.warn(`Failed checking gateway status for ${paymentRequestId}: ${error}`)
     return false
   }
 }

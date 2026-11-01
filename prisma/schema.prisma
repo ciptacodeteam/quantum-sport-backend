@@ -196,6 +196,7 @@ model Staff {
   role         Role       @default(ADMIN)
   coachType    CoachType?
   coachProfile String?    @db.Text
+  adminServiceOnly Boolean @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @default(now()) @updatedAt
 
@@ -364,7 +365,8 @@ model Slot {
   staff Staff? @relation(fields: [staffId], references: [id])
 
   bookingDetails     BookingDetail[] // court slots
-  bookingCoaches     BookingCoach[] // coach slots
+  bookingCoaches     BookingCoach[] @relation("CoachServiceSlot") // coach slots
+  courtCoaches       BookingCoach[] @relation("CoachCourtSlot")
   bookingBallboys    BookingBallboy[]   @relation("BallboyServiceSlot") // ballboy slots
   courtBallboys      BookingBallboy[]   @relation("BallboyCourtSlot") // court slots linked to ballboy bookings
   bookingInventories BookingInventory[] // inventory tied to a court slot/session
@@ -492,6 +494,9 @@ model Booking {
   branch                 Branch        @relation(fields: [branchId], references: [id])
   id                     String        @id @default(cuid())
   userId                 String
+  serviceForBookingId    String?
+  serviceForBooking      Booking? @relation("CourtBookingServices", fields: [serviceForBookingId], references: [id], onDelete: SetNull)
+  serviceBookings        Booking[] @relation("CourtBookingServices")
   status                 BookingStatus @default(HOLD)
   totalPrice             Int           @default(0) @db.Integer
   processingFee          Int           @default(0) @db.Integer
@@ -524,6 +529,7 @@ model Booking {
 
   @@index([branchId])
   @@index([userId, status, createdAt])
+  @@index([serviceForBookingId])
   @@index([promoCodeId])
   @@index([membershipUserId])
   @@map("bookings")
@@ -639,6 +645,7 @@ model BookingCoach {
   id                 String        @id @default(cuid())
   bookingId          String
   slotId             String // COACH slot
+  courtSlotId        String?
   bookingCoachTypeId String
   description        String? // Optional: names of members joining this coach session
   price              Int           @db.Integer
@@ -649,11 +656,13 @@ model BookingCoach {
   updatedAt          DateTime      @default(now()) @updatedAt
 
   booking          Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  slot             Slot             @relation(fields: [slotId], references: [id])
+  slot             Slot             @relation("CoachServiceSlot", fields: [slotId], references: [id])
+  courtSlot        Slot?            @relation("CoachCourtSlot", fields: [courtSlotId], references: [id])
   bookingCoachType BookingCoachType @relation(fields: [bookingCoachTypeId], references: [id])
 
   @@index([status])
   @@index([slotId])
+  @@index([courtSlotId])
   @@map("booking_coaches")
 }
 

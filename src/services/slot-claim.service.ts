@@ -1,6 +1,7 @@
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import { BadRequestException } from '@/exceptions'
 import type { Prisma, SlotType } from '@prisma/client'
+import { lockStaffSlots } from './staff-slot-claim.service'
 
 type Tx = Prisma.TransactionClient
 
@@ -32,6 +33,8 @@ export async function claimSlotsAtomically(
   }
 
   const uniqueSlotIds = Array.from(new Set(slotIds))
+  if (type === 'COACH' || type === 'BALLBOY')
+    await lockStaffSlots(tx, uniqueSlotIds, type)
   const claimed = await tx.slot.updateMany({
     where: {
       id: { in: uniqueSlotIds },
@@ -46,7 +49,7 @@ export async function claimSlotsAtomically(
               none: { booking: { status: { not: 'CANCELLED' } } },
             },
           }
-        : {}),
+        : { scheduleClosed: false }),
       ...(startsAfter ? { startAt: { gt: startsAfter } } : {}),
     },
     data: {
