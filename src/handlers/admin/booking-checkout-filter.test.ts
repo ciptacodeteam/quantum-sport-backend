@@ -9,6 +9,7 @@ vi.mock('@/lib/create-app', () => ({
 import {
   getAllBookingTransactionsHandler,
   exportBookingsHandler,
+  getAllBookingScheduleHandler,
 } from './booking.handler'
 import { bookingCheckoutWhere } from '@/lib/booking-checkout'
 
@@ -60,4 +61,36 @@ it('does not restrict checkout type when all checkouts are requested', async () 
     context({ courtSport: 'TENNIS' }),
   )
   expect(mocks.findMany.mock.calls[0][0].where.AND).toBeUndefined()
+})
+
+it('limits schedule to the selected WIB slot day while preserving tennis and service bookings', async () => {
+  await (getAllBookingScheduleHandler[1] as any)(
+    context({ courtSport: 'TENNIS', date: '2026-11-03' }),
+  )
+  const options = mocks.findMany.mock.calls[0][0]
+  const [base, day] = options.where.AND
+  expect(base.status).toEqual({ not: 'CANCELLED' })
+  expect(JSON.stringify(base.OR)).toContain('TENNIS')
+  expect(base.createdAt).toBeUndefined()
+  for (const [index, relation] of [
+    'details',
+    'coaches',
+    'ballboys',
+    'inventories',
+  ].entries()) {
+    expect(day.OR[index][relation].some.slot.startAt).toEqual({
+      gte: new Date('2026-11-03T00:00:00Z'),
+      lt: new Date('2026-11-04T00:00:00Z'),
+    })
+  }
+  expect(options.include.user.select.image).toBeUndefined()
+  expect(options.include.details.include.court.select.image).toBeUndefined()
+})
+it('keeps schedule requests without a date compatible', async () => {
+  await (getAllBookingScheduleHandler[1] as any)(
+    context({ courtSport: 'PADEL' }),
+  )
+  const { where } = mocks.findMany.mock.calls[0][0]
+  expect(where.AND).toBeUndefined()
+  expect(JSON.stringify(where.OR)).toContain('PADEL')
 })

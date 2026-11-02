@@ -2,7 +2,7 @@ import {
   bookingCheckoutTypes,
   bookingCheckoutWhere,
 } from '@/lib/booking-checkout'
-import { formatClubWallClock } from '@/lib/club-time'
+import { formatClubWallClock, toClubWallDate } from '@/lib/club-time'
 import { getOngoingSchedule } from '@/lib/ongoing-schedule'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -116,6 +116,7 @@ const bookingsQuerySchema = searchQuerySchema.extend({
 })
 
 const scheduleQuerySchema = searchQuerySchema.extend({
+  date: z.iso.date().optional(),
   courtSport: z
     .nativeEnum(CourtSport)
     .optional()
@@ -318,6 +319,7 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
     try {
       const query = c.req.valid('query') as SearchQuerySchema & {
         courtSport?: CourtSport
+        date?: string
       }
       const queryOptions = buildFindManyOptions(query, {
         defaultOrderBy: { createdAt: 'desc' },
@@ -338,6 +340,28 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         }
       }
 
+      if (query.date) {
+        const startAt = {
+          gte: toClubWallDate(`${query.date} 00:00:00`),
+          lt: new Date(+toClubWallDate(`${query.date} 00:00:00`) + 86400000),
+        }
+        // Match the scheduled slot day, not the date the booking was created.
+        // Include independent coach/ballboy invoices that have no court details.
+        where = {
+          AND: [
+            where,
+            {
+              OR: [
+                { details: { some: { slot: { startAt } } } },
+                { coaches: { some: { slot: { startAt } } } },
+                { ballboys: { some: { slot: { startAt } } } },
+                { inventories: { some: { slot: { startAt } } } },
+              ],
+            },
+          ],
+        }
+      }
+
       const bookings = await db.booking.findMany({
         ...queryOptions,
         where,
@@ -348,7 +372,6 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
               name: true,
               email: true,
               phone: true,
-              image: true,
             },
           },
           cashier: {
@@ -366,7 +389,6 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                   id: true,
                   name: true,
                   description: true,
-                  image: true,
                   sport: true,
                 },
               },
@@ -424,7 +446,6 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                       name: true,
                       email: true,
                       phone: true,
-                      image: true,
                       role: true,
                       coachType: true,
                       isActive: true,
@@ -478,7 +499,6 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
                       name: true,
                       email: true,
                       phone: true,
-                      image: true,
                       role: true,
                       isActive: true,
                     },
@@ -528,36 +548,7 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
         },
       })
 
-      // Process image URLs for user, court, and staff images
       for (const booking of bookings) {
-        // Process user image
-        if (booking.user.image) {
-          booking.user.image = await getFileUrl(booking.user.image)
-        }
-
-        // Process court images
-        for (const detail of booking.details) {
-          if (detail.court?.image) {
-            detail.court.image = await getFileUrl(detail.court.image)
-          }
-        }
-
-        // Process coach staff images
-        for (const coach of booking.coaches) {
-          if (coach.slot.staff?.image) {
-            coach.slot.staff.image = await getFileUrl(coach.slot.staff.image)
-          }
-        }
-
-        // Process ballboy staff images
-        for (const ballboy of booking.ballboys) {
-          if (ballboy.slot.staff?.image) {
-            ballboy.slot.staff.image = await getFileUrl(
-              ballboy.slot.staff.image,
-            )
-          }
-        }
-
         for (const inventory of booking.inventories) {
           if (inventory.slot?.startAt) {
             inventory.slot.startAt = formatClubWallClock(

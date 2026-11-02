@@ -1,0 +1,97 @@
+import { beforeEach, expect, it, vi } from 'vitest'
+const mocks = vi.hoisted(() => ({ occupied: vi.fn(), update: vi.fn() }))
+vi.mock('@/lib/create-app', () => ({
+  factory: { createHandlers: (...handlers: unknown[]) => handlers },
+}))
+vi.mock('@/lib/prisma', () => ({
+  db: {
+    $transaction: (fn: any) =>
+      fn({
+        slot: {
+          findFirst: async () => ({ id: 'slot', staffId: 'ballboy' }),
+          count: mocks.occupied,
+          update: mocks.update,
+        },
+        staff: {
+          findFirst: async () => ({
+            id: 'ballboy',
+            role: 'BALLBOY',
+            branchId: 'cemara',
+          }),
+        },
+        $queryRaw: vi.fn(),
+      }),
+  },
+}))
+import { Hono } from 'hono'
+import {
+  attachCoachingHandler,
+  toggleCoachingSlotHandler,
+} from './coaching.handler'
+const request = (body: Record<string, unknown>) =>
+  (toggleCoachingSlotHandler.at(-1) as any)({
+    req: {
+      valid: (type: string) => (type === 'param' ? { id: 'slot' } : body),
+    },
+    json: (body: unknown) => body,
+  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.occupied.mockResolvedValue(0)
+  mocks.update.mockResolvedValue({
+    id: 'slot',
+    price: 60000,
+    isAvailable: true,
+  })
+})
+it('updates an individual service price without toggling its availability', async () => {
+  await request({ price: 60000 })
+  expect(mocks.update).toHaveBeenCalledWith({
+    where: { id: 'slot' },
+    data: { price: 60000, isAvailable: undefined },
+  })
+})
+it('protects the price of an occupied slot after acquiring the staff lock', async () => {
+  mocks.occupied.mockResolvedValue(1)
+  await expect(request({ price: 60000 })).rejects.toThrow('dibooking')
+  expect(mocks.update).not.toHaveBeenCalled()
+})
+
+const validationApp = new Hono().post(
+  '/:id',
+  attachCoachingHandler[0] as any,
+  attachCoachingHandler[1] as any,
+  (c) => c.json({ valid: true }),
+)
+it.each([
+  { slotIds: ['coach'], manualPayment: { method: 'EDC', received: false } },
+  { slotIds: ['coach'], manualPayment: { method: 'QRIS_STATIC' } },
+  {
+    slotIds: ['coach'],
+    paymentMethodId: 'va',
+    manualPayment: { method: 'EDC', received: true },
+  },
+  { slotId: 'coach', slotIds: ['ballboy'] },
+  { slotIds: ['a', 'b', 'c'] },
+])(
+  'rejects invalid or unconfirmed service payment payloads: %j',
+  async (body) => {
+    const res = await validationApp.request('/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    expect(res.status).toBe(422)
+  },
+)
+it('accepts a combined service selection with an explicitly received static QRIS payment', async () => {
+  const res = await validationApp.request('/detail', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slotIds: ['coach', 'ballboy'],
+      manualPayment: { method: 'QRIS_STATIC', received: true },
+    }),
+  })
+  expect(res.status).toBe(200)
+})

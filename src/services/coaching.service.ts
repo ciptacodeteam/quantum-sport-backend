@@ -267,103 +267,155 @@ export async function coachingAvailability(
     }))
 }
 
-/** Automatic independent invoice; only a real gateway settlement marks a paid service. */
+/** One atomic service booking and invoice for a coach and/or ballboy. */
 export async function attachCoachingService(
   detailId: string,
-  slotId: string,
+  slotId: string | string[],
   cashierId: string,
   paymentMethodId?: string,
   now = new Date(),
+  manualPayment?: { method: 'EDC' | 'QRIS_STATIC'; received: boolean },
 ) {
+  const slotIds = Array.isArray(slotId) ? slotId : [slotId]
+  if (
+    !slotIds.length ||
+    slotIds.length > 2 ||
+    new Set(slotIds).size !== slotIds.length
+  )
+    throw new BadRequestException('Pilih maksimal satu coach dan satu ballboy.')
+  if (manualPayment && (!manualPayment.received || paymentMethodId))
+    throw new BadRequestException(
+      'Konfirmasi pembayaran EDC/QRIS Statis telah diterima.',
+    )
   const number = await generateInvoiceNumber()
   return db.$transaction(async (tx) => {
     const detail = await coachingCourtDetail(tx, detailId)
     // Serialize additions/cancellation to this court booking as well as staff claims.
     await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${detail.bookingId} FOR UPDATE`
     await coachingCourtDetail(tx, detailId)
-    const candidate = await tx.slot.findFirst({
+    const candidates = await tx.slot.findMany({
       where: {
-        id: slotId,
+        id: { in: slotIds },
         branchId: detail.booking.branchId,
         type: { in: ['COACH', 'BALLBOY'] },
       },
       select: { staffId: true },
     })
-    if (!candidate?.staffId)
-      throw new BadRequestException('Layanan tidak tersedia.')
-    await tx.$queryRaw`SELECT id FROM staff WHERE id = ${candidate.staffId} FOR UPDATE`
-    // Profile, price and availability may have changed while this request waited.
-    const slot = await tx.slot.findFirst({
-      where: {
-        id: slotId,
-        branchId: detail.booking.branchId,
-        type: { in: ['COACH', 'BALLBOY'] },
-        isAvailable: true,
-        scheduleClosed: false,
-      },
-      include: { staff: true },
-    })
-    if (!slot?.staff?.isActive || slot.staff.role !== slot.type)
-      throw new BadRequestException('Layanan tidak tersedia.')
-    assertCoachingSport(
-      slot.type,
-      slot.staff.coachType,
-      detail.slot.court!.sport,
-    )
     if (
-      slot.startAt < detail.slot.startAt ||
-      slot.endAt > detail.slot.endAt ||
-      +slot.endAt - +slot.startAt !== 3_600_000
+      candidates.length !== slotIds.length ||
+      candidates.some((s) => !s.staffId)
     )
-      throw new BadRequestException(
-        'Slot layanan harus berada di dalam waktu booking lapangan.',
-      )
-    if (slot.startAt <= courtBookingCutoff(now))
-      throw new BadRequestException('Slot melewati batas pemesanan 15 menit.')
-    // At most one ballboy for each tennis court interval.
-    if (
-      slot.type === 'BALLBOY' &&
-      (await tx.bookingBallboy.findFirst({
+      throw new BadRequestException('Layanan tidak tersedia.')
+    for (const staffId of [
+      ...new Set(candidates.map((s) => s.staffId!)),
+    ].sort())
+      await tx.$queryRaw`SELECT id FROM staff WHERE id = ${staffId} FOR UPDATE`
+    const selectedSlots: Prisma.SlotGetPayload<{ include: { staff: true } }>[] =
+      []
+    for (const selectedId of slotIds) {
+      // Profile, price and availability may have changed while this request waited.
+      const slot = await tx.slot.findFirst({
         where: {
-          courtSlotId: detail.slotId,
-          OR: [
-            { bookingId: detail.bookingId },
-            { booking: { serviceForBookingId: detail.bookingId } },
-          ],
-          ...activeBallboys,
-          slot: { startAt: { lt: slot.endAt }, endAt: { gt: slot.startAt } },
+          id: selectedId,
+          branchId: detail.booking.branchId,
+          type: { in: ['COACH', 'BALLBOY'] },
+          isAvailable: true,
+          scheduleClosed: false,
         },
-        select: { id: true },
-      }))
+        include: { staff: true },
+      })
+      if (!slot?.staff?.isActive || slot.staff.role !== slot.type)
+        throw new BadRequestException('Layanan tidak tersedia.')
+      assertCoachingSport(
+        slot.type,
+        slot.staff.coachType,
+        detail.slot.court!.sport,
+      )
+      if (
+        slot.startAt < detail.slot.startAt ||
+        slot.endAt > detail.slot.endAt ||
+        +slot.endAt - +slot.startAt !== 3_600_000
+      )
+        throw new BadRequestException(
+          'Slot layanan harus berada di dalam waktu booking lapangan.',
+        )
+      if (slot.startAt <= courtBookingCutoff(now))
+        throw new BadRequestException('Slot melewati batas pemesanan 15 menit.')
+      // At most one ballboy for each tennis court interval.
+      if (
+        slot.type === 'BALLBOY' &&
+        (await tx.bookingBallboy.findFirst({
+          where: {
+            courtSlotId: detail.slotId,
+            OR: [
+              { bookingId: detail.bookingId },
+              { booking: { serviceForBookingId: detail.bookingId } },
+            ],
+            ...activeBallboys,
+            slot: { startAt: { lt: slot.endAt }, endAt: { gt: slot.startAt } },
+          },
+          select: { id: true },
+        }))
+      )
+        throw new BadRequestException(
+          'Ballboy sudah ditambahkan untuk lapangan dan jam ini.',
+        )
+      await claimSlotsAtomically(tx, {
+        slotIds: [slot.id],
+        type: slot.type,
+        startsAfter: courtBookingCutoff(now),
+      })
+      selectedSlots.push(slot)
+    }
+    if (
+      new Set(selectedSlots.map((s) => s.type)).size !== selectedSlots.length ||
+      selectedSlots.some(
+        (s) =>
+          +s.startAt !== +selectedSlots[0].startAt ||
+          +s.endAt !== +selectedSlots[0].endAt,
+      )
     )
       throw new BadRequestException(
-        'Ballboy sudah ditambahkan untuk lapangan dan jam ini.',
+        'Pilih satu coach dan satu ballboy pada jam yang sama.',
       )
-    await claimSlotsAtomically(tx, {
-      slotIds: [slot.id],
-      type: slot.type,
-      startsAfter: courtBookingCutoff(now),
-    })
+    const price = selectedSlots.reduce((sum, s) => sum + s.price, 0)
     const dueDate = paymentDeadline(now)
-    const paid = slot.price === 0
-    const method = paid
-      ? null
-      : await tx.paymentMethod.findFirst({
-          where: {
-            isActive: true,
-            ...(paymentMethodId ? { id: paymentMethodId } : {}),
-          },
-          orderBy: { sequence: 'asc' },
-        })
+    const paid = price === 0 || !!manualPayment
+    const method =
+      manualPayment && price > 0
+        ? await tx.paymentMethod.upsert({
+            where: {
+              name: manualPayment.method === 'EDC' ? 'EDC' : 'QRIS Statis',
+            },
+            create: {
+              name: manualPayment.method === 'EDC' ? 'EDC' : 'QRIS Statis',
+              channel: manualPayment.method,
+              fees: 0,
+              percentage: 0,
+            },
+            update: {},
+          })
+        : paid
+          ? null
+          : await tx.paymentMethod.findFirst({
+              where: {
+                isActive: true,
+                ...(paymentMethodId ? { id: paymentMethodId } : {}),
+              },
+              orderBy: { sequence: 'asc' },
+            })
+    if (method && !method.isActive)
+      throw new BadRequestException('Metode pembayaran tidak aktif.')
     if (!paid && (!method?.channel || !isSupportedChannel(method.channel)))
       throw new BadRequestException(
         'Pilih metode pembayaran layanan yang aktif.',
       )
-    const baseFee = method
-      ? method.fees + Math.round((slot.price * Number(method.percentage)) / 100)
-      : 0
+    const baseFee =
+      method && !manualPayment
+        ? method.fees + Math.round((price * Number(method.percentage)) / 100)
+        : 0
     const fee = baseFee + Math.round(baseFee * 0.11)
-    const total = slot.price + fee
+    const total = price + fee
     if (total > 2147483647)
       throw new BadRequestException('Total pembayaran terlalu besar.')
     const booking = await tx.booking.create({
@@ -374,47 +426,49 @@ export async function attachCoachingService(
         cashierId,
         status: paid ? 'CONFIRMED' : 'HOLD',
         holdExpiresAt: paid ? null : dueDate,
-        totalPrice: slot.price,
+        totalPrice: price,
         processingFee: fee,
         adminNote: `Layanan untuk booking ${detail.bookingId}, lapangan ${detail.slot.court!.name}`,
       },
     })
-    if (slot.type === 'COACH') {
-      const type = await tx.bookingCoachType.findFirst({
-        where: { name: 'Coaching', isActive: true },
-        select: { id: true },
-      })
-      if (!type)
-        throw new BadRequestException(
-          'Jalankan migrasi Coaching sebelum menambah layanan.',
-        )
-      await tx.bookingCoach.create({
-        data: {
-          bookingId: booking.id,
-          slotId: slot.id,
-          courtSlotId: detail.slotId,
-          bookingCoachTypeId: type.id,
-          price: slot.price,
-          status: paid ? 'CONFIRMED' : 'HOLD',
-        },
-      })
-    } else
-      await tx.bookingBallboy.create({
-        data: {
-          bookingId: booking.id,
-          slotId: slot.id,
-          courtSlotId: detail.slotId,
-          price: slot.price,
-          status: paid ? 'CONFIRMED' : 'HOLD',
-        },
-      })
+    for (const slot of selectedSlots) {
+      if (slot.type === 'COACH') {
+        const type = await tx.bookingCoachType.findFirst({
+          where: { name: 'Coaching', isActive: true },
+          select: { id: true },
+        })
+        if (!type)
+          throw new BadRequestException(
+            'Jalankan migrasi Coaching sebelum menambah layanan.',
+          )
+        await tx.bookingCoach.create({
+          data: {
+            bookingId: booking.id,
+            slotId: slot.id,
+            courtSlotId: detail.slotId,
+            bookingCoachTypeId: type.id,
+            price: slot.price,
+            status: paid ? 'CONFIRMED' : 'HOLD',
+          },
+        })
+      } else
+        await tx.bookingBallboy.create({
+          data: {
+            bookingId: booking.id,
+            slotId: slot.id,
+            courtSlotId: detail.slotId,
+            price: slot.price,
+            status: paid ? 'CONFIRMED' : 'HOLD',
+          },
+        })
+    }
     const invoice = await tx.invoice.create({
       data: {
         branchId: detail.booking.branchId,
         bookingId: booking.id,
         userId: detail.booking.userId,
         number,
-        subtotal: slot.price,
+        subtotal: price,
         processingFee: fee,
         total,
         status: paid ? 'PAID' : 'PENDING',
@@ -424,7 +478,27 @@ export async function attachCoachingService(
       },
     })
     let settled = paid
-    if (method) {
+    if (method && manualPayment) {
+      const payment = await tx.payment.create({
+        data: {
+          paymentMethodId: method.id,
+          status: 'PAID',
+          amount: total,
+          fees: 0,
+          paidAt: now,
+          meta: {
+            source: 'ADMIN_SERVICE',
+            channel: manualPayment.method,
+            receivedBy: cashierId,
+            receivedAt: now.toISOString(),
+          },
+        },
+      })
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: { paymentId: payment.id },
+      })
+    } else if (method) {
       const customer = await tx.user.findUniqueOrThrow({
         where: { id: detail.booking.userId },
         select: { name: true, email: true, phone: true },
@@ -433,7 +507,12 @@ export async function attachCoachingService(
         orderId: invoice.id,
         amount: total,
         channelCode: method.channel!,
-        description: `${slot.type === 'COACH' ? 'Coach' : 'Ballboy'} ${slot.staff.name}`,
+        description: selectedSlots
+          .map(
+            (s) =>
+              `${s.type === 'COACH' ? 'Coach' : 'Ballboy'} ${s.staff!.name}`,
+          )
+          .join(' + '),
         customer: {
           name: customer.name,
           email: customer.email ?? undefined,

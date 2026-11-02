@@ -538,4 +538,77 @@ run('admin coaching transactional integration', () => {
     )
     expect(availability.some((s) => s.staffId === staff)).toBe(false)
   })
+  it('books coach and ballboy atomically in one EDC invoice with a cashier audit trail', async () => {
+    const coach = await profile('combined-coach', 'COACH', 'TENNIS')
+    const ballboy = await profile('combined-ballboy', 'BALLBOY')
+    const coachSlot = await staffSlot(coach)
+    const ballboySlot = await staffSlot(ballboy, 13, '00', 45000, 'BALLBOY')
+    const court = await courtBooking('combined-manual', 'TENNIS')
+    const calls = gateway.mock.calls.length
+    const result = await context(() =>
+      service.attachCoachingService(
+        court.detail.id,
+        [coachSlot.id, ballboySlot.id],
+        admin,
+        undefined,
+        now,
+        { method: 'EDC', received: true },
+      ),
+    )
+    const invoice = await raw.invoice.findUniqueOrThrow({
+      where: { id: result.invoiceId },
+      include: {
+        payment: true,
+        booking: { include: { coaches: true, ballboys: true } },
+      },
+    })
+    expect(invoice).toMatchObject({
+      status: 'PAID',
+      total: 195000,
+      processingFee: 0,
+    })
+    expect(invoice.booking).toMatchObject({
+      status: 'CONFIRMED',
+      holdExpiresAt: null,
+    })
+    expect(invoice.booking?.coaches).toHaveLength(1)
+    expect(invoice.booking?.ballboys).toHaveLength(1)
+    expect(invoice.payment).toMatchObject({
+      status: 'PAID',
+      amount: 195000,
+      meta: { receivedBy: admin, channel: 'EDC' },
+    })
+    expect(gateway.mock.calls).toHaveLength(calls)
+  })
+  it('rolls back the first slot claim if the second service is unavailable', async () => {
+    const coach = await profile('rollback-coach', 'COACH', 'TENNIS')
+    const ballboy = await profile('rollback-ballboy', 'BALLBOY')
+    const coachSlot = await staffSlot(coach)
+    const ballboySlot = await staffSlot(ballboy, 13, '00', 45000, 'BALLBOY')
+    await raw.slot.update({
+      where: { id: ballboySlot.id },
+      data: { isAvailable: false },
+    })
+    const court = await courtBooking('combined-rollback', 'TENNIS')
+    await expect(
+      context(() =>
+        service.attachCoachingService(
+          court.detail.id,
+          [coachSlot.id, ballboySlot.id],
+          admin,
+          undefined,
+          now,
+          { method: 'EDC', received: true },
+        ),
+      ),
+    ).rejects.toThrow('tersedia')
+    expect(
+      await raw.slot.findUnique({ where: { id: coachSlot.id } }),
+    ).toMatchObject({ isAvailable: true })
+    expect(
+      await raw.booking.count({
+        where: { serviceForBookingId: court.booking.id },
+      }),
+    ).toBe(0)
+  })
 })

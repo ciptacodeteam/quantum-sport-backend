@@ -164,12 +164,21 @@ export const toggleCoachingSlotHandler = factory.createHandlers(
   zValidator('param', params, validateHook),
   zValidator(
     'json',
-    z.object({ isAvailable: z.boolean() }).strict(),
+    z
+      .object({
+        isAvailable: z.boolean().optional(),
+        price: z.number().int().min(0).max(2147483647).optional(),
+      })
+      .strict()
+      .refine(
+        (v) => v.isAvailable !== undefined || v.price !== undefined,
+        'Pilih perubahan slot.',
+      ),
     validateHook,
   ),
   async (c) => {
     const { id } = c.req.valid('param'),
-      { isAvailable } = c.req.valid('json')
+      { isAvailable, price } = c.req.valid('json')
     const result = await db.$transaction(async (tx) => {
       const slot = await tx.slot.findFirst({
         where: { id, type: { in: ['COACH', 'BALLBOY'] } },
@@ -205,9 +214,15 @@ export const toggleCoachingSlotHandler = factory.createHandlers(
         throw new BadRequestException(
           'Slot yang dibooking tidak dapat diubah. Batalkan pemesanan layanan terlebih dahulu.',
         )
-      return tx.slot.update({ where: { id }, data: { isAvailable } })
+      return tx.slot.update({ where: { id }, data: { isAvailable, price } })
     })
-    return c.json(ok({ id: result.id, isAvailable: result.isAvailable }))
+    return c.json(
+      ok({
+        id: result.id,
+        isAvailable: result.isAvailable,
+        price: result.price,
+      }),
+    )
   },
 )
 export const availableCoachingHandler = factory.createHandlers(
@@ -232,10 +247,23 @@ export const attachCoachingHandler = factory.createHandlers(
     'json',
     z
       .object({
-        slotId: z.string().min(1),
+        slotId: z.string().min(1).optional(),
+        slotIds: z.array(z.string().min(1)).min(1).max(2).optional(),
+        manualPayment: z
+          .object({
+            method: z.enum(['EDC', 'QRIS_STATIC']),
+            received: z.literal(true),
+          })
+          .strict()
+          .optional(),
         paymentMethodId: z.string().min(1).optional(),
       })
-      .strict(),
+      .strict()
+      .refine((v) => !!v.slotId !== !!v.slotIds, 'Pilih layanan.')
+      .refine(
+        (v) => !(v.manualPayment && v.paymentMethodId),
+        'Pilih satu metode pembayaran.',
+      ),
     validateHook,
   ),
   async (c) => {
@@ -244,9 +272,11 @@ export const attachCoachingHandler = factory.createHandlers(
       ok(
         await attachCoachingService(
           c.req.valid('param').id,
-          q.slotId,
+          q.slotIds ?? q.slotId!,
           c.get('admin')!.id,
           q.paymentMethodId,
+          new Date(),
+          q.manualPayment,
         ),
       ),
       201,
