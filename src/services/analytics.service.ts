@@ -24,6 +24,9 @@ export async function getIncomeBySourceAnalytics(
   }
 
   const includeClause: any = {
+    user: { select: { id: true, name: true } },
+    branch: { select: { name: true } },
+    payment: { select: { method: { select: { name: true } } } },
     booking: {
       include: { cashier: { select: { id: true, name: true, email: true } } },
     },
@@ -42,6 +45,7 @@ export async function getIncomeBySourceAnalytics(
   const invoices = await db.invoice.findMany({
     where: invoiceWhere,
     include: includeClause,
+    orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
   })
 
   // Separate by source and account for processing fees
@@ -68,7 +72,7 @@ export async function getIncomeBySourceAnalytics(
 
     // Court booking income
     if (invoice.booking) {
-      const src = invoice.booking.cashier ? 'Cashier' : 'Online'
+      const src = invoice.booking.cashierId ? 'Cashier' : 'Online'
       // processingFee and netAmount already computed above
 
       if (src === 'Cashier') {
@@ -174,6 +178,28 @@ export async function getIncomeBySourceAnalytics(
       ...classIncome,
       ...membershipIncome_,
     },
+    // One row per paid invoice, including invoices whose original product was
+    // removed. Use the exact same invoice set as the financial summary.
+    transactions: invoices.map((invoice: any) => ({
+      id: invoice.id,
+      invoiceNumber: invoice.number,
+      customerName: invoice.user?.name ?? 'Customer tidak tersedia',
+      branchName: invoice.branch?.name ?? invoice.branchId,
+      source: invoice.booking
+        ? invoice.booking.cashierId
+          ? 'Cashier'
+          : 'Online'
+        : invoice.classBooking
+          ? 'Class Bookings'
+          : invoice.membershipUser
+            ? 'Membership'
+            : 'Other',
+      paymentMethod: invoice.payment?.method?.name ?? null,
+      paidAt: invoice.paidAt,
+      amount: invoice.total || 0,
+      processingFee: invoice.processingFee || 0,
+      netAmount: (invoice.total || 0) - (invoice.processingFee || 0),
+    })),
     dateRange: { startDate, endDate },
   }
 }
