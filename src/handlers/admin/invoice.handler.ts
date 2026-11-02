@@ -7,11 +7,24 @@ import { ok } from '@/lib/response'
 import { SearchQuerySchema, searchQuerySchema } from '@/lib/validation'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
-import dayjs from 'dayjs'
+import { formatClubWallClock } from '@/lib/club-time'
 import { z } from 'zod'
 
 const idSchema = z.object({ id: z.string() })
 type IdSchema = z.infer<typeof idSchema>
+
+function invoiceScheduleSlot<T extends { startAt: Date; endAt: Date }>(
+  slot: T,
+) {
+  return {
+    ...slot,
+    startAt: formatClubWallClock(slot.startAt),
+    endAt: formatClubWallClock(slot.endAt),
+    date: formatClubWallClock(slot.startAt, 'YYYY-MM-DD'),
+    startTime: formatClubWallClock(slot.startAt, 'HH:mm'),
+    endTime: formatClubWallClock(slot.endAt, 'HH:mm'),
+  }
+}
 
 export const getAllInvoicesAdminHandler = factory.createHandlers(
   zValidator('query', searchQuerySchema, validateHook),
@@ -112,6 +125,7 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
             processingFee: true,
             courtNormalPrice: true,
             courtDiscountPrice: true,
+            membershipUserId: true,
             createdAt: true,
             updatedAt: true,
             user: {
@@ -201,34 +215,19 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
         ...invoice.booking,
         courts: invoice.booking.details.map((d) => ({
           court: d.court,
-          slot: {
-            ...d.slot,
-            date: dayjs(d.slot.startAt).format('YYYY-MM-DD'),
-            startTime: dayjs(d.slot.startAt).format('HH:mm'),
-            endTime: dayjs(d.slot.endAt).format('HH:mm'),
-          },
+          slot: invoiceScheduleSlot(d.slot),
           price: d.price,
           discountPrice: d.discountPrice,
         })),
         coaches: invoice.booking.coaches.map((c) => ({
           staff: c.slot.staff,
           coachType: c.bookingCoachType,
-          slot: {
-            ...c.slot,
-            date: dayjs(c.slot.startAt).format('YYYY-MM-DD'),
-            startTime: dayjs(c.slot.startAt).format('HH:mm'),
-            endTime: dayjs(c.slot.endAt).format('HH:mm'),
-          },
+          slot: invoiceScheduleSlot(c.slot),
           price: c.price,
         })),
         ballboys: invoice.booking.ballboys.map((b) => ({
           staff: b.slot.staff,
-          slot: {
-            ...b.slot,
-            date: dayjs(b.slot.startAt).format('YYYY-MM-DD'),
-            startTime: dayjs(b.slot.startAt).format('HH:mm'),
-            endTime: dayjs(b.slot.endAt).format('HH:mm'),
-          },
+          slot: invoiceScheduleSlot(b.slot),
           price: b.price,
         })),
         inventories: invoice.booking.inventories.map((i) => ({
