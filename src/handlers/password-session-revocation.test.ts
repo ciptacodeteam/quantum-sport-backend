@@ -44,6 +44,10 @@ vi.mock('@/lib/token', () => ({
 vi.mock('@/services/email.service', () => ({
   queueSendTemplatedEmail: mocks.notify,
 }))
+vi.mock('@/services/phone.service', () => ({
+  sendPhoneOtp: vi.fn(),
+  verifyPhoneOtp: vi.fn(),
+}))
 vi.mock('@/services/email-queue.service', () => ({ queueEmail: mocks.notify }))
 vi.mock('@/services/password-reset.service', () => ({
   getValidPasswordResetToken: mocks.validReset,

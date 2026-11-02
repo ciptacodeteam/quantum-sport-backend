@@ -51,6 +51,10 @@ vi.mock('@/services/upload.service', () => ({
 vi.mock('@/services/email.service', () => ({
   queueSendTemplatedEmail: vi.fn(),
 }))
+vi.mock('@/services/phone.service', () => ({
+  sendPhoneOtp: vi.fn(),
+  verifyPhoneOtp: vi.fn(),
+}))
 import {
   loginHandler,
   refreshTokenHandler,

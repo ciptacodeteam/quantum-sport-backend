@@ -16,6 +16,10 @@ vi.mock('@/lib/logger', () => ({ log: { info: vi.fn(), error: vi.fn() } }))
 vi.mock('@/services/email.service', () => ({
   queueSendTemplatedEmail: vi.fn(),
 }))
+vi.mock('@/services/phone.service', () => ({
+  sendPhoneOtp: vi.fn(),
+  verifyPhoneOtp: vi.fn(),
+}))
 vi.mock('@/services/upload.service', () => ({ getFileUrl: vi.fn() }))
 vi.mock('@/services/password-reset-otp.service', () => ({
   verifyPasswordResetOtp: mocks.verify,
