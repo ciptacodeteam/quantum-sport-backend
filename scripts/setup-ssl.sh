@@ -38,8 +38,10 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-DOMAIN="api.quantumsocialclub.id"
-EMAIL="${SSL_EMAIL:-admin@quantumsocialclub.id}"
+# Usage: ./scripts/setup-ssl.sh [domain]
+# Example: ./scripts/setup-ssl.sh api.blackpadel.id
+DOMAIN="${1:-api.quantumsocialclub.id}"
+EMAIL="${SSL_EMAIL:-ciptacodeteam@gmail.com}"
 
 print_header "SSL Certificate Setup"
 print_info "Domain: $DOMAIN"
@@ -86,7 +88,7 @@ if docker volume ls | grep -q certbot_certs; then
         read -p "Do you want to renew it? (yes/no): " renew
         if [ "$renew" = "yes" ]; then
             print_info "Renewing certificate..."
-            $DOCKER_COMPOSE -f docker-compose.prod.yml run --rm certbot certonly \
+            $DOCKER_COMPOSE -f docker-compose.prod.yml run --rm --entrypoint certbot certbot certonly \
                 --webroot \
                 --webroot-path=/var/www/certbot \
                 --email $EMAIL \
@@ -132,7 +134,7 @@ sleep 5
 print_info "Requesting certificate from Let's Encrypt..."
 print_warning "This may take a minute..."
 
-$DOCKER_COMPOSE -f docker-compose.prod.yml run --rm certbot certonly \
+$DOCKER_COMPOSE -f docker-compose.prod.yml run --rm --entrypoint certbot certbot certonly \
     --webroot \
     --webroot-path=/var/www/certbot \
     --email $EMAIL \
