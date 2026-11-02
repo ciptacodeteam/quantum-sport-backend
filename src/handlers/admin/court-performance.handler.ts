@@ -64,7 +64,7 @@ export const courtPerformanceExportHandler = factory.createHandlers(
         'Tanggal main (WIB)': clubWallTime(r.startAt).format('DD/MM/YYYY'),
         Mulai: clubWallTime(r.startAt).format('HH:mm'),
         Selesai: clubWallTime(r.endAt).format('HH:mm'),
-        'Jam dipesan': r.hours,
+        'Jam dipakai': r.hours,
         'Jam berlalu': r.pastHours,
         'Jam mendatang': r.upcomingHours,
         'Harga normal': r.normalPrice,
@@ -80,7 +80,7 @@ export const courtPerformanceExportHandler = factory.createHandlers(
     append('Definisi', [
       {
         Keterangan:
-          'Berdasarkan tanggal main WIB, hanya booking confirmed. Pembayaran lapangan dibagi proporsional setelah promo, tidak termasuk biaya proses dan add-on. Value Pack dialokasikan dari harga pembelian dibayar per jam paket, bukan penerimaan kas baru. Complimentary adalah non-membership dengan nilai lapangan nol. Kapasitas adalah gabungan slot terbit tersedia dan slot confirmed; slot tutup tidak dihitung. Kapasitas belum terbit tidak diestimasi.',
+          'Jam dipakai berdasarkan tanggal main WIB, hanya booking confirmed. Total jam dipesan (createdBookingHours) berdasarkan tanggal pembuatan booking WIB dalam periode pilihan, termasuk jadwal main di luar periode. Pembayaran lapangan dibagi proporsional setelah promo, tidak termasuk biaya proses dan add-on. Value Pack dialokasikan dari harga pembelian dibayar per jam paket, bukan penerimaan kas baru. Complimentary adalah non-membership dengan nilai lapangan nol. Kapasitas adalah gabungan slot terbit tersedia dan slot confirmed; slot tutup tidak dihitung. Kapasitas belum terbit tidak diestimasi.',
       },
     ])
     c.header(

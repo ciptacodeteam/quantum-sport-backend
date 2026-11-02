@@ -35,9 +35,7 @@ const slot = (id: string, hour: number, available = false) => ({
   court,
   // Wall-clock hours stored as UTC components (timestamp without time zone)
   startAt: new Date(`2026-10-01T${String(hour).padStart(2, '0')}:00:00Z`),
-  endAt: new Date(
-    `2026-10-01T${String(hour + 1).padStart(2, '0')}:00:00Z`,
-  ),
+  endAt: new Date(`2026-10-01T${String(hour + 1).padStart(2, '0')}:00:00Z`),
   isAvailable: available,
   scheduleClosed: false,
 })
@@ -119,6 +117,78 @@ it('uses WIB playing dates, excludes closures, counts occupied slots even when u
     bookings: 1,
   })
 })
+it('counts hours booked on the selected WIB day even when play is outside that day', async () => {
+  const futureSlot = {
+    ...slot('future', 6),
+    startAt: new Date('2026-10-10T06:00:00Z'),
+    endAt: new Date('2026-10-10T08:00:00Z'),
+  }
+  mocks.bookings.mockResolvedValue([
+    booking({
+      id: 'earlier-order',
+      createdAt: new Date('2026-09-30T16:59:59.999Z'),
+    }),
+    booking({
+      id: 'today-order',
+      createdAt: new Date('2026-09-30T17:00:00Z'),
+      details: [
+        {
+          id: 'future-detail',
+          slotId: futureSlot.id,
+          price: 200000,
+          discountPrice: 200000,
+          slot: futureSlot,
+        },
+      ],
+    }),
+    booking({
+      id: 'next-day-order',
+      createdAt: new Date('2026-10-01T17:00:00Z'),
+      details: [
+        {
+          id: 'later-detail',
+          slotId: futureSlot.id,
+          price: 200000,
+          discountPrice: 200000,
+          slot: futureSlot,
+        },
+      ],
+    }),
+  ])
+  const report = await getCourtPerformance('2026-10-01', '2026-10-01')
+  expect(report.summary.createdBookingHours).toBe(2)
+  expect(report.summary.hours).toBe(1)
+  expect(report.rows.map((row) => row.bookingId)).toEqual(['earlier-order'])
+  expect(mocks.bookings.mock.calls[0][0].where.OR).toContainEqual({
+    createdAt: {
+      gte: new Date('2026-09-30T17:00:00Z'),
+      lt: new Date('2026-10-01T17:00:00Z'),
+    },
+  })
+})
+
+it('limits creation-date hours to the selected court and includes the final WIB day of a range', async () => {
+  const otherSlot = {
+    ...slot('other', 6),
+    courtId: 'court-2',
+    court: { ...court, id: 'court-2' },
+  }
+  mocks.bookings.mockResolvedValue([
+    booking({
+      createdAt: new Date('2026-10-02T16:59:59.999Z'),
+      details: [
+        booking().details[0],
+        { ...booking().details[0], id: 'other-detail', slot: otherSlot },
+      ],
+    }),
+  ])
+  const report = await getCourtPerformance('2026-10-01', '2026-10-02', court.id)
+  expect(report.summary.createdBookingHours).toBe(1)
+  expect(mocks.bookings.mock.calls[0][0].where.details).toEqual({
+    some: { slot: { courtId: court.id } },
+  })
+})
+
 it('allocates paid package purchase value and keeps cash revenue separate', async () => {
   mocks.bookings.mockResolvedValue([
     booking({

@@ -1,5 +1,5 @@
 import { db } from '@/lib/prisma'
-import {
+import clubTime, {
   clubNowAsWallDate,
   clubWallDayStart,
   clubWallNextDayStart,
@@ -76,6 +76,9 @@ export async function getCourtPerformance(
 ) {
   const start = clubWallDayStart(startDate)
   const end = clubWallNextDayStart(endDate)
+  // Booking creation is a real timestamp, unlike wall-clock slot timestamps.
+  const createdStart = clubTime(startDate).startOf('day').toDate()
+  const createdEnd = clubTime(endDate).add(1, 'day').startOf('day').toDate()
   const window = { startAt: { lt: end }, endAt: { gt: start } }
   const [courts, slots, bookings, rules, packages] = await Promise.all([
     db.court.findMany({
@@ -101,9 +104,15 @@ export async function getCourtPerformance(
     db.booking.findMany({
       where: {
         status: 'CONFIRMED',
-        details: {
-          some: { slot: { ...window, ...(courtId ? { courtId } : {}) } },
-        },
+        ...(courtId ? { details: { some: { slot: { courtId } } } } : {}),
+        OR: [
+          {
+            details: {
+              some: { slot: { ...window, ...(courtId ? { courtId } : {}) } },
+            },
+          },
+          { createdAt: { gte: createdStart, lt: createdEnd } },
+        ],
       },
       include: bookingInclude,
     }),
@@ -111,6 +120,27 @@ export async function getCourtPerformance(
     db.membership.findMany({ orderBy: { sequence: 'asc' } }),
   ])
   const now = clubNowAsWallDate()
+  const createdBookingHours = bookings
+    .filter(
+      (booking) =>
+        booking.createdAt >= createdStart && booking.createdAt < createdEnd,
+    )
+    .reduce(
+      (total, booking) =>
+        total +
+        booking.details.reduce((hours, detail) => {
+          if (
+            !detail.slot.court ||
+            (courtId && detail.slot.court.id !== courtId)
+          )
+            return hours
+          return (
+            hours +
+            Math.max(0, (+detail.slot.endAt - +detail.slot.startAt) / 3_600_000)
+          )
+        }, 0),
+      0,
+    )
   const rows = bookings
     .flatMap((booking) => {
       const regularDetails = booking.details.filter(
@@ -320,6 +350,7 @@ export async function getCourtPerformance(
     })),
     summary: {
       ...sum(rows),
+      createdBookingHours,
       capacityHours,
       occupiedHours,
       occupancy: capacityHours > 0 ? (occupiedHours / capacityHours) * 100 : 0,
