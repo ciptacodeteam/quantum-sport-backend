@@ -161,11 +161,10 @@ BASE_URL="$(read_env_value BASE_URL 2>/dev/null || true)"
 
 print_header "Pulling Latest Code"
 print_info "Fetching latest changes from repository..."
-if git pull origin main; then
-    print_success "Code updated successfully"
+if git fetch origin main && git reset --hard origin/main; then
+    print_success "Code updated successfully (reset to origin/main)"
 else
-    print_warning "git pull failed (often CRLF or local edits on tracked files)"
-    print_info "Recover with: git fetch origin main && git reset --hard origin/main"
+    print_warning "git fetch/reset failed"
     print_info "Continuing with current checkout..."
 fi
 
