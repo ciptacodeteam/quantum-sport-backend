@@ -115,7 +115,7 @@ export const resetPasswordWithTokenHandler = factory.createHandlers(
             variables: {
               name: user.name,
               message: 'Your password has been successfully changed.',
-              actionUrl: `${env.baseUrl}?login=true`,
+              actionUrl: `${env.frontEndUrl.replace(/\/+$/, '')}/?login=true`,
             },
           })
         }
@@ -242,7 +242,7 @@ export const requestPasswordResetHandler = factory.createHandlers(
         await import('@/services/password-reset.service')
 
       const { token, expiresIn } = await createPasswordResetToken(user.id)
-      const resetLink = buildPasswordResetLink(token, env.baseUrl)
+      const resetLink = buildPasswordResetLink(token, env.frontEndUrl)
 
       // Queue email (email is guaranteed to exist if emailVerified is true)
       const { queueEmail } = await import('@/services/email-queue.service')

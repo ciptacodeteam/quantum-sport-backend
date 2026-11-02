@@ -55,7 +55,7 @@ export const buildPasswordResetLink = (
   token: string,
   baseUrl: string,
 ): string => {
-  return `${baseUrl}/reset-password?token=${token}`
+  return `${baseUrl.replace(/\/+$/, '')}/reset-password?token=${token}`
 }
 
 /**
