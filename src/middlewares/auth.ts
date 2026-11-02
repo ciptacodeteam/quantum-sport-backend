@@ -89,6 +89,7 @@ export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
       id: true,
       isActive: true,
       role: true,
+      mustChangePassword: true,
     },
   })
 
@@ -98,6 +99,20 @@ export const requireAdminAuth: MiddlewareHandler = async (c, next) => {
 
   await assertStaffActive(dbStaff)
   c.set('admin', { ...admin, role: dbStaff.role })
+
+  const passwordChangePaths = new Set([
+    'GET /admin/auth/profile',
+    'POST /admin/auth/change-password',
+    'POST /admin/auth/logout',
+  ])
+  if (
+    dbStaff.mustChangePassword &&
+    !passwordChangePaths.has(`${c.req.method} ${c.req.path}`)
+  ) {
+    throw new ForbiddenException(
+      'Ganti kata sandi sementara Anda sebelum melanjutkan.',
+    )
+  }
 
   return next()
 }
@@ -182,6 +197,7 @@ export const blockAdminViewerWrites: MiddlewareHandler = async (c, next) => {
 
   // Allow ADMIN_VIEWER to access admin checkout (booking)
   const allowedPaths = ['/admin/checkout']
+  const ownAccountPaths = ['/admin/auth/change-password', '/admin/auth/logout']
 
   // If user is ADMIN_VIEWER and trying to modify data
   if (
@@ -190,7 +206,10 @@ export const blockAdminViewerWrites: MiddlewareHandler = async (c, next) => {
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
   ) {
     // Check if the path is in the allowed list
-    if (allowedPaths.some((allowedPath) => path.startsWith(allowedPath))) {
+    if (
+      allowedPaths.some((allowedPath) => path.startsWith(allowedPath)) ||
+      (method === 'POST' && ownAccountPaths.includes(path))
+    ) {
       return next()
     }
 

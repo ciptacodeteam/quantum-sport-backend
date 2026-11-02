@@ -183,6 +183,7 @@ model EmailVerification {
 }
 
 model Staff {
+  mustChangePassword Boolean @default(false)
   branchId     String     @default("cemara")
   branch       Branch     @relation(fields: [branchId], references: [id])
   id           String     @id @default(cuid())

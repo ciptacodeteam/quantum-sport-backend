@@ -3,10 +3,7 @@ import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
-import {
-  invalidatePasswordResetToken,
-  getValidPasswordResetToken,
-} from '@/services/password-reset.service'
+import { getValidPasswordResetToken } from '@/services/password-reset.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import z from 'zod'
@@ -73,24 +70,32 @@ export const resetPasswordWithTokenHandler = factory.createHandlers(
         throw new Error('Failed to process password reset')
       }
 
-      // Update user password
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          password: hashedPassword,
-        },
-      })
-
-      // Invalidate the reset token (mark as used)
-      await invalidatePasswordResetToken(token, user.id)
-
-      // Invalidate all other reset tokens for this user (security best practice)
-      await db.passwordResetToken.updateMany({
-        where: {
-          userId: user.id,
-          token: { not: token },
-        },
-        data: { usedAt: new Date() },
+      await db.$transaction(async (tx) => {
+        const now = new Date()
+        // Claim the reset link once, including when requests arrive together.
+        const consumed = await tx.passwordResetToken.updateMany({
+          where: {
+            token,
+            userId: user.id,
+            usedAt: null,
+            expiresAt: { gt: now },
+          },
+          data: { usedAt: now },
+        })
+        if (consumed.count !== 1) {
+          throw new BadRequestException(
+            'This password reset link is invalid or has expired. Please request a new one.',
+          )
+        }
+        await tx.user.update({
+          where: { id: user.id },
+          data: { password: hashedPassword },
+        })
+        await tx.authToken.deleteMany({ where: { userId: user.id } })
+        await tx.passwordResetToken.updateMany({
+          where: { userId: user.id, usedAt: null },
+          data: { usedAt: now },
+        })
       })
 
       c.var.logger.info(
@@ -233,9 +238,8 @@ export const requestPasswordResetHandler = factory.createHandlers(
       }
 
       // Create reset token
-      const { createPasswordResetToken, buildPasswordResetLink } = await import(
-        '@/services/password-reset.service'
-      )
+      const { createPasswordResetToken, buildPasswordResetLink } =
+        await import('@/services/password-reset.service')
 
       const { token, expiresIn } = await createPasswordResetToken(user.id)
       const resetLink = buildPasswordResetLink(token, env.baseUrl)

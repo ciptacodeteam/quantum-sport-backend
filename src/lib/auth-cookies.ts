@@ -4,6 +4,10 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 
 export const USER_ACCESS_TOKEN_COOKIE = 'accessToken'
 export const ADMIN_ACCESS_TOKEN_COOKIE = 'adminAccessToken'
+export const USER_REFRESH_TOKEN_COOKIE = 'userRefreshToken'
+export const ADMIN_REFRESH_TOKEN_COOKIE = 'adminRefreshToken'
+/** @deprecated Shared refresh cookie; never read for authentication. */
+export const LEGACY_REFRESH_TOKEN_COOKIE = 'refreshToken'
 /** @deprecated Legacy cookie name; cleared on logout */
 export const LEGACY_ACCESS_TOKEN_COOKIE = 'token'
 
@@ -33,13 +37,30 @@ export function setAdminAccessTokenCookie(c: Context, accessToken: string) {
 export function clearUserAuthCookies(c: Context) {
   deleteCookie(c, USER_ACCESS_TOKEN_COOKIE, { path: '/' })
   deleteCookie(c, LEGACY_ACCESS_TOKEN_COOKIE, { path: '/' })
-  deleteCookie(c, 'refreshToken', { path: '/' })
+  deleteCookie(c, USER_REFRESH_TOKEN_COOKIE, { path: '/' })
+  deleteCookie(c, LEGACY_REFRESH_TOKEN_COOKIE, { path: '/' })
 }
 
 export function clearAdminAuthCookies(c: Context) {
   deleteCookie(c, ADMIN_ACCESS_TOKEN_COOKIE, { path: '/' })
-  deleteCookie(c, LEGACY_ACCESS_TOKEN_COOKIE, { path: '/' })
-  deleteCookie(c, 'refreshToken', { path: '/' })
+  deleteCookie(c, ADMIN_REFRESH_TOKEN_COOKIE, { path: '/' })
+  deleteCookie(c, LEGACY_REFRESH_TOKEN_COOKIE, { path: '/' })
+}
+
+function setRefreshTokenCookie(c: Context, name: string, refreshToken: string) {
+  deleteCookie(c, LEGACY_REFRESH_TOKEN_COOKIE, { path: '/' })
+  setCookie(c, name, refreshToken, {
+    ...baseCookieOptions(),
+    maxAge: Number(env.jwt.refreshExpires) * 24 * 60 * 60,
+  })
+}
+
+export function setUserRefreshTokenCookie(c: Context, refreshToken: string) {
+  setRefreshTokenCookie(c, USER_REFRESH_TOKEN_COOKIE, refreshToken)
+}
+
+export function setAdminRefreshTokenCookie(c: Context, refreshToken: string) {
+  setRefreshTokenCookie(c, ADMIN_REFRESH_TOKEN_COOKIE, refreshToken)
 }
 
 export function resolveAccessTokenFromRequest(c: Context): string | null {

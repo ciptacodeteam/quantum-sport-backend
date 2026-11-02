@@ -88,21 +88,10 @@ async function reapplyInventoryForRevivedBooking(
       bookingId,
       returnedAt: { not: null },
     },
+    orderBy: [{ inventoryId: 'asc' }, { id: 'asc' }],
   })
 
   for (const bookingInv of returnedInventories) {
-    const inventory = await tx.inventory.findUnique({
-      where: { id: bookingInv.inventoryId },
-      select: { id: true, quantity: true },
-    })
-
-    if (!inventory || inventory.quantity < bookingInv.quantity) {
-      return {
-        ok: false,
-        reason: `Insufficient inventory ${bookingInv.inventoryId} to revive booking`,
-      }
-    }
-
     const claimed = await tx.bookingInventory.updateMany({
       where: {
         id: bookingInv.id,
@@ -115,10 +104,19 @@ async function reapplyInventoryForRevivedBooking(
       continue
     }
 
-    await tx.inventory.update({
-      where: { id: bookingInv.inventoryId },
+    const stock = await tx.inventory.updateMany({
+      where: {
+        id: bookingInv.inventoryId,
+        quantity: { gte: bookingInv.quantity },
+      },
       data: { quantity: { decrement: bookingInv.quantity } },
     })
+    if (stock.count !== 1) {
+      return {
+        ok: false,
+        reason: `Insufficient inventory ${bookingInv.inventoryId} to revive booking`,
+      }
+    }
   }
 
   return { ok: true }
@@ -140,31 +138,19 @@ async function reapplyMembershipSessionsForRevivedBooking(
     return { ok: true }
   }
 
-  const membershipUser = await tx.membershipUser.findUnique({
-    where: { id: booking.membershipUserId },
-    select: { id: true, remainingSessions: true },
-  })
-
-  if (!membershipUser) {
-    return {
-      ok: false,
-      reason: 'Membership user missing; cannot re-deduct sessions',
-    }
-  }
-
-  if (membershipUser.remainingSessions < sessions) {
-    return {
-      ok: false,
-      reason: 'Insufficient membership sessions to revive booking',
-    }
-  }
-
-  await tx.membershipUser.update({
-    where: { id: membershipUser.id },
-    data: {
-      remainingSessions: membershipUser.remainingSessions - sessions,
+  const claimed = await tx.membershipUser.updateMany({
+    where: {
+      id: booking.membershipUserId,
+      remainingSessions: { gte: sessions },
     },
+    data: { remainingSessions: { decrement: sessions } },
   })
+  if (claimed.count !== 1) {
+    return {
+      ok: false,
+      reason: 'Insufficient or missing membership sessions to revive booking',
+    }
+  }
 
   return { ok: true }
 }
@@ -175,6 +161,21 @@ async function reapplyMembershipSessionsForRevivedBooking(
  * membership usage. Returns false when resources are no longer available.
  */
 async function reviveCancelledBookingAfterLatePayment(
+  tx: Tx,
+  bookingId: string,
+  now: Date,
+): Promise<{ revived: true } | { revived: false; reason: string }> {
+  // Keep the outer PAID invoice update, but undo every resource change when
+  // revival fails. Unexpected errors still abort the caller's transaction.
+  await tx.$executeRaw`SAVEPOINT revive_cancelled_booking`
+  const result = await attemptReviveCancelledBooking(tx, bookingId, now)
+  if (!result.revived)
+    await tx.$executeRaw`ROLLBACK TO SAVEPOINT revive_cancelled_booking`
+  await tx.$executeRaw`RELEASE SAVEPOINT revive_cancelled_booking`
+  return result
+}
+
+async function attemptReviveCancelledBooking(
   tx: Tx,
   bookingId: string,
   now: Date,
@@ -228,39 +229,14 @@ async function reviveCancelledBookingAfterLatePayment(
     return { revived: false, reason: 'Court slots no longer available' }
   }
   if (!(await tryClaimSlots(tx, coachSlotIds, SlotType.COACH))) {
-    // Roll back court claims from this attempt
-    if (courtSlotIds.length > 0) {
-      await tx.slot.updateMany({
-        where: { id: { in: courtSlotIds } },
-        data: { isAvailable: true },
-      })
-    }
     return { revived: false, reason: 'Coach slots no longer available' }
   }
   if (!(await tryClaimSlots(tx, ballboySlotIds, SlotType.BALLBOY))) {
-    if (courtSlotIds.length > 0) {
-      await tx.slot.updateMany({
-        where: { id: { in: courtSlotIds } },
-        data: { isAvailable: true },
-      })
-    }
-    if (coachSlotIds.length > 0) {
-      await tx.slot.updateMany({
-        where: { id: { in: coachSlotIds } },
-        data: { isAvailable: true },
-      })
-    }
     return { revived: false, reason: 'Ballboy slots no longer available' }
   }
 
   const inventoryResult = await reapplyInventoryForRevivedBooking(tx, bookingId)
   if (!inventoryResult.ok) {
-    await tx.slot.updateMany({
-      where: {
-        id: { in: [...courtSlotIds, ...coachSlotIds, ...ballboySlotIds] },
-      },
-      data: { isAvailable: true },
-    })
     return { revived: false, reason: inventoryResult.reason }
   }
 
@@ -269,12 +245,6 @@ async function reviveCancelledBookingAfterLatePayment(
     booking,
   )
   if (!membershipResult.ok) {
-    await tx.slot.updateMany({
-      where: {
-        id: { in: [...courtSlotIds, ...coachSlotIds, ...ballboySlotIds] },
-      },
-      data: { isAvailable: true },
-    })
     return { revived: false, reason: membershipResult.reason }
   }
 

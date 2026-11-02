@@ -1,5 +1,5 @@
 import { ADMIN_PROFILE_SUBDIR } from '@/config'
-import { env, isDeployedEnv } from '@/env'
+import { env } from '@/env'
 import { UnauthorizedException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -30,8 +30,10 @@ import dayjs from 'dayjs'
 import {
   clearAdminAuthCookies,
   setAdminAccessTokenCookie,
+  setAdminRefreshTokenCookie,
+  ADMIN_REFRESH_TOKEN_COOKIE,
 } from '@/lib/auth-cookies'
-import { getCookie, setCookie } from 'hono/cookie'
+import { getCookie } from 'hono/cookie'
 import status from 'http-status'
 
 export const registerAdminHandler = factory.createHandlers(
@@ -92,12 +94,7 @@ export const registerAdminHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: isDeployedEnv(),
-        sameSite: 'Lax',
-        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-      })
+      setAdminRefreshTokenCookie(c, refreshToken)
 
       setAdminAccessTokenCookie(c, token)
 
@@ -132,6 +129,7 @@ export const loginAdminHandler = factory.createHandlers(
           email: true,
           phone: true,
           password: true,
+          mustChangePassword: true,
           role: true,
           branchId: true,
           branch: {
@@ -197,12 +195,7 @@ export const loginAdminHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: isDeployedEnv(),
-        sameSite: 'Lax',
-        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-      })
+      setAdminRefreshTokenCookie(c, refreshToken)
 
       setAdminAccessTokenCookie(c, token)
 
@@ -267,6 +260,7 @@ export const getAdminProfileHandler = factory.createHandlers(async (c) => {
         },
         isActive: true,
         joinedAt: true,
+        mustChangePassword: true,
       },
     })
 
@@ -417,7 +411,7 @@ export const checkAdminAccountHandler = factory.createHandlers(async (c) => {
 
 export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
   try {
-    const refreshToken = getCookie(c, 'refreshToken')
+    const refreshToken = getCookie(c, ADMIN_REFRESH_TOKEN_COOKIE)
 
     if (!refreshToken) {
       clearAdminAuthCookies(c)
@@ -491,12 +485,7 @@ export const refreshTokenAdminHandler = factory.createHandlers(async (c) => {
       },
     })
 
-    setCookie(c, 'refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: isDeployedEnv(),
-      sameSite: 'Lax',
-      expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-    })
+    setAdminRefreshTokenCookie(c, newRefreshToken)
 
     setAdminAccessTokenCookie(c, newToken)
 
@@ -548,13 +537,21 @@ export const changePasswordAdminHandler = factory.createHandlers(
         )
       }
 
+      if (existingAdmin.mustChangePassword && newPassword.length < 12) {
+        return c.json(
+          err('Kata sandi baru harus minimal 12 karakter', status.BAD_REQUEST),
+          status.BAD_REQUEST,
+        )
+      }
+
       const hashedNewPassword = await hashPassword(newPassword)
 
-      await db.staff.update({
-        where: { id: admin.id },
-        data: {
-          password: hashedNewPassword,
-        },
+      await db.$transaction(async (tx) => {
+        await tx.staff.update({
+          where: { id: admin.id },
+          data: { password: hashedNewPassword, mustChangePassword: false },
+        })
+        await tx.authToken.deleteMany({ where: { staffId: admin.id } })
       })
 
       c.var.logger.info(`Admin password changed for admin ID: ${admin.id}`)

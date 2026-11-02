@@ -114,7 +114,8 @@ for sql in \
   /app/prisma/rolling-booking-window.sql \
   /app/prisma/recurring-bookings.sql \
   /app/prisma/membership-renewal.sql \
-  /app/prisma/coaching-admin.sql
+  /app/prisma/coaching-admin.sql \
+  /app/prisma/staff-password-reset.sql
 do
   echo "   Applying $(basename "$sql")..."
   psql "$FEATURE_PSQL_URL" -v ON_ERROR_STOP=1 -f "$sql"

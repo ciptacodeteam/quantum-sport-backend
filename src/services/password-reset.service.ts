@@ -86,7 +86,7 @@ export const verifyPasswordResetToken = async (
       return false
     }
 
-    if (resetToken.expiresAt < new Date()) {
+    if (resetToken.expiresAt <= new Date()) {
       log.warn(
         { token: token.substring(0, 10) + '...', userId },
         'Password reset token expired',
@@ -111,25 +111,7 @@ export const verifyPasswordResetToken = async (
 }
 
 /**
- * Invalidate password reset token
- */
-export const invalidatePasswordResetToken = async (
-  token: string,
-  userId: string,
-) => {
-  try {
-    await db.passwordResetToken.update({
-      where: { token },
-      data: { usedAt: new Date() },
-    })
-    log.info({ userId }, 'Password reset token invalidated')
-  } catch (error) {
-    log.error({ error }, 'Failed to invalidate password reset token')
-  }
-}
-
-/**
- * Get valid password reset token
+ * Read-only token preflight. The reset transaction must recheck and consume it.
  */
 export const getValidPasswordResetToken = async (token: string) => {
   try {
@@ -143,7 +125,7 @@ export const getValidPasswordResetToken = async (token: string) => {
     }
 
     // Check if token is expired
-    if (resetToken.expiresAt < new Date()) {
+    if (resetToken.expiresAt <= new Date()) {
       return null
     }
 

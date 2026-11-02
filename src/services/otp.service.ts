@@ -5,17 +5,20 @@ import { log } from '@/lib/logger'
 import { db } from '@/lib/prisma'
 import { verifyPhoneOtp } from '@/services/phone.service'
 import dayjs from 'dayjs'
+import { PhoneVerificationType } from '@prisma/client'
 
 export async function validateOtp(
   phone: string,
   requestId: string,
   code: string,
+  type?: PhoneVerificationType,
 ) {
   const verificationRecord = await db.phoneVerification.findFirst({
     where: {
       requestId,
       phone,
       isUsed: false,
+      ...(type ? { type } : {}),
     },
   })
 
@@ -38,7 +41,7 @@ export async function validateOtp(
     throw new BadRequestException('Kode OTP sudah digunakan')
   }
 
-  if (verificationRecord.expiresAt < dayjs().toDate()) {
+  if (verificationRecord.expiresAt <= dayjs().toDate()) {
     log.error(`Expired OTP code for phone ${phone}, requestId: ${requestId}`)
     throw new BadRequestException(
       'Kode OTP sudah kadaluarsa. Silakan kirim ulang.',

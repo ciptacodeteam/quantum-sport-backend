@@ -1,6 +1,6 @@
 import { env, isDeployedEnv } from '@/env'
 import { pinoLogger } from 'hono-pino'
-import pino from 'pino'
+import pino, { type DestinationStream } from 'pino'
 import pretty from 'pino-pretty'
 
 // In serverless environments (Vercel), we use stdout
@@ -9,16 +9,19 @@ const isVercel = process.env.VERCEL === '1'
 const isProduction = isDeployedEnv()
 
 const SENSITIVE_KEY =
-  /^(password|token|refreshToken|accessToken|authorization|cookie|x-callback-token|card_number|cvv|secret)$/i
+  /^(password|generatedPassword|currentPassword|newPassword|confirmPassword|code|otp|resetToken|token|refreshToken|userRefreshToken|adminRefreshToken|accessToken|authorization|cookie|x-callback-token|card_number|cvv|secret)$/i
 
 function redactSensitive(value: unknown, depth = 0): unknown {
-  if (depth > 6 || value == null) return value
+  if (value == null) return value
+  if (depth > 6) return '[TRUNCATED]'
   if (Array.isArray(value)) {
     return value.map((item) => redactSensitive(item, depth + 1))
   }
   if (typeof value === 'object') {
     const out: Record<string, unknown> = {}
-    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       out[key] = SENSITIVE_KEY.test(key)
         ? '[REDACTED]'
         : redactSensitive(nested, depth + 1)
@@ -28,57 +31,31 @@ function redactSensitive(value: unknown, depth = 0): unknown {
   return value
 }
 
-// Configuration for serverless (stdout) or local development
-const getPinoConfig = () => {
-  // On Vercel or production, use stdout (structured logging)
-  if (isVercel || (isProduction && process.env.AWS_LAMBDA_FUNCTION_NAME)) {
-    return {
-      level: env.logLevel || 'info',
-      formatters: {
-        level(label: string) {
-          return { level: label }
-        },
-        bindings(bindings: any) {
-          return bindings
-        },
-        log(object: any) {
-          const out: any = {}
-          if (object.req && object.req.body !== undefined) {
-            out.req = { payload: redactSensitive(object.req.body) }
-          }
-          if (object.res && object.res.body !== undefined) {
-            out.res = { data: redactSensitive(object.res.body) }
-          }
-          if (object.msg) out.msg = object.msg
-          return out
-        },
-      },
-    }
+// Redact before serialization so raw fields cannot bypass the pretty message
+// formatter or be emitted alongside its sanitized message.
+export function createLogger(destination?: DestinationStream) {
+  const options: pino.LoggerOptions = {
+    level: env.logLevel || 'info',
+    formatters: {
+      log: (object) => redactSensitive(object) as Record<string, unknown>,
+    },
   }
 
-  // Local development with pretty console output
-  return pretty({
-    ignore: 'req.headers,res.headers',
-    colorize: true,
-    translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-    levelFirst: true,
-    messageFormat: (log) => {
-      let msg = ''
-      if (log.req && typeof log.req === 'object' && 'body' in log.req) {
-        msg += `req.payload: ${JSON.stringify(redactSensitive(log.req.body))} `
-      }
-      if (log.res && typeof log.res === 'object' && 'body' in log.res) {
-        msg += `res.data: ${JSON.stringify(redactSensitive(log.res.body))} `
-      }
-      if (log.msg) msg += log.msg
-      return msg.trim()
-    },
-  })
+  if (destination) return pino(options, destination)
+  if (isVercel || (isProduction && process.env.AWS_LAMBDA_FUNCTION_NAME))
+    return pino(options)
+
+  return pino(
+    options,
+    pretty({
+      ignore: 'req.headers,res.headers',
+      colorize: true,
+      translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+      levelFirst: true,
+    }),
+  )
 }
 
-export const logger = () =>
-  pinoLogger({
-    pino: pino(getPinoConfig()),
-  })
+export const logger = () => pinoLogger({ pino: createLogger() })
 
-export const log = pino(getPinoConfig())
+export const log = createLogger()

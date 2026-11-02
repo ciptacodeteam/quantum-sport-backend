@@ -33,23 +33,34 @@ import {
   VerifyEmailChangeSchema,
   verifyPasswordSchema,
   VerifyPasswordSchema,
+  verifyOtpSchema,
 } from '@/lib/validation'
 import { requireAuth } from '@/middlewares/auth'
 import { queueSendTemplatedEmail } from '@/services/email.service'
 import { validateOtp } from '@/services/otp.service'
+import {
+  verifyPasswordResetOtp,
+  resetPasswordWithOtpToken,
+} from '@/services/password-reset-otp.service'
 import { sendPhoneOtp } from '@/services/phone.service'
 import { assertUserNotBanned } from '@/services/account-status.service'
 import { getFileUrl } from '@/services/upload.service'
 import { AppRouteHandler, UserTokenPayload } from '@/types'
 import { zValidator } from '@hono/zod-validator'
-import { AuthTokenType, PhoneVerificationType, UserSource } from '@prisma/client'
+import {
+  AuthTokenType,
+  PhoneVerificationType,
+  UserSource,
+} from '@prisma/client'
 import crypto from 'crypto'
 import dayjs from 'dayjs'
 import {
   clearUserAuthCookies,
   setUserAccessTokenCookie,
+  setUserRefreshTokenCookie,
+  USER_REFRESH_TOKEN_COOKIE,
 } from '@/lib/auth-cookies'
-import { getCookie, setCookie } from 'hono/cookie'
+import { getCookie } from 'hono/cookie'
 import status from 'http-status'
 
 export const checkAccountHandler = factory.createHandlers(
@@ -151,12 +162,7 @@ export const loginHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: isDeployedEnv(),
-        sameSite: 'Lax',
-        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-      })
+      setUserRefreshTokenCookie(c, refreshToken)
 
       setUserAccessTokenCookie(c, token)
 
@@ -264,12 +270,7 @@ export const registerHandler = factory.createHandlers(
         }
       })
 
-      setCookie(c, 'refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: isDeployedEnv(),
-        sameSite: 'Lax',
-        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-      })
+      setUserRefreshTokenCookie(c, refreshToken)
 
       setUserAccessTokenCookie(c, token)
 
@@ -325,7 +326,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
       )
     }
 
-    const refreshToken = getCookie(c, 'refreshToken')
+    const refreshToken = getCookie(c, USER_REFRESH_TOKEN_COOKIE)
 
     if (!refreshToken) {
       clearUserAuthCookies(c)
@@ -346,7 +347,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
       include: { user: true },
     })
 
-    if (!authToken || !authToken.user) {
+    if (!authToken?.user || authToken.type !== AuthTokenType.USER) {
       throw new UnauthorizedException()
     }
 
@@ -392,12 +393,7 @@ export const refreshTokenHandler = factory.createHandlers(async (c) => {
 
     clearUserAuthCookies(c)
 
-    setCookie(c, 'refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: isDeployedEnv(),
-      sameSite: 'Lax',
-      expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-    })
+    setUserRefreshTokenCookie(c, newRefreshToken)
 
     setUserAccessTokenCookie(c, newToken)
 
@@ -491,53 +487,35 @@ export const forgotPasswordHandler = factory.createHandlers(
   },
 )
 
+export const verifyResetPasswordOtpHandler = factory.createHandlers(
+  zValidator('json', verifyOtpSchema, validateHook),
+  async (c) => {
+    const { phone, requestId, code } = c.req.valid('json')
+    const result = await verifyPasswordResetOtp(
+      await formatPhone(phone),
+      requestId,
+      code,
+    )
+    c.header('Cache-Control', 'no-store')
+    return c.json(ok(result, 'OTP verified successfully'))
+  },
+)
+
 export const resetPasswordHandler = factory.createHandlers(
   zValidator('json', resetPasswordSchema, validateHook),
   async (c) => {
     try {
       const validated = c.req.valid('json') as ResetPasswordSchema
-      const { phone, requestId, newPassword } = validated
+      const { phone, requestId, resetToken, newPassword } = validated
 
       const formattedPhone = await formatPhone(phone)
 
-      const existingUser = await db.user.findUnique({
-        where: { phone: formattedPhone },
-      })
-
-      if (!existingUser) {
-        c.var.logger.error(`No user found with phone number: ${formattedPhone}`)
-        return c.json(
-          err('Phone number is incorrect', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
-
-      // Mark the OTP as used
-      await db.phoneVerification.update({
-        where: {
-          requestId: requestId,
-          phone: formattedPhone,
-        },
-        data: {
-          type: PhoneVerificationType.FORGOT_PASSWORD,
-          isUsed: true,
-        },
-      })
-
-      // Here you would typically hash the new password before saving it
-      // For demonstration purposes, we'll just log it
-      c.var.logger.info(
-        `Resetting password for ${formattedPhone} to ${newPassword}`,
+      await resetPasswordWithOtpToken(
+        formattedPhone,
+        requestId,
+        resetToken,
+        newPassword,
       )
-
-      const hashNewPassword = await hashPassword(newPassword)
-
-      await db.user.update({
-        where: { id: existingUser.id },
-        data: {
-          password: hashNewPassword,
-        },
-      })
 
       return c.json(ok(null, 'Password reset successful'))
     } catch (err) {
@@ -612,12 +590,7 @@ export const loginWithEmailHandler = factory.createHandlers(
         },
       })
 
-      setCookie(c, 'refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: isDeployedEnv(),
-        sameSite: 'Lax',
-        expires: dayjs().add(Number(env.jwt.refreshExpires), 'days').toDate(),
-      })
+      setUserRefreshTokenCookie(c, refreshToken)
 
       setUserAccessTokenCookie(c, token)
 
@@ -737,8 +710,7 @@ export const requestEmailChangeHandler = factory.createHandlers(
       }
 
       // Generate OTP code
-      const code =
-        isDeployedEnv() ? await generateOtp(6) : '888888'
+      const code = isDeployedEnv() ? await generateOtp(6) : '888888'
       const requestId = crypto.randomUUID()
       const expiresAt = dayjs().add(10, 'minutes').toDate()
 
@@ -1014,10 +986,13 @@ export const changeUserPasswordHandler = factory.createHandlers(
       // Hash new password
       const hashedPassword = await hashPassword(newPassword)
 
-      // Update password
-      await db.user.update({
-        where: { id: user.id },
-        data: { password: hashedPassword },
+      // Password changes and refresh-session revocation must commit together.
+      await db.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { password: hashedPassword },
+        })
+        await tx.authToken.deleteMany({ where: { userId: user.id } })
       })
 
       // Send confirmation email if user has email

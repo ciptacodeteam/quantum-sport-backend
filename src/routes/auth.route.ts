@@ -10,6 +10,7 @@ import {
   registerHandler,
   requestEmailChangeHandler,
   resetPasswordHandler,
+  verifyResetPasswordOtpHandler,
   verifyEmailChangeHandler,
   verifyUserPasswordHandler,
 } from '@/handlers/auth.handler'
@@ -26,6 +27,7 @@ const authRoute = createRouter()
   .post('/refresh-token', ...refreshTokenHandler)
   .post('/forgot-password', ...forgotPasswordHandler)
   .post('/reset-password', ...resetPasswordHandler)
+  .post('/verify-reset-otp', ...verifyResetPasswordOtpHandler)
   .get('/profile', getProfileHandler)
   .post('/email/request-change', ...requestEmailChangeHandler)
   .post('/email/verify-change', ...verifyEmailChangeHandler)

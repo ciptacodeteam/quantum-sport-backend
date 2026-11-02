@@ -20,6 +20,7 @@ import {
 import { deleteFile, getFileUrl, uploadFile } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
+import { randomBytes } from 'node:crypto'
 
 export const getAllStaffHandler = factory.createHandlers(
   zValidator('query', searchQuerySchema, validateHook),
@@ -335,19 +336,23 @@ export const changeStaffPasswordHandler = factory.createHandlers(
         throw new NotFoundException('Staff not found')
       }
 
-      const defaultPassword = 'password'
+      const generatedPassword = randomBytes(24).toString('base64url')
 
-      const hashedNewPassword = await hashPassword(defaultPassword)
+      const hashedNewPassword = await hashPassword(generatedPassword)
 
-      await db.staff.update({
-        where: { id: staffId },
-        data: { password: hashedNewPassword },
+      await db.$transaction(async (tx) => {
+        await tx.staff.update({
+          where: { id: staffId },
+          data: { password: hashedNewPassword, mustChangePassword: true },
+        })
+        await tx.authToken.deleteMany({ where: { staffId } })
       })
 
+      c.header('Cache-Control', 'no-store')
       return c.json(
         ok(
           {
-            generatedPassword: defaultPassword,
+            generatedPassword,
           },
           'Password changed successfully',
         ),
