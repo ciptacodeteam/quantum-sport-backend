@@ -20,7 +20,7 @@ beforeEach(() => {
   mocks.available.mockResolvedValue({ options: [] })
   mocks.replace.mockResolvedValue({ id: 'item' })
 })
-it.each(['ADMIN', 'SUPER_ADMIN', 'CASHIER'])(
+it.each(['SUPER_ADMIN'])(
   'allows %s to find and replace coaches using the authenticated actor',
   async (role) => {
     const a = app(role)
@@ -47,7 +47,7 @@ it.each(['ADMIN', 'SUPER_ADMIN', 'CASHIER'])(
     )
   },
 )
-it.each([undefined, 'ADMIN_VIEWER', 'COACH'])(
+it.each([undefined, 'ADMIN', 'CASHIER', 'ADMIN_VIEWER', 'COACH', 'BALLBOY'])(
   'prevents unauthorized role %s from reading choices or changing assignments',
   async (role) => {
     const a = app(role)
@@ -68,7 +68,7 @@ it.each([
   { slotId: 'next', expectedSlotId: 'old', price: 1 },
   { slotId: 'next', expectedSlotId: 'old', reason: 'a'.repeat(501) },
 ])('rejects an invalid reassignment payload %j', async (body) => {
-  const response = await app('ADMIN').request(
+  const response = await app('SUPER_ADMIN').request(
     '/admin/coaching/bookings/item/replace-coach',
     {
       method: 'POST',

@@ -17,6 +17,7 @@ import {
 
 const read = requireAnyAdminRole(['ADMIN', 'CASHIER', 'ADMIN_VIEWER'])
 const write = requireAnyAdminRole(['ADMIN', 'CASHIER'])
+const replaceCoach = requireAnyAdminRole(['SUPER_ADMIN'])
 export default createRouter()
   .basePath('/coaching')
   .get('/', read, ...listCoachingHandler)
@@ -24,10 +25,14 @@ export default createRouter()
   .get('/bookings', read, ...listCoachingBookingsHandler)
   .get(
     '/bookings/:id/replacements',
-    write,
+    replaceCoach,
     ...availableCoachReplacementsHandler,
   )
-  .post('/bookings/:id/replace-coach', write, ...replaceBookedCoachHandler)
+  .post(
+    '/bookings/:id/replace-coach',
+    replaceCoach,
+    ...replaceBookedCoachHandler,
+  )
   .get('/booking-details/:id/availability', read, ...availableCoachingHandler)
   .post('/booking-details/:id/services', write, ...attachCoachingHandler)
   .patch('/slots/:id', requireAdmin, ...toggleCoachingSlotHandler)
