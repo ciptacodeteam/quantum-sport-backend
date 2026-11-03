@@ -68,6 +68,10 @@ it.each([
   { slotIds: ['coach'], manualPayment: { method: 'QRIS_STATIC' } },
   {
     slotIds: ['coach'],
+    manualPayment: { method: 'BANK_TRANSFER_MANUAL', received: false },
+  },
+  {
+    slotIds: ['coach'],
     paymentMethodId: 'va',
     manualPayment: { method: 'EDC', received: true },
   },
@@ -84,14 +88,17 @@ it.each([
     expect(res.status).toBe(422)
   },
 )
-it('accepts a combined service selection with an explicitly received static QRIS payment', async () => {
-  const res = await validationApp.request('/detail', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      slotIds: ['coach', 'ballboy'],
-      manualPayment: { method: 'QRIS_STATIC', received: true },
-    }),
-  })
-  expect(res.status).toBe(200)
-})
+it.each(['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'])(
+  'accepts a combined service selection with an explicitly received %s payment',
+  async (method) => {
+    const res = await validationApp.request('/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slotIds: ['coach', 'ballboy'],
+        manualPayment: { method, received: true },
+      }),
+    })
+    expect(res.status).toBe(200)
+  },
+)

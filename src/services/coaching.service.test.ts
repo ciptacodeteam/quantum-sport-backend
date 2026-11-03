@@ -20,6 +20,8 @@ vi.mock('./payment-reconcile.service', () => ({
   finalizeSuccessfulPayment: vi.fn(),
 }))
 import { attachCoachingService } from './coaching.service'
+import { withBranchContext, branchContext } from '@/lib/branch-context'
+import { scopeBranchOperation } from '@/lib/branch-scope'
 const now = new Date('2026-11-01T05:00:00Z')
 const startAt = new Date('2026-11-02T13:00:00Z')
 const endAt = new Date('2026-11-02T14:00:00Z')
@@ -56,18 +58,16 @@ beforeEach(() => {
   mocks.tx = {
     $queryRaw: vi.fn(),
     bookingDetail: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          slotId: 'court-slot',
-          bookingId: 'court-booking',
-          slot: { startAt, endAt, court: { name: 'Tennis', sport: 'TENNIS' } },
-          booking: {
-            status: 'CONFIRMED',
-            branchId: 'cemara',
-            userId: 'customer',
-          },
-        }),
+      findFirst: vi.fn().mockResolvedValue({
+        slotId: 'court-slot',
+        bookingId: 'court-booking',
+        slot: { startAt, endAt, court: { name: 'Tennis', sport: 'TENNIS' } },
+        booking: {
+          status: 'CONFIRMED',
+          branchId: 'cemara',
+          userId: 'customer',
+        },
+      }),
     },
     slot: {
       findMany: vi
@@ -89,16 +89,37 @@ beforeEach(() => {
     },
     bookingCoachType: { findFirst: vi.fn().mockResolvedValue({ id: 'type' }) },
     paymentMethod: {
-      upsert: vi.fn().mockResolvedValue({ id: 'manual', isActive: true }),
-      findFirst: vi
+      upsert: vi
         .fn()
-        .mockResolvedValue({
-          id: 'va',
-          isActive: true,
-          channel: 'BCA_VIRTUAL_ACCOUNT',
-          fees: 4000,
-          percentage: 1,
-        }),
+        .mockRejectedValue(
+          new Error('Hanya super admin yang dapat mengubah katalog bersama.'),
+        ),
+      findFirst: vi.fn().mockImplementation(async (args) => {
+        const context = branchContext.getStore()
+        if (context)
+          await scopeBranchOperation(
+            {},
+            'PaymentMethod',
+            'findFirst',
+            args,
+            context,
+          )
+        return args.where.channel
+          ? {
+              id: 'manual',
+              isActive: true,
+              channel: args.where.channel,
+              fees: 0,
+              percentage: 0,
+            }
+          : {
+              id: 'va',
+              isActive: true,
+              channel: 'BCA_VIRTUAL_ACCOUNT',
+              fees: 4000,
+              percentage: 1,
+            }
+      }),
     },
     invoice: {
       create: vi
@@ -117,17 +138,30 @@ beforeEach(() => {
     meta: {},
   })
 })
-it.each(['EDC', 'QRIS_STATIC'] as const)(
-  'records both services in one paid %s invoice without gateway fees',
-  async (method) => {
-    const result = await attachCoachingService(
-      'detail',
-      ['coach', 'ballboy'],
-      'admin',
-      undefined,
-      now,
-      { method, received: true },
+it.each(
+  (['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'] as const).flatMap((method) =>
+    ['ADMIN', 'CASHIER'].map((role) => ({ method, role })),
+  ),
+)(
+  'records a paid $method invoice for $role without shared catalog writes',
+  async ({ method, role }) => {
+    const result = await withBranchContext(
+      { branchId: 'cemara', isAdmin: true, isSuperAdmin: false, staffId: role },
+      () =>
+        attachCoachingService(
+          'detail',
+          ['coach', 'ballboy'],
+          'admin',
+          undefined,
+          now,
+          { method, received: true },
+        ),
     )
+    expect(mocks.tx.paymentMethod.findFirst).toHaveBeenCalledWith({
+      where: { channel: method, isActive: true },
+      orderBy: { sequence: 'asc' },
+    })
+    expect(mocks.tx.paymentMethod.upsert).not.toHaveBeenCalled()
     expect(result).toMatchObject({ total: 195000, status: 'PAID' })
     expect(mocks.tx.booking.create).toHaveBeenCalledOnce()
     expect(mocks.tx.booking.create.mock.calls[0][0].data).toMatchObject({
@@ -215,4 +249,33 @@ it('preserves the legacy single-slot caller', async () => {
   expect(
     await attachCoachingService('detail', 'coach', 'admin', 'va', now),
   ).toMatchObject({ total: 156105, status: 'PENDING' })
+})
+
+it('keeps the shared catalog protected for non-super admins', async () => {
+  await withBranchContext(
+    { branchId: 'cemara', isAdmin: true, isSuperAdmin: false },
+    async () => {
+      await expect(
+        scopeBranchOperation(
+          {},
+          'PaymentMethod',
+          'upsert',
+          { where: { name: 'EDC' }, create: {}, update: {} },
+          branchContext.getStore()!,
+        ),
+      ).rejects.toThrow('Hanya super admin')
+    },
+  )
+})
+it('fails clearly without creating billing records when a manual method is missing or disabled', async () => {
+  mocks.tx.paymentMethod.findFirst.mockResolvedValueOnce(null)
+  await expect(
+    attachCoachingService('detail', ['coach'], 'admin', undefined, now, {
+      method: 'BANK_TRANSFER_MANUAL',
+      received: true,
+    }),
+  ).rejects.toThrow('Hubungi Super Admin')
+  expect(mocks.tx.paymentMethod.upsert).not.toHaveBeenCalled()
+  expect(mocks.tx.booking.create).not.toHaveBeenCalled()
+  expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
 })

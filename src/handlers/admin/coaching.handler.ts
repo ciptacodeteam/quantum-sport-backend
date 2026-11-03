@@ -255,7 +255,7 @@ export const attachCoachingHandler = factory.createHandlers(
         slotIds: z.array(z.string().min(1)).min(1).max(2).optional(),
         manualPayment: z
           .object({
-            method: z.enum(['EDC', 'QRIS_STATIC']),
+            method: z.enum(['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL']),
             received: z.literal(true),
           })
           .strict()

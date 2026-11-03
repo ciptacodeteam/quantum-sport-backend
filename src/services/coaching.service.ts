@@ -274,7 +274,10 @@ export async function attachCoachingService(
   cashierId: string,
   paymentMethodId?: string,
   now = new Date(),
-  manualPayment?: { method: 'EDC' | 'QRIS_STATIC'; received: boolean },
+  manualPayment?: {
+    method: 'EDC' | 'QRIS_STATIC' | 'BANK_TRANSFER_MANUAL'
+    received: boolean
+  },
 ) {
   const slotIds = Array.isArray(slotId) ? slotId : [slotId]
   if (
@@ -285,7 +288,7 @@ export async function attachCoachingService(
     throw new BadRequestException('Pilih maksimal satu coach dan satu ballboy.')
   if (manualPayment && (!manualPayment.received || paymentMethodId))
     throw new BadRequestException(
-      'Konfirmasi pembayaran EDC/QRIS Statis telah diterima.',
+      'Konfirmasi pembayaran EDC/QRIS Statis/Transfer telah diterima.',
     )
   const number = await generateInvoiceNumber()
   return db.$transaction(async (tx) => {
@@ -383,17 +386,9 @@ export async function attachCoachingService(
     const paid = price === 0 || !!manualPayment
     const method =
       manualPayment && price > 0
-        ? await tx.paymentMethod.upsert({
-            where: {
-              name: manualPayment.method === 'EDC' ? 'EDC' : 'QRIS Statis',
-            },
-            create: {
-              name: manualPayment.method === 'EDC' ? 'EDC' : 'QRIS Statis',
-              channel: manualPayment.method,
-              fees: 0,
-              percentage: 0,
-            },
-            update: {},
+        ? await tx.paymentMethod.findFirst({
+            where: { channel: manualPayment.method, isActive: true },
+            orderBy: { sequence: 'asc' },
           })
         : paid
           ? null
@@ -404,6 +399,10 @@ export async function attachCoachingService(
               },
               orderBy: { sequence: 'asc' },
             })
+    if (manualPayment && price > 0 && !method)
+      throw new BadRequestException(
+        'Metode pembayaran manual belum tersedia atau nonaktif. Hubungi Super Admin untuk mengaktifkan EDC, QRIS Statis, atau Transfer.',
+      )
     if (method && !method.isActive)
       throw new BadRequestException('Metode pembayaran tidak aktif.')
     if (!paid && (!method?.channel || !isSupportedChannel(method.channel)))

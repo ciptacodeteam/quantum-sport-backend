@@ -143,6 +143,14 @@ run('admin coaching transactional integration', () => {
         percentage: 1,
       },
     })
+    for (const channel of ['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'])
+      await raw.paymentMethod.create({
+        data: {
+          id: `${prefix}-${channel}`,
+          name: `${prefix}-${channel}`,
+          channel,
+        },
+      })
     gateway.mockImplementation(async (input) => ({
       mode: 'snap',
       orderId: input.orderId,
@@ -179,7 +187,18 @@ run('admin coaching transactional integration', () => {
     await raw.staff.deleteMany({ where: { branchId: branch } })
     await raw.user.deleteMany({ where: { id: user } })
     await raw.branch.deleteMany({ where: { id: branch } })
-    await raw.paymentMethod.deleteMany({ where: { id: `${prefix}-method` } })
+    await raw.paymentMethod.deleteMany({
+      where: {
+        id: {
+          in: [
+            `${prefix}-method`,
+            ...['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'].map(
+              (channel) => `${prefix}-${channel}`,
+            ),
+          ],
+        },
+      },
+    })
     await raw.$disconnect()
   })
   it('exposes profiles only to admin and prevents cashier catalog writes', async () => {
