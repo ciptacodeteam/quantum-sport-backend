@@ -1,6 +1,6 @@
 # Grup Coaching (admin)
 
-Grup adalah brand bersama lintas cabang. Super Admin mengelola nama, logo (URL), deskripsi, olahraga, cabang layanan dan status melalui **Master Data → Grup Coaching**. Admin dapat membaca grup dan mengatur keanggotaan coach di cabangnya melalui **Master Data → Coaching → Edit profil**. Coach dapat mempunyai beberapa grup; tanpa keanggotaan, coach diperlakukan sebagai Coach Independen. Ballboy tidak masuk grup.
+Grup adalah brand bersama lintas cabang. Super Admin mengelola nama, logo (unggah JPG/PNG/WebP maksimal 5 MB), deskripsi, olahraga, cabang layanan dan status melalui **Master Data → Grup Coaching**. Admin dapat membaca grup dan mengatur keanggotaan coach di cabangnya melalui **Master Data → Coaching → Edit profil**. Coach dapat mempunyai beberapa grup; tanpa keanggotaan, coach diperlakukan sebagai Coach Independen. Ballboy tidak masuk grup.
 
 Di Schedule, buka booking terkonfirmasi lalu **Tambah Coach → Grup coaching → Coach**. Pilihan mengikuti cabang, olahraga, satu jam di dalam booking lapangan, dan ketersediaan coach. Ballboy dapat dipilih bersamaan untuk Tennis. Harga, pembayaran, penahanan slot dan batas waktu booking tetap mengikuti aturan layanan yang ada. Grup tidak tampil sebagai pilihan pada alur booking pelanggan.
 

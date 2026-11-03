@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import type { Context } from 'hono'
+import type { AppEnv } from '@/types'
+import { BadRequestException } from '@/exceptions'
 import { zValidator } from '@hono/zod-validator'
 import { validateHook } from '@/helpers/validate-hook'
 import { createRouter } from '@/lib/create-app'
@@ -7,8 +10,29 @@ import { ok } from '@/lib/response'
 import { requireAnyAdminRole } from '@/middlewares/auth'
 import {
   coachingGroupSchema,
+  coachingGroupUploadSchema,
+  saveCoachingGroupUpload,
   saveCoachingGroup,
 } from '@/services/coaching-group.service'
+async function saveGroupRequest(c: Context<AppEnv>, id?: string) {
+  const status = id ? 200 : 201
+  if (c.req.header('Content-Type')?.includes('multipart/form-data')) {
+    const parsed = coachingGroupUploadSchema.safeParse(await c.req.parseBody())
+    if (!parsed.success)
+      return validateHook({ ...parsed, data: undefined, target: 'form' }, c)!
+    return c.json(ok(await saveCoachingGroupUpload(id, parsed.data)), status)
+  }
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    throw new BadRequestException('Data grup tidak valid.')
+  }
+  const parsed = coachingGroupSchema.safeParse(body)
+  if (!parsed.success)
+    return validateHook({ ...parsed, data: undefined, target: 'json' }, c)!
+  return c.json(ok(await saveCoachingGroup(id, parsed.data)), status)
+}
 const read = requireAnyAdminRole(['ADMIN', 'CASHIER', 'ADMIN_VIEWER'])
 const write = requireAnyAdminRole(['SUPER_ADMIN'])
 export default createRouter()
@@ -39,19 +63,5 @@ export default createRouter()
       return c.json(ok(items))
     },
   )
-  .post(
-    '/',
-    write,
-    zValidator('json', coachingGroupSchema, validateHook),
-    async (c) =>
-      c.json(ok(await saveCoachingGroup(undefined, c.req.valid('json'))), 201),
-  )
-  .put(
-    '/:id',
-    write,
-    zValidator('json', coachingGroupSchema, validateHook),
-    async (c) =>
-      c.json(
-        ok(await saveCoachingGroup(c.req.param('id'), c.req.valid('json'))),
-      ),
-  )
+  .post('/', write, (c) => saveGroupRequest(c))
+  .put('/:id', write, (c) => saveGroupRequest(c, c.req.param('id')))

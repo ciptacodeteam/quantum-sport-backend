@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { Prisma, CourtSport } from '@prisma/client'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { db } from '@/lib/prisma'
+import { uploadFile, deleteFile } from './upload.service'
 
 export const coachingGroupSchema = z
   .object({
@@ -21,6 +22,52 @@ export const coachingGroupSchema = z
     isActive: z.boolean(),
   })
   .strict()
+
+export const coachingGroupUploadSchema = z
+  .object({
+    data: z
+      .string()
+      .transform((value, ctx) => {
+        try {
+          return JSON.parse(value)
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'Data grup tidak valid.' })
+          return z.NEVER
+        }
+      })
+      .pipe(coachingGroupSchema),
+    logo: z
+      .file()
+      .min(1)
+      .max(5 * 1024 * 1024)
+      .mime(['image/jpeg', 'image/png', 'image/webp'])
+      .optional(),
+    removeLogo: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+  })
+  .strict()
+  .refine((v) => !(v.logo && v.removeLogo), 'Pilih unggah atau hapus logo.')
+
+export async function saveCoachingGroupUpload(
+  id: string | undefined,
+  input: z.infer<typeof coachingGroupUploadSchema>,
+) {
+  let uploaded: Awaited<ReturnType<typeof uploadFile>> | undefined
+  try {
+    if (input.logo)
+      uploaded = await uploadFile(input.logo, { subdir: 'coaching-groups' })
+    return await saveCoachingGroup(id, input.data, {
+      uploadedLogo: uploaded?.absolutePath,
+      removeLogo: input.removeLogo,
+    })
+  } catch (error) {
+    // Only remove the new asset owned by this failed request. Existing URLs may be shared.
+    if (uploaded) await deleteFile(uploaded.absolutePath).catch(() => false)
+    throw error
+  }
+}
 
 export const coachingGroupMembershipSelect = {
   group: {
@@ -117,13 +164,17 @@ export async function resolveBookingCoachingGroup(
 export async function saveCoachingGroup(
   id: string | undefined,
   input: z.infer<typeof coachingGroupSchema>,
+  logoChange?: { uploadedLogo?: string; removeLogo: boolean },
 ) {
   return db
     .$transaction(async (tx) => {
+      let previousLogo: string | null = null
       if (id) {
         await tx.$queryRaw`SELECT id FROM coaching_groups WHERE id = ${id} FOR UPDATE`
-        if (!(await tx.coachingGroup.findUnique({ where: { id } })))
+        const existing = await tx.coachingGroup.findUnique({ where: { id } })
+        if (!existing)
           throw new NotFoundException('Grup coaching tidak ditemukan.')
+        previousLogo = existing.logo
       }
       if (
         (await tx.branch.count({
@@ -134,7 +185,11 @@ export async function saveCoachingGroup(
       const { branchIds, logo, description, ...fields } = input
       const data = {
         ...fields,
-        logo: logo || null,
+        logo: logoChange
+          ? logoChange.removeLogo
+            ? null
+            : (logoChange.uploadedLogo ?? previousLogo)
+          : logo || null,
         description: description || null,
         branches: {
           ...(id ? { deleteMany: {} } : {}),

@@ -1,12 +1,17 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
-const mocks = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  save: vi.fn(),
+  upload: vi.fn(),
+}))
 vi.mock('@/lib/prisma', () => ({
   db: { coachingGroup: { findMany: mocks.list } },
 }))
 vi.mock('@/services/coaching-group.service', async (original) => ({
   ...(await original<typeof import('@/services/coaching-group.service')>()),
   saveCoachingGroup: mocks.save,
+  saveCoachingGroupUpload: mocks.upload,
 }))
 import route from './coaching-group.route'
 const app = (role?: string) => {
@@ -35,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.list.mockResolvedValue([])
   mocks.save.mockResolvedValue({ id: 'northwest' })
+  mocks.upload.mockResolvedValue({ id: 'northwest' })
 })
 it('lets a super admin create a shared group and limits list results to the requested branch', async () => {
   expect(
@@ -75,4 +81,66 @@ it.each([
     ).status,
   ).toBe(422)
   expect(mocks.save).not.toHaveBeenCalled()
+})
+
+const form = (file?: File) => {
+  const body = new FormData()
+  body.append('data', JSON.stringify(input))
+  if (file) body.append('logo', file)
+  return body
+}
+it('accepts a local logo file with multipart group data', async () => {
+  const file = new File(['image'], 'logo.png', { type: 'image/png' })
+  const response = await app('SUPER_ADMIN').request('/admin/coaching-groups', {
+    method: 'POST',
+    body: form(file),
+  })
+  expect(response.status).toBe(201)
+  const uploaded = mocks.upload.mock.calls[0][1]
+  expect(uploaded.data).toEqual(input)
+  expect(uploaded.logo.name).toBe('logo.png')
+  expect(uploaded.removeLogo).toBe(false)
+})
+it.each([
+  new File(['svg'], 'logo.svg', { type: 'image/svg+xml' }),
+  new File([], 'empty.png', { type: 'image/png' }),
+  new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.png', {
+    type: 'image/png',
+  }),
+])(
+  'rejects an unsupported, empty or oversized logo before uploading',
+  async (file) => {
+    expect(
+      (
+        await app('SUPER_ADMIN').request('/admin/coaching-groups', {
+          method: 'POST',
+          body: form(file),
+        })
+      ).status,
+    ).toBe(422)
+    expect(mocks.upload).not.toHaveBeenCalled()
+  },
+)
+it('rejects malformed multipart settings and simultaneous upload/removal', async () => {
+  const invalid = new FormData()
+  invalid.append('data', '{broken')
+  expect(
+    (
+      await app('SUPER_ADMIN').request('/admin/coaching-groups', {
+        method: 'POST',
+        body: invalid,
+      })
+    ).status,
+  ).toBe(422)
+  const conflict = form(new File(['image'], 'logo.png', { type: 'image/png' }))
+  conflict.append('removeLogo', 'true')
+  expect(
+    (
+      await app('SUPER_ADMIN').request('/admin/coaching-groups', {
+        method: 'POST',
+        body: conflict,
+      })
+    ).status,
+  ).toBe(422)
+  expect(mocks.upload).not.toHaveBeenCalled()
 })
