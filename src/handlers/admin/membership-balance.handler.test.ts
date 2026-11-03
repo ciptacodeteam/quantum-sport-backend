@@ -64,3 +64,33 @@ it('exports exactly the shared debt scope rather than the normal sales list', as
   })
   expect(mocks.contexts).toEqual([undefined])
 })
+
+it.each(['nonnegative', 'negative'])(
+  'applies full WIB purchase days consistently to the %s balance list and Excel export',
+  async (balance) => {
+    const params = `balance=${balance}&sport=TENNIS&dateFrom=2026-11-03&dateTo=2026-11-03`
+    for (const path of ['/', '/export']) {
+      mocks.find.mockClear()
+      expect((await app.request(`${path}?${params}`)).status).toBe(200)
+      const where = mocks.find.mock.calls[0][0].where
+      expect(where.AND[0]).toMatchObject({
+        membership: { sport: 'TENNIS' },
+        createdAt: {
+          gte: new Date('2026-11-02T17:00:00Z'),
+          lt: new Date('2026-11-03T17:00:00Z'),
+        },
+      })
+      expect(where.AND[1]).toEqual({
+        remainingSessions: balance === 'negative' ? { lt: 0 } : { gte: 0 },
+      })
+    }
+  },
+)
+it('rejects an inverted purchase range before querying either report', async () => {
+  for (const path of ['/', '/export'])
+    expect(
+      (await app.request(`${path}?dateFrom=2026-11-04&dateTo=2026-11-03`))
+        .status,
+    ).toBe(422)
+  expect(mocks.find).not.toHaveBeenCalled()
+})

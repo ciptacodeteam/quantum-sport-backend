@@ -1,3 +1,9 @@
+import {
+  bookingDateRangeFields,
+  validBookingDateRange,
+  bookingDateRangeError,
+  playingDateRange,
+} from '@/lib/booking-date-filter'
 import { previewCoachCancellation } from '@/services/coach-cancellation.service'
 import { randomUUID } from 'node:crypto'
 import {
@@ -291,7 +297,9 @@ export const attachCoachingHandler = factory.createHandlers(
 export const listCoachingBookingsHandler = factory.createHandlers(
   zValidator(
     'query',
-    z.object({ kind: z.enum(['COACH', 'BALLBOY']) }),
+    z
+      .object({ kind: z.enum(['COACH', 'BALLBOY']), ...bookingDateRangeFields })
+      .refine(validBookingDateRange, bookingDateRangeError),
     validateHook,
   ),
   async (c) => {
@@ -315,16 +323,21 @@ export const listCoachingBookingsHandler = factory.createHandlers(
         },
       },
     }
-    const kind = c.req.valid('query').kind
+    const query = c.req.valid('query')
+    const kind = query.kind
+    const range = playingDateRange(query)
+    const where = range ? { slot: { startAt: range } } : {}
     const items =
       kind === 'COACH'
         ? await db.bookingCoach.findMany({
             include,
+            where,
             orderBy: { createdAt: 'desc' },
             take: 500,
           })
         : await db.bookingBallboy.findMany({
             include,
+            where,
             orderBy: { createdAt: 'desc' },
             take: 500,
           })

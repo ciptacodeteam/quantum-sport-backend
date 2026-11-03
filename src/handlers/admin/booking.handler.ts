@@ -1,4 +1,10 @@
 import {
+  bookingDateRangeFields,
+  validBookingDateRange,
+  bookingDateRangeError,
+  courtPlayingDateWhere,
+} from '@/lib/booking-date-filter'
+import {
   bookingCheckoutTypes,
   bookingCheckoutWhere,
 } from '@/lib/booking-checkout'
@@ -16,7 +22,6 @@ import {
   SearchQuerySchema,
   searchQuerySchema,
 } from '@/lib/validation'
-import { getFileUrl } from '@/services/upload.service'
 import { zValidator } from '@hono/zod-validator'
 import {
   BookingStatus,
@@ -99,21 +104,24 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
 
 // GET /admin/bookings
 // Get all booking transactions
-const bookingsQuerySchema = searchQuerySchema.extend({
-  checkoutType: z.enum(bookingCheckoutTypes).optional(),
-  source: z
-    .enum(['cashier', 'online'])
-    .optional()
-    .describe('Filter by booking source: cashier or online'),
-  courtSport: z
-    .nativeEnum(CourtSport)
-    .optional()
-    .describe('Filter by court sport: PADEL or TENNIS'),
-  coach: z
-    .enum(['with', 'without'])
-    .optional()
-    .describe('Filter bookings that include or do not include coach add-ons'),
-})
+const bookingsQuerySchema = searchQuerySchema
+  .extend({
+    ...bookingDateRangeFields,
+    checkoutType: z.enum(bookingCheckoutTypes).optional(),
+    source: z
+      .enum(['cashier', 'online'])
+      .optional()
+      .describe('Filter by booking source: cashier or online'),
+    courtSport: z
+      .nativeEnum(CourtSport)
+      .optional()
+      .describe('Filter by court sport: PADEL or TENNIS'),
+    coach: z
+      .enum(['with', 'without'])
+      .optional()
+      .describe('Filter bookings that include or do not include coach add-ons'),
+  })
+  .refine(validBookingDateRange, bookingDateRangeError)
 
 const scheduleQuerySchema = searchQuerySchema.extend({
   date: z.iso.date().optional(),
@@ -174,6 +182,9 @@ export const getAllBookingTransactionsHandler = factory.createHandlers(
       if (query.checkoutType) {
         where = { AND: [where, bookingCheckoutWhere(query.checkoutType)] }
       }
+
+      if (query.dateFrom || query.dateTo)
+        where = { AND: [where, courtPlayingDateWhere(query, query.courtSport)] }
 
       const bookings = await db.booking.findMany({
         ...queryOptions,
@@ -1264,14 +1275,17 @@ export const exportBookingTransactionsToExcelHandler = factory.createHandlers(
 
 // GET /admin/bookings/export
 // Export booking transactions to Excel using date range with enriched columns
-const bookingsExportQuerySchema = z.object({
-  checkoutType: z.enum(bookingCheckoutTypes).optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  source: z.enum(['cashier', 'online']).optional(),
-  courtSport: z.nativeEnum(CourtSport).optional(),
-  coach: z.enum(['with', 'without']).optional(),
-})
+const bookingsExportQuerySchema = z
+  .object({
+    ...bookingDateRangeFields,
+    checkoutType: z.enum(bookingCheckoutTypes).optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    source: z.enum(['cashier', 'online']).optional(),
+    courtSport: z.nativeEnum(CourtSport).optional(),
+    coach: z.enum(['with', 'without']).optional(),
+  })
+  .refine(validBookingDateRange, bookingDateRangeError)
 
 export const exportBookingsHandler = factory.createHandlers(
   zValidator('query', bookingsExportQuerySchema, validateHook),
@@ -1293,6 +1307,7 @@ export const exportBookingsHandler = factory.createHandlers(
         query.courtSport,
         query.coach,
         query.checkoutType,
+        { dateFrom: query.dateFrom, dateTo: query.dateTo },
       )
       const filename = `bookings-export-${dayjs().format('YYYY-MM-DD')}.xlsx`
 

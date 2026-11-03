@@ -94,3 +94,41 @@ it('keeps schedule requests without a date compatible', async () => {
   expect(where.AND).toBeUndefined()
   expect(JSON.stringify(where.OR)).toContain('PADEL')
 })
+
+it.each(['PADEL', 'TENNIS'])(
+  'filters %s playing dates identically in table and export without losing checkout or source filters',
+  async (courtSport) => {
+    const query = {
+      courtSport,
+      checkoutType: 'membership',
+      source: 'cashier',
+      dateFrom: '2026-11-03',
+      dateTo: '2026-11-04',
+    }
+    await (getAllBookingTransactionsHandler[1] as any)(context(query))
+    const listing = mocks.findMany.mock.calls[0][0].where
+    const dateFilter = {
+      details: {
+        some: {
+          court: { sport: courtSport },
+          slot: {
+            startAt: {
+              gte: new Date('2026-11-03T00:00:00Z'),
+              lt: new Date('2026-11-05T00:00:00Z'),
+            },
+          },
+        },
+      },
+    }
+    expect(listing.AND[1]).toEqual(dateFilter)
+    expect(listing.AND[0].AND[0].cashierId).toEqual({ not: null })
+    expect(listing.AND[0].AND[1]).toEqual(bookingCheckoutWhere('membership'))
+    expect(listing.createdAt).toBeUndefined()
+    mocks.findMany.mockClear()
+    await (exportBookingsHandler[1] as any)(context(query))
+    const exported = mocks.findMany.mock.calls[0][0].where
+    expect(exported.AND).toContainEqual(dateFilter)
+    expect(exported.AND).toContainEqual(bookingCheckoutWhere('membership'))
+    expect(exported.cashierId).toEqual({ not: null })
+  },
+)

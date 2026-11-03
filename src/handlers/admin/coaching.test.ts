@@ -1,10 +1,17 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ occupied: vi.fn(), update: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  occupied: vi.fn(),
+  update: vi.fn(),
+  coaches: vi.fn(),
+  ballboys: vi.fn(),
+}))
 vi.mock('@/lib/create-app', () => ({
   factory: { createHandlers: (...handlers: unknown[]) => handlers },
 }))
 vi.mock('@/lib/prisma', () => ({
   db: {
+    bookingCoach: { findMany: mocks.coaches },
+    bookingBallboy: { findMany: mocks.ballboys },
     $transaction: (fn: any) =>
       fn({
         slot: {
@@ -25,6 +32,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 import { Hono } from 'hono'
 import {
+  listCoachingBookingsHandler,
   attachCoachingHandler,
   toggleCoachingSlotHandler,
 } from './coaching.handler'
@@ -37,6 +45,8 @@ const request = (body: Record<string, unknown>) =>
   })
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.coaches.mockResolvedValue([])
+  mocks.ballboys.mockResolvedValue([])
   mocks.occupied.mockResolvedValue(0)
   mocks.update.mockResolvedValue({
     id: 'slot',
@@ -102,3 +112,38 @@ it.each(['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'])(
     expect(res.status).toBe(200)
   },
 )
+
+it.each(['COACH', 'BALLBOY'])(
+  'limits %s rows by playing date before the 500-row cap',
+  async (kind) => {
+    await (listCoachingBookingsHandler.at(-1) as any)({
+      req: {
+        valid: () => ({ kind, dateFrom: '2026-11-03', dateTo: '2026-11-03' }),
+      },
+      json: (value: unknown) => value,
+    })
+    const query = (kind === 'COACH' ? mocks.coaches : mocks.ballboys).mock
+      .calls[0][0]
+    expect(query.where).toEqual({
+      slot: {
+        startAt: {
+          gte: new Date('2026-11-03T00:00:00Z'),
+          lt: new Date('2026-11-04T00:00:00Z'),
+        },
+      },
+    })
+    expect(query.take).toBe(500)
+  },
+)
+it('rejects invalid coach/ballboy date ranges before querying bookings', async () => {
+  const a = new Hono().get(
+    '/',
+    listCoachingBookingsHandler[0] as any,
+    listCoachingBookingsHandler.at(-1) as any,
+  )
+  expect(
+    (await a.request('/?kind=COACH&dateFrom=2026-11-05&dateTo=2026-11-03'))
+      .status,
+  ).toBe(422)
+  expect(mocks.coaches).not.toHaveBeenCalled()
+})

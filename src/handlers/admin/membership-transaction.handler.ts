@@ -1,3 +1,10 @@
+import {
+  bookingDateRangeFields,
+  validBookingDateRange,
+  bookingDateRangeError,
+  purchaseDateWhere,
+  type BookingDateRange,
+} from '@/lib/booking-date-filter'
 import { withCustomerWallet } from '@/services/membership-renewal.service'
 import { activateMembershipAfterPayment } from '@/services/membership-activation.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -25,15 +32,18 @@ import {
 
 // GET /admin/membership-transactions
 // Get all membership transactions
-const membershipTransactionsQuerySchema = searchQuerySchema.extend({
-  source: z
-    .enum(['cashier', 'online'])
-    .optional()
-    .describe('Filter by transaction source: cashier or online'),
-  sport: z.nativeEnum(CourtSport).optional(),
-  status: z.enum(membershipTransactionStatuses).optional(),
-  balance: z.enum(['nonnegative', 'negative']).default('nonnegative'),
-})
+const membershipTransactionsQuerySchema = searchQuerySchema
+  .extend({
+    ...bookingDateRangeFields,
+    source: z
+      .enum(['cashier', 'online'])
+      .optional()
+      .describe('Filter by transaction source: cashier or online'),
+    sport: z.nativeEnum(CourtSport).optional(),
+    status: z.enum(membershipTransactionStatuses).optional(),
+    balance: z.enum(['nonnegative', 'negative']).default('nonnegative'),
+  })
+  .refine(validBookingDateRange, bookingDateRangeError)
 
 export const getAllMembershipTransactionsHandler = factory.createHandlers(
   zValidator('query', membershipTransactionsQuerySchema, validateHook),
@@ -48,6 +58,7 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
       // Add source filter if provided
       let where = {
         ...queryOptions.where,
+        ...purchaseDateWhere(query),
         ...membershipTransactionStatusWhere(query.status),
       }
       if (query.source) {
@@ -456,17 +467,19 @@ export const exportMembershipTransactionsToExcelHandler =
     zValidator('query', membershipTransactionsQuerySchema, validateHook),
     async (c) => {
       try {
-        const query = c.req.valid('query') as SearchQuerySchema & {
-          sport?: CourtSport
-          status?: string
-          balance?: 'negative' | 'nonnegative'
-        }
+        const query = c.req.valid('query') as SearchQuerySchema &
+          BookingDateRange & {
+            sport?: CourtSport
+            status?: string
+            balance?: 'negative' | 'nonnegative'
+          }
         const queryOptions = buildFindManyOptions(query, {
           defaultOrderBy: { createdAt: 'desc' },
           searchableFields: [],
         })
         let where = {
           ...queryOptions.where,
+          ...purchaseDateWhere(query),
           ...membershipTransactionStatusWhere(query.status),
         }
         if (query.sport) {
