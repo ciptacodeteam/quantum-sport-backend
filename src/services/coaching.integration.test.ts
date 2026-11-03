@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type BookingCoach } from '@prisma/client'
 import { withBranchContext } from '@/lib/branch-context'
 const url = process.env.TEST_COACHING_DATABASE_URL
 const gateway = vi.hoisted(() => vi.fn())
@@ -610,5 +610,131 @@ run('admin coaching transactional integration', () => {
         where: { serviceForBookingId: court.booking.id },
       }),
     ).toBe(0)
+  })
+  it('replaces a paid coach without changing invoice totals or payment and scopes replacement choices to the booking branch', async () => {
+    const original = await profile('replace-paid-old', 'COACH', 'TENNIS')
+    const next = await profile('replace-paid-new', 'COACH', 'TENNIS')
+    const oldSlot = await staffSlot(original)
+    const nextSlot = await staffSlot(next)
+    const court = await courtBooking('replace-paid', 'TENNIS')
+    const attached = await context(() =>
+      service.attachCoachingService(
+        court.detail.id,
+        oldSlot.id,
+        admin,
+        undefined,
+        now,
+        { method: 'EDC', received: true },
+      ),
+    )
+    const item = await raw.bookingCoach.findFirstOrThrow({
+      where: { bookingId: attached.bookingId },
+    })
+    const replacement = await import('./coach-replacement.service')
+    await expect(
+      context(
+        () => replacement.availableCoachReplacements(item.id, now),
+        'another-branch',
+      ),
+    ).rejects.toThrow('cabang')
+    const before = await raw.invoice.findUniqueOrThrow({
+      where: { id: attached.invoiceId },
+    })
+    const choices = await context(() =>
+      replacement.availableCoachReplacements(item.id, now),
+    )
+    expect(choices.options.some((o) => o.slotId === nextSlot.id)).toBe(true)
+    await context(() =>
+      replacement.replaceBookedCoach(
+        item.id,
+        {
+          slotId: nextSlot.id,
+          expectedSlotId: oldSlot.id,
+          reason: 'Berhalangan',
+        },
+        admin,
+        now,
+      ),
+    )
+    expect(
+      await raw.invoice.findUnique({ where: { id: attached.invoiceId } }),
+    ).toEqual(before)
+    expect(
+      await raw.bookingCoach.findUnique({ where: { id: item.id } }),
+    ).toMatchObject({ slotId: nextSlot.id, price: 150000, status: 'CONFIRMED' })
+    expect(
+      await raw.slot.findUnique({ where: { id: oldSlot.id } }),
+    ).toMatchObject({ isAvailable: true })
+    expect(
+      await raw.slot.findUnique({ where: { id: nextSlot.id } }),
+    ).toMatchObject({ isAvailable: false })
+    await expect(
+      context(() =>
+        replacement.replaceBookedCoach(
+          item.id,
+          { slotId: oldSlot.id, expectedSlotId: oldSlot.id },
+          admin,
+          now,
+        ),
+      ),
+    ).rejects.toThrow('sudah diubah')
+  })
+  it('allows only one concurrent replacement to claim the same new coach and leaves the loser unchanged', async () => {
+    const first = await profile('replace-race-a', 'COACH', 'TENNIS')
+    const second = await profile('replace-race-b', 'COACH', 'TENNIS')
+    const next = await profile('replace-race-next', 'COACH', 'TENNIS')
+    const oldSlots = [
+      await staffSlot(first, 13, '00', 0),
+      await staffSlot(second, 13, '00', 0),
+    ]
+    const nextSlot = await staffSlot(next, 13, '00', 0)
+    const courts = [
+      await courtBooking('replace-race-a', 'TENNIS'),
+      await courtBooking('replace-race-b', 'TENNIS'),
+    ]
+    const items: BookingCoach[] = []
+    for (const [i, slot] of oldSlots.entries()) {
+      const attached = await context(() =>
+        service.attachCoachingService(
+          courts[i].detail.id,
+          slot.id,
+          admin,
+          undefined,
+          now,
+        ),
+      )
+      items.push(
+        await raw.bookingCoach.findFirstOrThrow({
+          where: { bookingId: attached.bookingId },
+        }),
+      )
+    }
+    const replacement = await import('./coach-replacement.service')
+    const results = await Promise.allSettled(
+      items.map((item) =>
+        context(() =>
+          replacement.replaceBookedCoach(
+            item.id,
+            { slotId: nextSlot.id, expectedSlotId: item.slotId },
+            admin,
+            now,
+          ),
+        ),
+      ),
+    )
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(
+      await raw.bookingCoach.count({
+        where: { slotId: nextSlot.id, status: 'CONFIRMED' },
+      }),
+    ).toBe(1)
+    for (const [i, item] of items.entries()) {
+      const stored = await raw.bookingCoach.findUniqueOrThrow({
+        where: { id: item.id },
+      })
+      expect(
+        await raw.slot.findUnique({ where: { id: oldSlots[i].id } }),
+      ).toMatchObject({ isAvailable: stored.slotId === nextSlot.id })
+    }
   })
 })

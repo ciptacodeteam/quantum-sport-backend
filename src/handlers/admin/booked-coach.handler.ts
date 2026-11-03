@@ -249,6 +249,14 @@ export const cancelCoachBookingHandler = factory.createHandlers(
       const { reason } = c.req.valid('json') as CancelBookingSchema
 
       const result = await db.$transaction(async (tx) => {
+        const target = await tx.bookingCoach.findFirst({
+          where: { id: coachBookingId },
+          select: { bookingId: true },
+        })
+        if (!target) throw new NotFoundException('Coach booking not found')
+        await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${target.bookingId} FOR UPDATE`
+        await tx.$queryRaw`SELECT id FROM booking_coaches WHERE id = ${coachBookingId} FOR UPDATE`
+        // Re-read after a concurrent coach replacement finishes.
         // 1. Fetch the coach booking
         const coachBooking = await tx.bookingCoach.findUnique({
           where: { id: coachBookingId },

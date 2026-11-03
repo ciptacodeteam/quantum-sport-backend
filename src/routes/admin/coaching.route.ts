@@ -1,6 +1,8 @@
 import { createRouter } from '@/lib/create-app'
 import { requireAdmin, requireAnyAdminRole } from '@/middlewares/auth'
 import {
+  availableCoachReplacementsHandler,
+  replaceBookedCoachHandler,
   listCoachingHandler,
   getCoachingHandler,
   createCoachingHandler,
@@ -20,6 +22,12 @@ export default createRouter()
   .get('/', read, ...listCoachingHandler)
   .post('/', requireAdmin, ...createCoachingHandler)
   .get('/bookings', read, ...listCoachingBookingsHandler)
+  .get(
+    '/bookings/:id/replacements',
+    write,
+    ...availableCoachReplacementsHandler,
+  )
+  .post('/bookings/:id/replace-coach', write, ...replaceBookedCoachHandler)
   .get('/booking-details/:id/availability', read, ...availableCoachingHandler)
   .post('/booking-details/:id/services', write, ...attachCoachingHandler)
   .patch('/slots/:id', requireAdmin, ...toggleCoachingSlotHandler)

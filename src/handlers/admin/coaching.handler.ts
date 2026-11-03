@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import {
+  availableCoachReplacements,
+  replaceBookedCoach,
+} from '@/services/coach-replacement.service'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
@@ -342,4 +346,34 @@ export const listCoachingBookingsHandler = factory.createHandlers(
       ),
     )
   },
+)
+
+export const availableCoachReplacementsHandler = factory.createHandlers(
+  zValidator('param', params, validateHook),
+  async (c) =>
+    c.json(ok(await availableCoachReplacements(c.req.valid('param').id))),
+)
+export const replaceBookedCoachHandler = factory.createHandlers(
+  zValidator('param', params, validateHook),
+  zValidator(
+    'json',
+    z
+      .object({
+        slotId: z.string().min(1),
+        expectedSlotId: z.string().min(1),
+        reason: z.string().trim().max(500).optional(),
+      })
+      .strict(),
+    validateHook,
+  ),
+  async (c) =>
+    c.json(
+      ok(
+        await replaceBookedCoach(
+          c.req.valid('param').id,
+          c.req.valid('json'),
+          c.get('admin')!.id,
+        ),
+      ),
+    ),
 )
