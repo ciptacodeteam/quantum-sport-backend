@@ -1,4 +1,9 @@
 import {
+  courtBookingListSchema,
+  getCourtBookingList,
+  courtBookingSortFields,
+} from '@/services/court-booking-list.service'
+import {
   bookingDateRangeFields,
   validBookingDateRange,
   bookingDateRangeError,
@@ -1278,6 +1283,9 @@ export const exportBookingTransactionsToExcelHandler = factory.createHandlers(
 const bookingsExportQuerySchema = z
   .object({
     ...bookingDateRangeFields,
+    search: z.string().trim().max(200).optional(),
+    sortBy: z.enum(courtBookingSortFields).optional(),
+    order: z.enum(['asc', 'desc']).optional(),
     checkoutType: z.enum(bookingCheckoutTypes).optional(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
@@ -1307,7 +1315,13 @@ export const exportBookingsHandler = factory.createHandlers(
         query.courtSport,
         query.coach,
         query.checkoutType,
-        { dateFrom: query.dateFrom, dateTo: query.dateTo },
+        {
+          dateFrom: query.dateFrom,
+          dateTo: query.dateTo,
+          search: query.search,
+          sortBy: query.sortBy,
+          order: query.order,
+        },
       )
       const filename = `bookings-export-${dayjs().format('YYYY-MM-DD')}.xlsx`
 
@@ -1611,4 +1625,9 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
       throw error
     }
   },
+)
+
+export const getCourtBookingTableHandler = factory.createHandlers(
+  zValidator('query', courtBookingListSchema, validateHook),
+  async (c) => c.json(ok(await getCourtBookingList(c.req.valid('query')))),
 )

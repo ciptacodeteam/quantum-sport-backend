@@ -1,4 +1,9 @@
 import {
+  courtBookingSearchWhere,
+  courtBookingOrder,
+  type CourtBookingSearch,
+} from './court-booking-list.service'
+import {
   courtPlayingDateWhere,
   type BookingDateRange,
 } from '@/lib/booking-date-filter'
@@ -312,7 +317,7 @@ export async function exportDataToExcel(
   courtSport?: CourtSport,
   coach?: 'with' | 'without',
   checkoutType?: BookingCheckoutType,
-  playingDates?: BookingDateRange,
+  playingDates?: BookingDateRange & CourtBookingSearch,
 ): Promise<Buffer> {
   const workbook = XLSX.utils.book_new()
 
@@ -445,8 +450,15 @@ export async function exportDataToExcel(
         courtPlayingDateWhere(playingDates, courtSport),
       ]
 
+    if (playingDates?.search?.trim())
+      where.AND = [
+        ...(where.AND ?? []),
+        courtBookingSearchWhere(playingDates.search),
+      ]
+
     const bookings = await db.booking.findMany({
       where,
+      orderBy: courtBookingOrder(playingDates ?? {}),
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
         cashier: { select: { id: true, name: true, email: true } },
@@ -473,7 +485,6 @@ export async function exportDataToExcel(
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
     })
 
     const bookingsData = bookings.map((b) => {
