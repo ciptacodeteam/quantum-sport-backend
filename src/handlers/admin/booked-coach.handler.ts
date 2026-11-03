@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@/exceptions'
+import { cancelBookedCoach } from '@/services/coach-cancellation.service'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -12,11 +12,12 @@ import status from 'http-status'
 import { z } from 'zod'
 
 // Schema for cancel booking request
-const cancelBookingSchema = z.object({
-  reason: z.string().min(1, 'Cancellation reason is required').optional(),
-})
-
-type CancelBookingSchema = z.infer<typeof cancelBookingSchema>
+const cancelBookingSchema = z
+  .object({
+    reason: z.string().trim().min(1, 'Alasan pembatalan wajib diisi.').max(500),
+    expectedSlotId: z.string().min(1),
+  })
+  .strict()
 
 // GET /admin/booked-coaches
 // Get all booked coaches
@@ -243,137 +244,14 @@ export const getBookedCoachDetailHandler = factory.createHandlers(
 export const cancelCoachBookingHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   zValidator('json', cancelBookingSchema, validateHook),
-  async (c) => {
-    try {
-      const { id: coachBookingId } = c.req.valid('param') as IdSchema
-      const { reason } = c.req.valid('json') as CancelBookingSchema
-
-      const result = await db.$transaction(async (tx) => {
-        const target = await tx.bookingCoach.findFirst({
-          where: { id: coachBookingId },
-          select: { bookingId: true },
-        })
-        if (!target) throw new NotFoundException('Coach booking not found')
-        await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${target.bookingId} FOR UPDATE`
-        await tx.$queryRaw`SELECT id FROM booking_coaches WHERE id = ${coachBookingId} FOR UPDATE`
-        // Re-read after a concurrent coach replacement finishes.
-        // 1. Fetch the coach booking
-        const coachBooking = await tx.bookingCoach.findUnique({
-          where: { id: coachBookingId },
-          include: {
-            slot: {
-              include: {
-                staff: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            booking: {
-              include: {
-                invoice: true,
-              },
-            },
-            bookingCoachType: true,
-          },
-        })
-
-        if (!coachBooking) {
-          throw new NotFoundException('Coach booking not found')
-        }
-
-        // 2. Check if the main booking is already cancelled
-        if (coachBooking.booking.status === BookingStatus.CANCELLED) {
-          throw new BadRequestException(
-            'Cannot cancel coach booking - main booking is already cancelled',
-          )
-        }
-
-        if (coachBooking.status === BookingStatus.CANCELLED) {
-          throw new BadRequestException('Coach booking is already cancelled')
-        }
-
-        // 3. Release the coach slot
-        await tx.slot.update({
-          where: { id: coachBooking.slotId },
-          data: {
-            isAvailable: true,
-          },
-        })
-
-        // 4. Keep the row for history, but mark the coach add-on as cancelled
-        const cancelledCoachBooking = await tx.bookingCoach.update({
-          where: { id: coachBookingId },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: reason || 'Cancelled by admin',
-          },
-          include: { bookingCoachType: true },
-        })
-
-        // 5. Update the main booking total price (subtract coach price)
-        const updatedBooking = await tx.booking.update({
-          where: { id: coachBooking.bookingId },
-          data: {
-            totalPrice: {
-              decrement: coachBooking.price,
-            },
-          },
-        })
-
-        // 6. Update invoice if exists
-        if (coachBooking.booking.invoice) {
-          await tx.invoice.update({
-            where: { id: coachBooking.booking.invoice.id },
-            data: {
-              subtotal: {
-                decrement: coachBooking.price,
-              },
-              total: {
-                decrement: coachBooking.price,
-              },
-            },
-          })
-        }
-
-        return {
-          coachBooking: cancelledCoachBooking,
-          updatedBooking,
-          releasedSlot: coachBooking.slot,
-        }
-      })
-
-      return c.json(
-        ok(
-          {
-            cancelledCoach: {
-              id: result.coachBooking.id,
-              coachType: result.coachBooking.bookingCoachType.name,
-              staff: result.releasedSlot.staff,
-              description: result.coachBooking.description,
-              price: result.coachBooking.price,
-              slot: {
-                startAt: result.releasedSlot.startAt,
-                endAt: result.releasedSlot.endAt,
-                isAvailable: true,
-              },
-            },
-            updatedBooking: {
-              id: result.updatedBooking.id,
-              totalPrice: result.updatedBooking.totalPrice,
-            },
-            reason: reason || 'Cancelled by admin',
-          },
-          'Coach booking cancelled successfully. Slot has been released.',
+  async (c) =>
+    c.json(
+      ok(
+        await cancelBookedCoach(
+          c.req.valid('param').id,
+          c.req.valid('json'),
+          c.get('admin')!.id,
         ),
-        status.OK,
-      )
-    } catch (error) {
-      c.var.logger.fatal(`Error in cancelCoachBookingHandler: ${error}`)
-      throw error
-    }
-  },
+      ),
+    ),
 )

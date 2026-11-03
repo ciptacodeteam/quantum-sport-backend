@@ -756,4 +756,124 @@ run('admin coaching transactional integration', () => {
       ).toMatchObject({ isAvailable: stored.slotId === nextSlot.id })
     }
   })
+  it('cancels only the coach in a paid combined service booking and preserves the invoice, court, and ballboy', async () => {
+    const coach = await profile('cancel-coach', 'COACH', 'TENNIS')
+    const ballboy = await profile('cancel-ballboy', 'BALLBOY')
+    const coachSlot = await staffSlot(coach)
+    const ballboySlot = await staffSlot(ballboy, 13, '00', 45000, 'BALLBOY')
+    const court = await courtBooking('cancel-coach', 'TENNIS')
+    const attached = await context(() =>
+      service.attachCoachingService(
+        court.detail.id,
+        [coachSlot.id, ballboySlot.id],
+        admin,
+        undefined,
+        now,
+        { method: 'EDC', received: true },
+      ),
+    )
+    const item = await raw.bookingCoach.findFirstOrThrow({
+      where: { bookingId: attached.bookingId },
+    })
+    const invoice = await raw.invoice.findUniqueOrThrow({
+      where: { id: attached.invoiceId },
+    })
+    const ballboyBefore = await raw.bookingBallboy.findFirstOrThrow({
+      where: { bookingId: attached.bookingId },
+    })
+    const cancellation = await import('./coach-cancellation.service')
+    await expect(
+      context(
+        () => cancellation.previewCoachCancellation(item.id, now),
+        'another-branch',
+      ),
+    ).rejects.toThrow('cabang')
+    const result = await context(() =>
+      cancellation.cancelBookedCoach(
+        item.id,
+        { expectedSlotId: coachSlot.id, reason: 'Coach berhalangan' },
+        admin,
+        now,
+      ),
+    )
+    expect(result).toMatchObject({
+      status: 'CANCELLED',
+      refundRequired: true,
+      slotReleased: true,
+    })
+    expect(
+      await raw.invoice.findUnique({ where: { id: attached.invoiceId } }),
+    ).toEqual(invoice)
+    expect(
+      await raw.bookingBallboy.findUnique({ where: { id: ballboyBefore.id } }),
+    ).toEqual(ballboyBefore)
+    expect(
+      await raw.slot.findUnique({ where: { id: coachSlot.id } }),
+    ).toMatchObject({ isAvailable: true })
+    expect(
+      await raw.slot.findUnique({ where: { id: ballboySlot.id } }),
+    ).toMatchObject({ isAvailable: false })
+    expect(
+      await raw.booking.findUnique({ where: { id: court.booking.id } }),
+    ).toMatchObject({ status: 'CONFIRMED' })
+    await expect(
+      context(() =>
+        cancellation.cancelBookedCoach(
+          item.id,
+          { expectedSlotId: coachSlot.id, reason: 'Ulang' },
+          admin,
+          now,
+        ),
+      ),
+    ).rejects.toThrow('terkonfirmasi')
+  })
+  it('serializes coach cancellation against replacement without leaving either slot stranded', async () => {
+    const original = await profile('cancel-race-old', 'COACH', 'TENNIS')
+    const next = await profile('cancel-race-new', 'COACH', 'TENNIS')
+    const oldSlot = await staffSlot(original, 13, '00', 0)
+    const nextSlot = await staffSlot(next, 13, '00', 0)
+    const court = await courtBooking('cancel-race', 'TENNIS')
+    const attached = await context(() =>
+      service.attachCoachingService(
+        court.detail.id,
+        oldSlot.id,
+        admin,
+        undefined,
+        now,
+      ),
+    )
+    const item = await raw.bookingCoach.findFirstOrThrow({
+      where: { bookingId: attached.bookingId },
+    })
+    const cancellation = await import('./coach-cancellation.service')
+    const replacement = await import('./coach-replacement.service')
+    const results = await Promise.allSettled([
+      context(() =>
+        cancellation.cancelBookedCoach(
+          item.id,
+          { expectedSlotId: oldSlot.id, reason: 'Batal' },
+          admin,
+          now,
+        ),
+      ),
+      context(() =>
+        replacement.replaceBookedCoach(
+          item.id,
+          { slotId: nextSlot.id, expectedSlotId: oldSlot.id },
+          admin,
+          now,
+        ),
+      ),
+    ])
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    const stored = await raw.bookingCoach.findUniqueOrThrow({
+      where: { id: item.id },
+    })
+    expect(
+      await raw.slot.findUnique({ where: { id: oldSlot.id } }),
+    ).toMatchObject({ isAvailable: true })
+    expect(
+      await raw.slot.findUnique({ where: { id: nextSlot.id } }),
+    ).toMatchObject({ isAvailable: stored.status === 'CANCELLED' })
+  })
 })

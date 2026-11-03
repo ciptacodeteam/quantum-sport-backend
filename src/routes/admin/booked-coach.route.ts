@@ -1,3 +1,4 @@
+import { requireAnyAdminRole } from '@/middlewares/auth'
 import { factory } from '@/lib/create-app'
 import {
   cancelCoachBookingHandler,
@@ -10,6 +11,10 @@ const adminBookedCoachRoute = factory
   .basePath('/booked-coaches')
   .get('/', ...getAllBookedCoachesHandler)
   .get('/:id', ...getBookedCoachDetailHandler)
-  .put('/:id/cancel', ...cancelCoachBookingHandler)
+  .put(
+    '/:id/cancel',
+    requireAnyAdminRole(['SUPER_ADMIN']),
+    ...cancelCoachBookingHandler,
+  )
 
 export default adminBookedCoachRoute

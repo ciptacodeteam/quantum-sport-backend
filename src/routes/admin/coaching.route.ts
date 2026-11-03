@@ -1,6 +1,8 @@
+import { cancelCoachBookingHandler } from '@/handlers/admin/booked-coach.handler'
 import { createRouter } from '@/lib/create-app'
 import { requireAdmin, requireAnyAdminRole } from '@/middlewares/auth'
 import {
+  previewCoachCancellationHandler,
   availableCoachReplacementsHandler,
   replaceBookedCoachHandler,
   listCoachingHandler,
@@ -32,6 +34,16 @@ export default createRouter()
     '/bookings/:id/replace-coach',
     replaceCoach,
     ...replaceBookedCoachHandler,
+  )
+  .get(
+    '/bookings/:id/cancellation',
+    replaceCoach,
+    ...previewCoachCancellationHandler,
+  )
+  .post(
+    '/bookings/:id/cancel-coach',
+    replaceCoach,
+    ...cancelCoachBookingHandler,
   )
   .get('/booking-details/:id/availability', read, ...availableCoachingHandler)
   .post('/booking-details/:id/services', write, ...attachCoachingHandler)

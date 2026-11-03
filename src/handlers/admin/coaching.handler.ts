@@ -1,3 +1,4 @@
+import { previewCoachCancellation } from '@/services/coach-cancellation.service'
 import { randomUUID } from 'node:crypto'
 import {
   availableCoachReplacements,
@@ -376,4 +377,10 @@ export const replaceBookedCoachHandler = factory.createHandlers(
         ),
       ),
     ),
+)
+
+export const previewCoachCancellationHandler = factory.createHandlers(
+  zValidator('param', params, validateHook),
+  async (c) =>
+    c.json(ok(await previewCoachCancellation(c.req.valid('param').id))),
 )
