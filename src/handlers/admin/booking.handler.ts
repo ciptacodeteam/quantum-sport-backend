@@ -433,6 +433,8 @@ export const getAllBookingScheduleHandler = factory.createHandlers(
               bookingId: true,
               slotId: true,
               bookingCoachTypeId: true,
+              coachingGroupId: true,
+              coachingGroupName: true,
               courtSlotId: true,
               courtSlot: {
                 select: {

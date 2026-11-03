@@ -206,6 +206,7 @@ model Staff {
   slot                Slot[]
   coachTypeStaffPrice CoachTypeStaffPrice[]
   bookingCashier      Booking[]
+  coachingGroups      CoachingGroupCoach[]
 
   @@index([branchId])
   @@index([isActive, role])
@@ -643,6 +644,9 @@ model CoachTypeStaffPrice {
 }
 
 model BookingCoach {
+  coachingGroupId   String?
+  coachingGroupName String?
+  coachingGroup     CoachingGroup? @relation(fields: [coachingGroupId], references: [id], onDelete: SetNull)
   id                 String        @id @default(cuid())
   bookingId          String
   slotId             String // COACH slot
@@ -982,6 +986,7 @@ model Branch {
   notificationRecords      Notification[]
   memberships              MembershipBranch[]
   tariffPeriods            TariffPeriod[]
+  coachingGroups           CoachingGroupBranch[]
 
   @@map("branches")
 }
@@ -1082,4 +1087,42 @@ model MembershipDebtTransfer {
 
   @@unique([fromMembershipUserId, toMembershipUserId])
   @@map("membership_debt_transfers")
+}
+
+model CoachingGroup {
+  id          String                @id @default(cuid())
+  name        String                @unique
+  logo        String?
+  description String?               @db.Text
+  sports      CourtSport[]
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @default(now()) @updatedAt
+  branches    CoachingGroupBranch[]
+  coaches     CoachingGroupCoach[]
+  bookings    BookingCoach[]
+
+  @@map("coaching_groups")
+}
+
+model CoachingGroupBranch {
+  groupId  String
+  branchId String
+  group    CoachingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  branch   Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, branchId])
+  @@index([branchId])
+  @@map("coaching_group_branches")
+}
+
+model CoachingGroupCoach {
+  groupId String
+  staffId String
+  group   CoachingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  staff   Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, staffId])
+  @@index([staffId])
+  @@map("coaching_group_coaches")
 }

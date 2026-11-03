@@ -11,7 +11,8 @@ const direct = new Set(
     .filter(
       (model) =>
         model.fields.some((field) => field.name === 'branchId') &&
-        model.name !== 'MembershipBranch',
+        model.name !== 'MembershipBranch' &&
+        model.name !== 'CoachingGroupBranch',
     )
     .map((model) => model.name),
 )
@@ -20,6 +21,7 @@ const parents: Record<string, string> = {
   BookingInventory: 'booking',
   BookingBallboy: 'booking',
   BookingCoach: 'booking',
+  CoachingGroupCoach: 'staff',
   ClassBookingDetail: 'classBooking',
   CoachTypeStaffPrice: 'staff',
   Payment: 'invoice',
@@ -30,6 +32,7 @@ const globalCatalogs = new Set([
   'MembershipBranch',
   'PaymentMethod',
   'BookingCoachType',
+  'CoachingGroup',
 ])
 const writes = new Set([
   'create',

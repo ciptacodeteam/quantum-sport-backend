@@ -163,6 +163,9 @@ run('admin coaching transactional integration', () => {
     }))
   })
   afterAll(async () => {
+    await raw.coachingGroup.deleteMany({
+      where: { name: { startsWith: prefix } },
+    })
     const bookings = await raw.booking.findMany({
       where: { branchId: branch },
       select: { id: true },
@@ -875,5 +878,240 @@ run('admin coaching transactional integration', () => {
     expect(
       await raw.slot.findUnique({ where: { id: nextSlot.id } }),
     ).toMatchObject({ isAvailable: stored.status === 'CANCELLED' })
+  })
+  it('stores the selected group per coach, preserves history and prevents a second booking through another group', async () => {
+    const { saveCoachingGroup, validateCoachGroups } =
+      await import('./coaching-group.service')
+    const { db } = await import('@/lib/prisma')
+    const manager = <T>(fn: () => T) =>
+      withBranchContext(
+        { branchId: null, isAdmin: true, isSuperAdmin: true },
+        fn,
+      )
+    const input = {
+      name: `${prefix}-northwest`,
+      description: '',
+      logo: '',
+      sports: ['PADEL', 'TENNIS'] as ('PADEL' | 'TENNIS')[],
+      branchIds: [branch],
+      isActive: true,
+    }
+    const first = await manager(() => saveCoachingGroup(undefined, input))
+    const second = await manager(() =>
+      saveCoachingGroup(undefined, { ...input, name: `${prefix}-second` }),
+    )
+    const apiCoach = await profile('group-api', 'COACH', 'PADEL')
+    const app = (await import('@/app')).default
+    const { generateJwtToken } = await import('@/lib/token')
+    const token = await generateJwtToken({
+      id: admin,
+      role: 'ADMIN',
+      email: `${admin}@test.invalid`,
+    })
+    const response = await app.request(`/admin/coaching/${apiCoach}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-Branch-ID': branch,
+      },
+      body: JSON.stringify({
+        name: 'Group API Coach',
+        kind: 'COACH',
+        coachType: 'PADEL',
+        isActive: true,
+        groupIds: [first.id],
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(((await response.json()) as any).data.coachingGroups).toContainEqual(
+      expect.objectContaining({
+        group: expect.objectContaining({ id: first.id }),
+      }),
+    )
+    await expect(
+      context(() => validateCoachGroups(db, [first.id], branch, 'BALLBOY')),
+    ).rejects.toThrow('hanya untuk coach')
+    await expect(
+      manager(() => saveCoachingGroup(undefined, input)),
+    ).rejects.toThrow('Nama grup coaching sudah digunakan')
+    const coach = await profile('group-member', 'COACH', 'TENNIS')
+    await context(() =>
+      validateCoachGroups(db, [first.id, second.id], branch, 'COACH', 'TENNIS'),
+    )
+    await context(() =>
+      db.staff.update({
+        where: { id: coach },
+        data: {
+          coachingGroups: {
+            create: [{ groupId: first.id }, { groupId: second.id }],
+          },
+        },
+      }),
+    )
+    const slot = await staffSlot(coach, 13, '00', 0)
+    const court = await courtBooking('group-booking', 'TENNIS')
+    const options = await context(() =>
+      service.coachingAvailability(
+        court.detail.id,
+        '2026-11-02 13:00:00',
+        '2026-11-02 14:00:00',
+        now,
+      ),
+    )
+    expect(
+      options
+        .find((o) => o.staffId === coach)
+        ?.groups.map((g) => g.id)
+        .sort(),
+    ).toEqual([first.id, second.id].sort())
+    await expect(
+      context(() =>
+        service.attachCoachingService(
+          court.detail.id,
+          slot.id,
+          admin,
+          undefined,
+          now,
+        ),
+      ),
+    ).rejects.toThrow('Pilih grup')
+    const created = await context(() =>
+      service.attachCoachingService(
+        court.detail.id,
+        slot.id,
+        admin,
+        undefined,
+        now,
+        undefined,
+        first.id,
+      ),
+    )
+    const stored = await raw.bookingCoach.findFirstOrThrow({
+      where: { bookingId: created.bookingId },
+    })
+    expect(stored).toMatchObject({
+      coachingGroupId: first.id,
+      coachingGroupName: first.name,
+      price: 0,
+    })
+    await manager(() =>
+      saveCoachingGroup(first.id, {
+        ...input,
+        name: `${prefix}-renamed`,
+        isActive: false,
+      }),
+    )
+    expect(
+      (await raw.bookingCoach.findUniqueOrThrow({ where: { id: stored.id } }))
+        .coachingGroupName,
+    ).toBe(first.name)
+    const otherCourt = await courtBooking('group-other-court', 'TENNIS')
+    await expect(
+      context(() =>
+        service.attachCoachingService(
+          otherCourt.detail.id,
+          slot.id,
+          admin,
+          undefined,
+          now,
+          undefined,
+          second.id,
+        ),
+      ),
+    ).rejects.toThrow()
+    const replacementCoach = await profile(
+      'group-replacement',
+      'COACH',
+      'TENNIS',
+    )
+    await context(() =>
+      db.staff.update({
+        where: { id: replacementCoach },
+        data: { coachingGroups: { create: { groupId: second.id } } },
+      }),
+    )
+    const nextSlot = await staffSlot(replacementCoach, 13, '00', 0)
+    const replacement = await import('./coach-replacement.service')
+    const choices = await context(() =>
+      replacement.availableCoachReplacements(stored.id, now),
+    )
+    expect(choices.options).toContainEqual(
+      expect.objectContaining({
+        slotId: nextSlot.id,
+        coachingGroupId: second.id,
+        coachingGroupName: second.name,
+      }),
+    )
+    await context(() =>
+      replacement.replaceBookedCoach(
+        stored.id,
+        {
+          slotId: nextSlot.id,
+          expectedSlotId: slot.id,
+          coachingGroupId: second.id,
+        },
+        admin,
+        now,
+      ),
+    )
+    expect(
+      await raw.bookingCoach.findUniqueOrThrow({ where: { id: stored.id } }),
+    ).toMatchObject({
+      coachingGroupId: second.id,
+      coachingGroupName: second.name,
+    })
+    expect(
+      await raw.slot.findUniqueOrThrow({ where: { id: slot.id } }),
+    ).toMatchObject({ isAvailable: true })
+  })
+  it('rejects inactive groups, non-members and groups for another sport before claiming slots', async () => {
+    const coach = await profile('invalid-group', 'COACH', 'TENNIS')
+    const slot = await staffSlot(coach, 13, '00', 0)
+    const court = await courtBooking('invalid-group-court', 'TENNIS')
+    const group = await raw.coachingGroup.create({
+      data: {
+        name: `${prefix}-invalid`,
+        sports: ['PADEL'],
+        branches: { create: { branchId: branch } },
+      },
+    })
+    for (const groupId of [group.id, 'missing'])
+      await expect(
+        context(() =>
+          service.attachCoachingService(
+            court.detail.id,
+            slot.id,
+            admin,
+            undefined,
+            now,
+            undefined,
+            groupId,
+          ),
+        ),
+      ).rejects.toThrow('Coach tidak tersedia di grup')
+    await raw.coachingGroupCoach.create({
+      data: { groupId: group.id, staffId: coach },
+    })
+    await raw.coachingGroup.update({
+      where: { id: group.id },
+      data: { sports: ['TENNIS'], isActive: false },
+    })
+    await expect(
+      context(() =>
+        service.attachCoachingService(
+          court.detail.id,
+          slot.id,
+          admin,
+          undefined,
+          now,
+          undefined,
+          group.id,
+        ),
+      ),
+    ).rejects.toThrow('Coach tidak tersedia di grup')
+    expect(
+      await raw.slot.findUniqueOrThrow({ where: { id: slot.id } }),
+    ).toMatchObject({ isAvailable: true })
   })
 })

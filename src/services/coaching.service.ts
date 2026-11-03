@@ -1,3 +1,8 @@
+import {
+  coachingGroupMembershipSelect,
+  eligibleCoachingGroups,
+  resolveBookingCoachingGroup,
+} from './coaching-group.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { db } from '@/lib/prisma'
 import { formatClubWallClock, toClubWallDate } from '@/lib/club-time'
@@ -30,6 +35,7 @@ export const coachingSelect = {
   role: true,
   coachType: true,
   coachProfile: true,
+  coachingGroups: { select: coachingGroupMembershipSelect },
   isActive: true,
 } satisfies Prisma.StaffSelect
 
@@ -253,7 +259,16 @@ export async function coachingAvailability(
     }))
   return slots
     .filter(
-      (s) => !busyIds.has(s.staffId) && !(hasBallboy && s.type === 'BALLBOY'),
+      (s) =>
+        !busyIds.has(s.staffId) &&
+        !(hasBallboy && s.type === 'BALLBOY') &&
+        (s.type !== 'COACH' ||
+          !s.staff?.coachingGroups?.length ||
+          eligibleCoachingGroups(
+            s.staff.coachingGroups,
+            detail.booking.branchId,
+            [sport],
+          ).length > 0),
     )
     .map((s) => ({
       slotId: s.id,
@@ -261,6 +276,14 @@ export async function coachingAvailability(
       name: s.staff!.name,
       kind: s.type,
       coachType: s.staff!.coachType,
+      groups:
+        s.type === 'COACH'
+          ? eligibleCoachingGroups(
+              s.staff!.coachingGroups,
+              detail.booking.branchId,
+              [sport],
+            )
+          : [],
       price: s.price,
       startAt: formatClubWallClock(s.startAt),
       endAt: formatClubWallClock(s.endAt),
@@ -278,6 +301,7 @@ export async function attachCoachingService(
     method: 'EDC' | 'QRIS_STATIC' | 'BANK_TRANSFER_MANUAL'
     received: boolean
   },
+  coachingGroupId?: string,
 ) {
   const slotIds = Array.isArray(slotId) ? slotId : [slotId]
   if (
@@ -313,8 +337,15 @@ export async function attachCoachingService(
       ...new Set(candidates.map((s) => s.staffId!)),
     ].sort())
       await tx.$queryRaw`SELECT id FROM staff WHERE id = ${staffId} FOR UPDATE`
-    const selectedSlots: Prisma.SlotGetPayload<{ include: { staff: true } }>[] =
-      []
+    const selectedSlots: Prisma.SlotGetPayload<{
+      include: {
+        staff: {
+          include: {
+            coachingGroups: { select: typeof coachingGroupMembershipSelect }
+          }
+        }
+      }
+    }>[] = []
     for (const selectedId of slotIds) {
       // Profile, price and availability may have changed while this request waited.
       const slot = await tx.slot.findFirst({
@@ -325,7 +356,13 @@ export async function attachCoachingService(
           isAvailable: true,
           scheduleClosed: false,
         },
-        include: { staff: true },
+        include: {
+          staff: {
+            include: {
+              coachingGroups: { select: coachingGroupMembershipSelect },
+            },
+          },
+        },
       })
       if (!slot?.staff?.isActive || slot.staff.role !== slot.type)
         throw new BadRequestException('Layanan tidak tersedia.')
@@ -381,6 +418,18 @@ export async function attachCoachingService(
       throw new BadRequestException(
         'Pilih satu coach dan satu ballboy pada jam yang sama.',
       )
+    const coach = selectedSlots.find((s) => s.type === 'COACH')
+    if (coachingGroupId && !coach)
+      throw new BadRequestException('Pilih coach untuk grup coaching.')
+    const group = coach
+      ? await resolveBookingCoachingGroup(
+          tx,
+          coach.staff!,
+          detail.booking.branchId,
+          [detail.slot.court!.sport],
+          coachingGroupId,
+        )
+      : null
     const price = selectedSlots.reduce((sum, s) => sum + s.price, 0)
     const dueDate = paymentDeadline(now)
     const paid = price === 0 || !!manualPayment
@@ -446,6 +495,7 @@ export async function attachCoachingService(
             slotId: slot.id,
             courtSlotId: detail.slotId,
             bookingCoachTypeId: type.id,
+            ...group,
             price: slot.price,
             status: paid ? 'CONFIRMED' : 'HOLD',
           },

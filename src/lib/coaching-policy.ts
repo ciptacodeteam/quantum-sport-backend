@@ -17,6 +17,11 @@ export const coachingProfileSchema = z
     kind: z.enum(['COACH', 'BALLBOY']),
     coachType: z.enum(['PADEL', 'TENNIS', 'PADEL_TENNIS']).optional(),
     phone: z.string().trim().min(8).max(20).optional(),
+    groupIds: z
+      .array(z.string().min(1))
+      .max(100)
+      .refine((v) => new Set(v).size === v.length)
+      .optional(),
     coachProfile: z.string().trim().max(2000).optional(),
     isActive: z.boolean().default(true),
   })

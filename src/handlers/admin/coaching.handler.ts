@@ -1,3 +1,4 @@
+import { validateCoachGroups } from '@/services/coaching-group.service'
 import {
   bookingDateRangeFields,
   validBookingDateRange,
@@ -83,6 +84,13 @@ export const createCoachingHandler = factory.createHandlers(
         : input.coachType,
       branchId,
     )
+    await validateCoachGroups(
+      db,
+      input.groupIds,
+      branchId,
+      input.kind,
+      input.coachType,
+    )
     const staff = await db.staff.create({
       data: {
         branchId,
@@ -93,6 +101,9 @@ export const createCoachingHandler = factory.createHandlers(
         phone: input.phone ? await formatPhone(input.phone) : null,
         isActive: input.isActive,
         adminServiceOnly: true,
+        coachingGroups: {
+          create: (input.groupIds ?? []).map((groupId) => ({ groupId })),
+        },
         email: `service-${randomUUID()}@internal.invalid`,
         password: await hashPassword(randomUUID()),
       },
@@ -133,9 +144,27 @@ export const updateCoachingHandler = factory.createHandlers(
         throw new BadRequestException(
           'Olahraga tidak dapat diganti setelah coach mempunyai booking. Nonaktifkan profil dan buat profil baru.',
         )
+      await validateCoachGroups(
+        tx,
+        input.groupIds,
+        existing.branchId,
+        input.kind,
+        input.coachType,
+      )
+      // Delete through the standalone delegate: Prisma nested deleteMany only
+      // accepts scalar predicates, while the branch client adds a staff relation.
+      if (input.groupIds !== undefined)
+        await tx.coachingGroupCoach.deleteMany({ where: { staffId: id } })
       return tx.staff.update({
         where: { id },
         data: {
+          ...(input.groupIds
+            ? {
+                coachingGroups: {
+                  create: input.groupIds.map((groupId) => ({ groupId })),
+                },
+              }
+            : {}),
           name: input.name,
           phone: input.phone ? await formatPhone(input.phone) : null,
           coachType: input.kind === 'COACH' ? input.coachType : null,
@@ -267,6 +296,7 @@ export const attachCoachingHandler = factory.createHandlers(
           })
           .strict()
           .optional(),
+        coachingGroupId: z.string().min(1).optional(),
         paymentMethodId: z.string().min(1).optional(),
       })
       .strict()
@@ -288,6 +318,7 @@ export const attachCoachingHandler = factory.createHandlers(
           q.paymentMethodId,
           new Date(),
           q.manualPayment,
+          q.coachingGroupId,
         ),
       ),
       201,
@@ -347,6 +378,8 @@ export const listCoachingBookingsHandler = factory.createHandlers(
           id: item.id,
           bookingId: item.bookingId,
           name: item.slot.staff?.name ?? '-',
+          coachingGroupName:
+            'coachingGroupName' in item ? item.coachingGroupName : null,
           customer: item.booking.user.name,
           phone: item.booking.user.phone,
           startAt: formatClubWallClock(item.slot.startAt),
@@ -374,6 +407,7 @@ export const replaceBookedCoachHandler = factory.createHandlers(
     z
       .object({
         slotId: z.string().min(1),
+        coachingGroupId: z.string().min(1).optional(),
         expectedSlotId: z.string().min(1),
         reason: z.string().trim().max(500).optional(),
       })

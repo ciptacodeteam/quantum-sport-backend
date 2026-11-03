@@ -102,7 +102,11 @@ it('claims the new coach first, moves the existing service row, and safely relea
   )
   expect(mocks.tx.bookingCoach.updateMany).toHaveBeenCalledWith({
     where: { id: 'item', slotId: 'old-slot', status: 'CONFIRMED' },
-    data: { slotId: 'new-slot' },
+    data: {
+      slotId: 'new-slot',
+      coachingGroupId: null,
+      coachingGroupName: null,
+    },
   })
   const release = mocks.tx.slot.updateMany.mock.calls[0][0]
   expect(release.where).toMatchObject({

@@ -29,8 +29,13 @@ export const branchMiddleware: MiddlewareHandler = async (c, next) => {
     })
     if (!staff?.isActive) throw new ForbiddenException('Akun staf tidak aktif.')
     const isSuperAdmin = staff.role === 'SUPER_ADMIN'
-    // Banner content is shared across locations; branch selection does not scope it.
-    if (path === '/admin/banners' || path.startsWith('/admin/banners/'))
+    // Banner content and coaching group catalogs are shared across locations.
+    if (
+      path === '/admin/banners' ||
+      path.startsWith('/admin/banners/') ||
+      path === '/admin/coaching-groups' ||
+      path.startsWith('/admin/coaching-groups/')
+    )
       return withBranchContext(
         { branchId: null, isAdmin: true, isSuperAdmin, staffId: admin.id },
         next,

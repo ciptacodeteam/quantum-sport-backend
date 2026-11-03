@@ -1,3 +1,8 @@
+import {
+  coachingGroupMembershipSelect,
+  eligibleCoachingGroups,
+  resolveBookingCoachingGroup,
+} from './coaching-group.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { db } from '@/lib/prisma'
 import { courtBookingCutoff } from '@/lib/booking-time-policy'
@@ -83,7 +88,16 @@ export async function availableCoachReplacements(id: string, now = new Date()) {
         })),
       },
     },
-    include: { staff: { select: { id: true, name: true, coachType: true } } },
+    include: {
+      staff: {
+        select: {
+          id: true,
+          name: true,
+          coachType: true,
+          coachingGroups: { select: coachingGroupMembershipSelect },
+        },
+      },
+    },
     orderBy: { staffId: 'asc' },
   })
   const busy = await db.slot.findMany({
@@ -121,21 +135,42 @@ export async function availableCoachReplacements(id: string, now = new Date()) {
       price: current.price,
       startAt: formatClubWallClock(current.slot.startAt),
       endAt: formatClubWallClock(current.slot.endAt),
+      coachingGroupId: current.coachingGroupId,
+      coachingGroupName: current.coachingGroupName,
     },
     options: options
       .filter((s) => !busyIds.has(s.staffId))
-      .map((s) => ({
-        slotId: s.id,
-        staffId: s.staffId!,
-        name: s.staff!.name,
-        price: s.price,
-      })),
+      .flatMap((s) => {
+        const groups = eligibleCoachingGroups(
+          s.staff!.coachingGroups,
+          current.booking.branchId,
+          sports,
+        )
+        const identities = s.staff!.coachingGroups?.length
+          ? groups.map((g) => ({
+              coachingGroupId: g.id,
+              coachingGroupName: g.name,
+            }))
+          : [{ coachingGroupId: null, coachingGroupName: null }]
+        return identities.map((group) => ({
+          slotId: s.id,
+          staffId: s.staffId!,
+          name: s.staff!.name,
+          price: s.price,
+          ...group,
+        }))
+      }),
   }
 }
 
 export async function replaceBookedCoach(
   id: string,
-  input: { slotId: string; expectedSlotId: string; reason?: string },
+  input: {
+    slotId: string
+    expectedSlotId: string
+    reason?: string
+    coachingGroupId?: string
+  },
   actorId: string,
   now = new Date(),
 ) {
@@ -178,7 +213,13 @@ export async function replaceBookedCoach(
         isAvailable: true,
         scheduleClosed: false,
       },
-      include: { staff: true },
+      include: {
+        staff: {
+          include: {
+            coachingGroups: { select: coachingGroupMembershipSelect },
+          },
+        },
+      },
     })
     if (!replacement?.staff?.isActive || replacement.staff.role !== 'COACH')
       throw new BadRequestException('Coach pengganti tidak tersedia.')
@@ -195,6 +236,13 @@ export async function replaceBookedCoach(
       )
     for (const sport of sports)
       assertCoachingSport('COACH', replacement.staff.coachType, sport)
+    const group = await resolveBookingCoachingGroup(
+      tx,
+      replacement.staff,
+      current.booking.branchId,
+      sports,
+      input.coachingGroupId,
+    )
     await claimSlotsAtomically(tx, {
       slotIds: [replacement.id],
       type: 'COACH',
@@ -202,7 +250,7 @@ export async function replaceBookedCoach(
     })
     const changed = await tx.bookingCoach.updateMany({
       where: { id, slotId: input.expectedSlotId, status: 'CONFIRMED' },
-      data: { slotId: replacement.id },
+      data: { slotId: replacement.id, ...group },
     })
     if (changed.count !== 1)
       throw new BadRequestException(
@@ -227,7 +275,8 @@ export async function replaceBookedCoach(
       },
       data: { isAvailable: true },
     })
-    const audit = `[${now.toISOString()}] Ganti coach: ${current.slot.staff?.name ?? current.slot.staffId} (${current.slotId}) → ${replacement.staff.name} (${replacement.id}); admin ${actorId}${input.reason ? `; alasan: ${input.reason}` : ''}`
+    const groupAudit = `; grup: ${current.coachingGroupName ?? 'Independen'} → ${group.coachingGroupName ?? 'Independen'}`
+    const audit = `[${now.toISOString()}] Ganti coach: ${current.slot.staff?.name ?? current.slot.staffId} (${current.slotId}) → ${replacement.staff.name} (${replacement.id})${groupAudit}; admin ${actorId}${input.reason ? `; alasan: ${input.reason}` : ''}`
     await tx.booking.update({
       where: { id: current.bookingId },
       data: {
