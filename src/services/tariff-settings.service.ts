@@ -1,5 +1,5 @@
 import { db } from '@/lib/prisma'
-import dayjs from '@/lib/club-time'
+import dayjs, { toClubWallDate } from '@/lib/club-time'
 import {
   BadRequestException,
   ForbiddenException,
@@ -7,7 +7,12 @@ import {
 } from '@/exceptions'
 import { branchContext } from '@/lib/branch-context'
 import { assertCourtSportAtBranch } from '@/lib/court-branch-policy'
-import { tariffPeriodSchema, type TariffPeriodInput } from '@/lib/tariff-period'
+import {
+  resolveTariffPeriod,
+  tariffPeriodSchema,
+  type TariffPeriodInput,
+} from '@/lib/tariff-period'
+import { getTariffPeriods } from './tariff-policy.service'
 import { refreshTariffCourtSchedules } from './rolling-court-schedule.service'
 
 export async function saveTariffPeriod(
@@ -29,8 +34,17 @@ export async function saveTariffPeriod(
       where: { id: branchId, isActive: true },
     })
     if (!branch) throw new NotFoundException('Cabang tidak ditemukan.')
-    await tx.$queryRaw`SELECT id FROM branches WHERE id = ${branchId} FOR UPDATE`
-    const effectiveFrom = new Date(`${data.effectiveFrom}T00:00:00Z`)
+    await tx.$queryRaw`SELECT id FROM branches WHERE id = ${branchId} FOR NO KEY UPDATE`
+    const effectiveFrom = toClubWallDate(`${data.effectiveFrom} 00:00:00`)
+    const previous = resolveTariffPeriod(
+      await getTariffPeriods(tx, branchId),
+      effectiveFrom,
+      branchId,
+      data.sport,
+    )
+    const hoursChanged = (
+      ['happyStart', 'happyEnd', 'peakStart', 'peakEnd'] as const
+    ).some((field) => previous[field] !== data[field])
     const rule = await tx.tariffPeriod.upsert({
       where: {
         branchId_sport_effectiveFrom: {
@@ -49,13 +63,14 @@ export async function saveTariffPeriod(
         peakCoachDiscount: data.peakCoachDiscount,
       },
     })
-    await refreshTariffCourtSchedules(
-      tx,
-      branchId,
-      data.sport,
-      dayjs(data.effectiveFrom).startOf('day').toDate(),
-      now,
-    )
+    if (hoursChanged)
+      await refreshTariffCourtSchedules(
+        tx,
+        branchId,
+        data.sport,
+        effectiveFrom,
+        now,
+      )
     return rule
   })
 }

@@ -3,6 +3,7 @@ import { BadRequestException, ForbiddenException } from '@/exceptions'
 import { branchContext, type BranchContext } from './branch-context'
 
 type Args = Record<string, any>
+type ReferenceChecks = Map<string, Promise<unknown>>
 const models = new Map(
   Prisma.dmmf.datamodel.models.map((model) => [model.name, model]),
 )
@@ -130,17 +131,24 @@ async function assertReference(
   model: string,
   where: Args,
   context: BranchContext,
+  checks: ReferenceChecks,
 ) {
   const filter = branchWhere(model, context)
   if (!filter) return
   if (typeof where.id === 'string' && context.created.get(model)?.has(where.id))
     return
-  const found = await db[delegate(model)].findFirst({
-    where: andWhere(where, filter),
-    select: models.get(model)?.fields.some((field) => field.name === 'id')
-      ? { id: true }
-      : { branchId: true },
-  })
+  const key = JSON.stringify([model, where])
+  let pending = checks.get(key)
+  if (!pending) {
+    pending = db[delegate(model)].findFirst({
+      where: andWhere(where, filter),
+      select: models.get(model)?.fields.some((field) => field.name === 'id')
+        ? { id: true }
+        : { branchId: true },
+    })
+    checks.set(key, pending!)
+  }
+  const found = await pending
   if (!found)
     throw new BadRequestException(
       'Data yang dipilih tidak tersedia di cabang ini.',
@@ -153,6 +161,7 @@ async function prepareData(
   data: Args,
   context: BranchContext,
   creating: boolean,
+  checks: ReferenceChecks,
 ): Promise<void> {
   if (!data || typeof data !== 'object') return
   if (context.isAdmin && !context.isSuperAdmin && globalCatalogs.has(model))
@@ -200,7 +209,7 @@ async function prepareData(
     if (field.relationFromFields?.length === 1) {
       const key = field.relationFromFields[0]
       const id = typeof data[key] === 'object' ? data[key]?.set : data[key]
-      if (id) await assertReference(db, field.type, { id }, context)
+      if (id) await assertReference(db, field.type, { id }, context, checks)
     }
     const nested = data[field.name]
     if (!nested || typeof nested !== 'object') continue
@@ -210,20 +219,28 @@ async function prepareData(
           'Gunakan ID data untuk perubahan relasi cabang.',
         )
       for (const item of asArray(nested[operation]))
-        if (item) await assertReference(db, field.type, item, context)
+        if (item) await assertReference(db, field.type, item, context, checks)
     }
     for (const item of asArray(nested.create))
-      await prepareData(db, field.type, item, context, true)
+      await prepareData(db, field.type, item, context, true, checks)
     for (const item of asArray(nested.createMany?.data))
-      await prepareData(db, field.type, item, context, true)
+      await prepareData(db, field.type, item, context, true, checks)
     for (const item of asArray(nested.update)) {
-      if (item.where) await assertReference(db, field.type, item.where, context)
-      await prepareData(db, field.type, item.data ?? item, context, false)
+      if (item.where)
+        await assertReference(db, field.type, item.where, context, checks)
+      await prepareData(
+        db,
+        field.type,
+        item.data ?? item,
+        context,
+        false,
+        checks,
+      )
     }
     for (const item of asArray(nested.updateMany)) {
       const filter = branchWhere(field.type, context)
       if (filter) item.where = andWhere(item.where, filter)
-      await prepareData(db, field.type, item.data, context, false)
+      await prepareData(db, field.type, item.data, context, false, checks)
     }
     for (const item of asArray(nested.deleteMany)) {
       const filter = branchWhere(field.type, context)
@@ -246,6 +263,8 @@ export async function scopeBranchOperation(
   args: Args,
   context: BranchContext,
 ): Promise<Args> {
+  // Cache reference reads only within this operation; later writes must validate again.
+  const checks: ReferenceChecks = new Map()
   if (writes.has(operation)) {
     if (context.isAdmin && !context.isSuperAdmin && globalCatalogs.has(model))
       throw new ForbiddenException(
@@ -273,9 +292,12 @@ export async function scopeBranchOperation(
         data,
         context,
         operation.startsWith('create'),
+        checks,
       )
-    if (args.create) await prepareData(db, model, args.create, context, true)
-    if (args.update) await prepareData(db, model, args.update, context, false)
+    if (args.create)
+      await prepareData(db, model, args.create, context, true, checks)
+    if (args.update)
+      await prepareData(db, model, args.update, context, false, checks)
   }
   const filter = branchWhere(model, context)
   if (filter && !operation.startsWith('create'))

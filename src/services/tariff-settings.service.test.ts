@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   branch: vi.fn(),
+  list: vi.fn(),
   upsert: vi.fn(),
   refresh: vi.fn(),
   lock: vi.fn(),
@@ -10,7 +11,7 @@ vi.mock('@/lib/prisma', () => ({
     $transaction: async (fn: any) =>
       fn({
         branch: { findFirst: mocks.branch },
-        tariffPeriod: { upsert: mocks.upsert },
+        tariffPeriod: { upsert: mocks.upsert, findMany: mocks.list },
         $queryRaw: mocks.lock,
       }),
   },
@@ -31,6 +32,8 @@ const now = new Date('2026-10-30T03:00:00Z')
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.branch.mockResolvedValue({ id: 'cemara' })
+  mocks.list.mockResolvedValue([])
+  mocks.refresh.mockResolvedValue(undefined)
   mocks.upsert.mockResolvedValue({ id: 'rule' })
 })
 it('saves and refreshes the same branch and sport atomically from the effective Jakarta date', async () => {
@@ -45,7 +48,7 @@ it('saves and refreshes the same branch and sport atomically from the effective 
     expect.anything(),
     'cemara',
     'PADEL',
-    new Date('2026-10-31T17:00:00Z'),
+    new Date('2026-11-01T00:00:00Z'),
     now,
   )
 })
@@ -71,4 +74,59 @@ it('persists coaching amounts with the effective tariff rule on both create and 
   await saveTariffPeriod('cemara', { ...input, ...discounts }, now)
   expect(mocks.upsert.mock.calls[0][0].create).toMatchObject(discounts)
   expect(mocks.upsert.mock.calls[0][0].update).toMatchObject(discounts)
+})
+
+it('saves the first coaching discount with default hours without regenerating court slots', async () => {
+  mocks.refresh.mockRejectedValue(new Error('unnecessary schedule rebuild'))
+  await expect(
+    saveTariffPeriod(
+      'cemara',
+      {
+        ...input,
+        happyEnd: 15,
+        peakStart: 15,
+        happyCoachDiscount: 50000,
+        peakCoachDiscount: 100000,
+      },
+      now,
+    ),
+  ).resolves.toEqual({ id: 'rule' })
+  expect(mocks.refresh).not.toHaveBeenCalled()
+  expect(mocks.upsert.mock.calls[0][0].update).toMatchObject({
+    happyCoachDiscount: 50000,
+    peakCoachDiscount: 100000,
+  })
+})
+it('skips regeneration when changing discounts on an existing non-default hour rule', async () => {
+  mocks.list.mockResolvedValue([
+    { ...input, id: 'existing', branchId: 'cemara', happyCoachDiscount: 10000 },
+    {
+      ...input,
+      id: 'later',
+      branchId: 'cemara',
+      effectiveFrom: '2026-12-01',
+      happyEnd: 17,
+      peakStart: 17,
+    },
+  ])
+  await saveTariffPeriod('cemara', { ...input, happyCoachDiscount: 50000 }, now)
+  expect(mocks.refresh).not.toHaveBeenCalled()
+})
+it('compares hours against the rule effective on the playing date, rather than a later scheduled rule', async () => {
+  mocks.list.mockResolvedValue([
+    { ...input, branchId: 'cemara', effectiveFrom: '2026-10-01' },
+    {
+      ...input,
+      branchId: 'cemara',
+      effectiveFrom: '2026-12-01',
+      happyEnd: 17,
+      peakStart: 17,
+    },
+  ])
+  await saveTariffPeriod(
+    'cemara',
+    { ...input, happyEnd: 17, peakStart: 17 },
+    now,
+  )
+  expect(mocks.refresh).toHaveBeenCalledOnce()
 })
