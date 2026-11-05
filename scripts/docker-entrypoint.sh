@@ -115,7 +115,11 @@ for sql in \
   /app/prisma/recurring-bookings.sql \
   /app/prisma/membership-renewal.sql \
   /app/prisma/coaching-admin.sql \
+  /app/prisma/coaching-groups.sql \
+  /app/prisma/rolling-service-schedule.sql \
+  /app/prisma/admin-coaching-discounts.sql \
   /app/prisma/admin-payment-methods.sql \
+  /app/prisma/offline-payment-methods.sql \
   /app/prisma/staff-password-reset.sql
 do
   echo "   Applying $(basename "$sql")..."

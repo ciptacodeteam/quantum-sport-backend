@@ -310,7 +310,7 @@ export async function attachCoachingService(
   paymentMethodId?: string,
   now = new Date(),
   manualPayment?: {
-    method: 'EDC' | 'QRIS_STATIC' | 'BANK_TRANSFER_MANUAL'
+    method?: 'EDC' | 'QRIS_STATIC' | 'BANK_TRANSFER_MANUAL'
     received: boolean
   },
   coachingGroupId?: string,
@@ -322,7 +322,11 @@ export async function attachCoachingService(
     new Set(slotIds).size !== slotIds.length
   )
     throw new BadRequestException('Pilih maksimal satu coach dan satu ballboy.')
-  if (manualPayment && (!manualPayment.received || paymentMethodId))
+  if (
+    manualPayment &&
+    (!manualPayment.received ||
+      (manualPayment.method ? !!paymentMethodId : !paymentMethodId))
+  )
     throw new BadRequestException(
       'Konfirmasi pembayaran EDC/QRIS Statis/Transfer telah diterima.',
     )
@@ -448,7 +452,12 @@ export async function attachCoachingService(
     const method =
       manualPayment && price > 0
         ? await tx.paymentMethod.findFirst({
-            where: { channel: manualPayment.method, isActive: true },
+            where: {
+              isActive: true,
+              ...(manualPayment.method
+                ? { channel: manualPayment.method }
+                : { id: paymentMethodId, isOffline: true }),
+            },
             orderBy: { sequence: 'asc' },
           })
         : paid
@@ -460,13 +469,22 @@ export async function attachCoachingService(
               },
               orderBy: { sequence: 'asc' },
             })
-    if (manualPayment && price > 0 && !method)
+    if (
+      manualPayment &&
+      price > 0 &&
+      (!method || (!manualPayment.method && !method.isOffline))
+    )
       throw new BadRequestException(
         'Metode pembayaran manual belum tersedia atau nonaktif. Hubungi Super Admin untuk mengaktifkan EDC, QRIS Statis, atau Transfer.',
       )
     if (method && !method.isActive)
       throw new BadRequestException('Metode pembayaran tidak aktif.')
-    if (!paid && (!method?.channel || !isSupportedChannel(method.channel)))
+    if (
+      !paid &&
+      (method?.isOffline ||
+        !method?.channel ||
+        !isSupportedChannel(method.channel))
+    )
       throw new BadRequestException(
         'Pilih metode pembayaran layanan yang aktif.',
       )
@@ -549,7 +567,7 @@ export async function attachCoachingService(
           paidAt: now,
           meta: {
             source: 'ADMIN_SERVICE',
-            channel: manualPayment.method,
+            channel: manualPayment.method ?? method.channel ?? 'OFFLINE',
             receivedBy: cashierId,
             receivedAt: now.toISOString(),
           },

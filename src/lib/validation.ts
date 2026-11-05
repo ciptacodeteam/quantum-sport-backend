@@ -543,6 +543,15 @@ export const updateMembershipSchema = createMembershipSchema
 export type UpdateMembershipSchema = z.infer<typeof updateMembershipSchema>
 
 // Payment Method schemas
+const paymentMethodBoolean = z.preprocess(
+  (value) =>
+    value === 'true' || value === '1' || value === 1
+      ? true
+      : value === 'false' || value === '0' || value === 0
+        ? false
+        : value,
+  z.boolean(),
+)
 export const createPaymentMethodSchema = z.object({
   name: z.string().min(3).max(100),
   logo: z.file().optional(),
@@ -554,7 +563,8 @@ export const createPaymentMethodSchema = z.object({
     },
     { message: 'Percentage must be a non-negative number' },
   ),
-  channel: z.string().min(2).max(50).optional(),
+  channel: z.union([z.string().min(2).max(50), z.literal('')]).optional(),
+  isOffline: paymentMethodBoolean.optional().default(false),
   sequence: z.coerce.number().min(0).optional().default(0),
   isActive: z.coerce.boolean().optional().default(true),
 })
@@ -569,6 +579,7 @@ export const updatePaymentMethodSchema = createPaymentMethodSchema
     isActive: true,
   })
   .extend({
+    isOffline: paymentMethodBoolean.optional(),
     isActive: z.coerce
       .number()
       .optional()

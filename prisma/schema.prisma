@@ -411,6 +411,7 @@ model CourtCostSchedule {
 // Payments & Invoices
 // ------------------------------
 model PaymentMethod {
+  isOffline Boolean @default(false)
   id         String   @id @default(cuid())
   name       String
   logo       String?

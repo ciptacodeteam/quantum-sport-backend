@@ -56,6 +56,9 @@ Dockerfile*
 # Development scripts
 Makefile
 *.sh
+# Runtime entrypoint and its helper scripts are required by Dockerfile COPY.
+!scripts/
+!scripts/**
 
 # Tests (not needed in production)
 **/*.test.ts

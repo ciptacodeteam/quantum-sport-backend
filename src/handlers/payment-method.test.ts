@@ -1,7 +1,13 @@
 import { expect, it, vi } from 'vitest'
 const methods = [
-  { id: 'va', channel: 'BCA_VIRTUAL_ACCOUNT', isActive: true },
-  { id: 'qris', channel: 'QRIS', isActive: true },
+  {
+    id: 'va',
+    channel: 'BCA_VIRTUAL_ACCOUNT',
+    isActive: true,
+    isOffline: false,
+  },
+  { id: 'qris', channel: 'QRIS', isActive: true, isOffline: false },
+  { id: 'offline-qris', channel: 'QRIS', isActive: true, isOffline: true },
   { id: 'edc', channel: 'EDC', isActive: true },
   { id: 'static', channel: 'QRIS_STATIC', isActive: true },
   { id: 'transfer', channel: 'BANK_TRANSFER_MANUAL', isActive: true },
@@ -13,6 +19,8 @@ vi.mock('@/lib/prisma', () => ({
         methods.filter(
           (m) =>
             (!args?.where?.isActive || m.isActive) &&
+            (args?.where?.isOffline !== false ||
+              !('isOffline' in m && m.isOffline)) &&
             (!args?.where?.OR ||
               args.where.OR.some(({ channel }: any) =>
                 typeof channel === 'string'

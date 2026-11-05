@@ -25,6 +25,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/recurring-booking.service', () => ({
   ensureRecurringBookings: vi.fn(),
 }))
+vi.mock('./rolling-service-schedule.service', () => ({
+  ensureRollingServiceSchedules: vi.fn(),
+}))
 vi.mock('@/lib/prisma', () => {
   const court = {
     findUnique: async () => mocks.court,

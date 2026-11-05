@@ -49,7 +49,8 @@
     "db:staff-password-reset": "prisma db execute --schema prisma/schema.prisma --file prisma/staff-password-reset.sql",
     "db:coaching-groups": "prisma db execute --schema prisma/schema.prisma --file prisma/coaching-groups.sql",
     "db:rolling-service-schedule": "prisma db execute --schema prisma/schema.prisma --file prisma/rolling-service-schedule.sql",
-    "db:admin-coaching-discounts": "prisma db execute --schema prisma/schema.prisma --file prisma/admin-coaching-discounts.sql"
+    "db:admin-coaching-discounts": "prisma db execute --schema prisma/schema.prisma --file prisma/admin-coaching-discounts.sql",
+    "db:offline-payment-methods": "prisma db execute --schema prisma/schema.prisma --file prisma/offline-payment-methods.sql"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",
@@ -76,7 +77,8 @@
     "slugify": "^1.6.6",
     "xendit-node": "^7.0.0",
     "xlsx": "^0.18.5",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "prisma": "^6.19.0"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",
@@ -85,7 +87,6 @@
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
-    "prisma": "^6.19.0",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1",

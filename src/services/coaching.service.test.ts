@@ -279,3 +279,52 @@ it('fails clearly without creating billing records when a manual method is missi
   expect(mocks.tx.booking.create).not.toHaveBeenCalled()
   expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
 })
+
+it('settles a custom offline catalog method only after receipt confirmation, without gateway fees', async () => {
+  mocks.tx.paymentMethod.findFirst.mockResolvedValue({
+    id: 'cash',
+    isActive: true,
+    isOffline: true,
+    channel: null,
+    fees: 5000,
+    percentage: 2,
+  })
+  const result = await attachCoachingService(
+    'detail',
+    ['coach'],
+    'admin',
+    'cash',
+    now,
+    { received: true },
+  )
+  expect(mocks.tx.paymentMethod.findFirst).toHaveBeenCalledWith({
+    where: { id: 'cash', isOffline: true, isActive: true },
+    orderBy: { sequence: 'asc' },
+  })
+  expect(result).toMatchObject({ total: 150000, status: 'PAID' })
+  expect(mocks.tx.payment.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        paymentMethodId: 'cash',
+        status: 'PAID',
+        fees: 0,
+        meta: expect.objectContaining({ channel: 'OFFLINE' }),
+      }),
+    }),
+  )
+  expect(mocks.gateway).not.toHaveBeenCalled()
+})
+it('does not send an offline catalog method to the online gateway without receipt confirmation', async () => {
+  mocks.tx.paymentMethod.findFirst.mockResolvedValue({
+    id: 'cash',
+    isActive: true,
+    isOffline: true,
+    channel: 'QRIS',
+    fees: 0,
+    percentage: 0,
+  })
+  await expect(
+    attachCoachingService('detail', ['coach'], 'admin', 'cash', now),
+  ).rejects.toThrow('metode pembayaran layanan')
+  expect(mocks.gateway).not.toHaveBeenCalled()
+})

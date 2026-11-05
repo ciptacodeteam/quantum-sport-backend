@@ -10,6 +10,7 @@ export const getCustomerPaymentMethodsHandler = factory.createHandlers(
       const paymentMethods = await db.paymentMethod.findMany({
         where: {
           isActive: true,
+          isOffline: false,
           OR: [
             { channel: 'CARDS' },
             { channel: 'QRIS' },

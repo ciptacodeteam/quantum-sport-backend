@@ -518,3 +518,19 @@ it('rejects checkout when a concurrent order has already consumed the selected s
   expect(mocks.gateway.charge).not.toHaveBeenCalled()
   expect(tx.invoice.create).not.toHaveBeenCalled()
 })
+
+it('rejects a direct customer checkout with an offline payment ID even if its channel is online', async () => {
+  mocks.db.paymentMethod.findUnique.mockResolvedValue({
+    id: 'offline',
+    isActive: true,
+    isOffline: true,
+    channel: 'QRIS',
+    fees: 0,
+    percentage: '0',
+  })
+  await expect(
+    checkout({ courtSlots: ['court-slot'], paymentMethodId: 'offline' }),
+  ).rejects.toThrow('offline hanya tersedia melalui admin')
+  expect(mocks.db.$transaction).not.toHaveBeenCalled()
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})

@@ -602,6 +602,10 @@ export const checkoutHandler = factory.createHandlers(
         : null
       if (paymentMethodId && !paymentMethod)
         throw new NotFoundException('Payment method not found')
+      if (paymentMethod?.isOffline)
+        throw new BadRequestException(
+          'Metode pembayaran offline hanya tersedia melalui admin.',
+        )
       if (paymentMethod && !paymentMethod.isActive)
         throw new BadRequestException('Payment method is not active')
 

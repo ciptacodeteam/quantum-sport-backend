@@ -68,6 +68,10 @@ export const membershipCheckoutHandler = factory.createHandlers(
       if (!paymentMethod) {
         throw new NotFoundException('Payment method not found')
       }
+      if (paymentMethod.isOffline)
+        throw new BadRequestException(
+          'Metode pembayaran offline hanya tersedia melalui admin.',
+        )
       if (!paymentMethod.isActive) {
         throw new BadRequestException('Payment method is not active')
       }

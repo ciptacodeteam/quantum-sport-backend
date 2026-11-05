@@ -302,7 +302,9 @@ export const attachCoachingHandler = factory.createHandlers(
         slotIds: z.array(z.string().min(1)).min(1).max(2).optional(),
         manualPayment: z
           .object({
-            method: z.enum(['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL']),
+            method: z
+              .enum(['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'])
+              .optional(),
             received: z.literal(true),
           })
           .strict()
@@ -313,7 +315,9 @@ export const attachCoachingHandler = factory.createHandlers(
       .strict()
       .refine((v) => !!v.slotId !== !!v.slotIds, 'Pilih layanan.')
       .refine(
-        (v) => !(v.manualPayment && v.paymentMethodId),
+        (v) =>
+          !v.manualPayment ||
+          (v.manualPayment.method ? !v.paymentMethodId : !!v.paymentMethodId),
         'Pilih satu metode pembayaran.',
       ),
     validateHook,
