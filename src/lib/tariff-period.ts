@@ -8,11 +8,16 @@ export const defaultTariffPeriod = {
   peakEnd: 24,
 }
 export type TariffBands = typeof defaultTariffPeriod
-export type TariffRule = TariffBands & {
-  branchId: string
-  sport: string
-  effectiveFrom: Date | string
+export type CoachingDiscounts = {
+  happyCoachDiscount?: number
+  peakCoachDiscount?: number
 }
+export type TariffRule = TariffBands &
+  CoachingDiscounts & {
+    branchId: string
+    sport: string
+    effectiveFrom: Date | string
+  }
 export const tariffPeriodSchema = z
   .object({
     sport: z.enum(['PADEL', 'TENNIS']),
@@ -28,6 +33,8 @@ export const tariffPeriodSchema = z
     happyEnd: z.number().int().min(1).max(24),
     peakStart: z.number().int().min(0).max(23),
     peakEnd: z.number().int().min(1).max(24),
+    happyCoachDiscount: z.number().int().min(0).max(2147483647).optional(),
+    peakCoachDiscount: z.number().int().min(0).max(2147483647).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.happyEnd <= value.happyStart)
@@ -64,7 +71,7 @@ export function resolveTariffPeriod(
   startAt: Date | string,
   branchId: string,
   sport: string,
-): TariffBands {
+): TariffBands & CoachingDiscounts {
   const date = clubWallTime(startAt).format('YYYY-MM-DD')
   return (
     rules
@@ -86,9 +93,7 @@ export function tariffBand(
 ): 'happyHour' | 'peakHour' | null {
   const start = clubWallTime(startAt)
   const minutes = start.hour() * 60 + start.minute()
-  const duration = endAt
-    ? clubWallTime(endAt).diff(start, 'minute', true)
-    : 0
+  const duration = endAt ? clubWallTime(endAt).diff(start, 'minute', true) : 0
   for (const band of ['happy', 'peak'] as const) {
     if (
       minutes >= bands[`${band}Start`] * 60 &&

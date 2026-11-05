@@ -198,6 +198,7 @@ model Staff {
   coachType    CoachType?
   coachProfile String?    @db.Text
   adminServiceOnly Boolean @default(false)
+  rollingServiceSchedule Json?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @default(now()) @updatedAt
 
@@ -993,6 +994,8 @@ model Branch {
 
 // Effective-dated court tariff bands, in whole hours of Asia/Jakarta.
 model TariffPeriod {
+  happyCoachDiscount Int @default(0)
+  peakCoachDiscount Int @default(0)
   id             String    @id @default(cuid())
   branchId       String
   sport          CourtSport

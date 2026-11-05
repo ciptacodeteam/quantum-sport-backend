@@ -1,3 +1,4 @@
+import { ensureRollingServiceSchedules } from './rolling-service-schedule.service'
 import { ensureRecurringBookings } from '@/services/recurring-booking.service'
 import { branchContext, withBranchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
@@ -40,7 +41,10 @@ async function generate(
   if (
     !reconfigure &&
     court.slotsGeneratedThrough &&
-    !clubWallTime(court.slotsGeneratedThrough).isBefore(clubWallTime(end), 'day')
+    !clubWallTime(court.slotsGeneratedThrough).isBefore(
+      clubWallTime(end),
+      'day',
+    )
   )
     return
   let from =
@@ -268,8 +272,7 @@ export async function ensureRollingCourtSchedules(
     const end = bookingWindowEnd(court.bookingWindowMonths!, now)
     if (
       court.slotsGeneratedThrough &&
-      clubWallDateString(court.slotsGeneratedThrough) >=
-        clubWallDateString(end)
+      clubWallDateString(court.slotsGeneratedThrough) >= clubWallDateString(end)
     )
       continue
     const extend = () =>
@@ -288,4 +291,5 @@ export async function ensureRollingCourtSchedules(
     }
   }
   await ensureRecurringBookings(now)
+  await ensureRollingServiceSchedules(now)
 }

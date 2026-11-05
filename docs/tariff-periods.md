@@ -84,3 +84,20 @@ RUN_TARIFF_DB_TESTS=1 node --import dotenv/config node_modules/vitest/vitest.mjs
 Tes integrasi dibatasi ke PostgreSQL lokal. Data fixture menggunakan awalan unik
 `tariff-test-` dan dibersihkan sesudah tes; tidak menulis aturan cabang bisnis.
 Frontend menggunakan `npx vitest run --globals` sesuai setup jest-dom proyek.
+
+## Potongan coaching khusus admin
+
+Halaman Pengaturan Jam Tarif menyediakan `happyCoachDiscount` dan `peakCoachDiscount`, berupa rupiah per slot lapangan satu jam. Keduanya mengikuti cabang, olahraga, dan tanggal mulai berlaku aturan tarif. Nilai 0 menonaktifkan potongan; nilai negatif, pecahan, atau di atas 2147483647 ditolak.
+
+Admin checkout menghitung nominal dari aturan server untuk tanggal bermain, hanya jika ada coach dengan awal dan akhir jam yang sama. Potongan maksimal sebesar harga lapangan yang dibayar, tidak mengurangi biaya coach, dan tidak ditumpuk dengan slot yang ditanggung membership. Detail lapangan, total booking, dan invoice menyimpan hasil potongan tersebut dalam transaksi yang sama. Booking lama tidak dihitung ulang.
+
+Customer checkout dan promo customer tidak menerapkan potongan coaching. Permintaan add-on coach melalui API customer tetap ditolak oleh kebijakan checkout customer.
+
+Jalankan migrasi tambahan sebelum memulai backend versi ini:
+
+```sh
+bun run db:admin-coaching-discounts
+bun run db:generate
+```
+
+Nominal awal adalah 0. Admin perlu mengisi potongan yang diinginkan lalu menyimpan aturan jam tarif. Tanggal mulai berlaku mengikuti **tanggal bermain**.

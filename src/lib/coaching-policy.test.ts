@@ -66,3 +66,40 @@ describe('admin coaching rules', () => {
     expect(() => assertCoachingSport('BALLBOY', null, 'TENNIS')).not.toThrow()
   })
 })
+
+it('builds repeating services only at matching court times and extends without a date range', async () => {
+  const { buildRollingCoachingSlots, rollingCoachingScheduleSchema } =
+    await import('./coaching-policy')
+  const config = rollingCoachingScheduleSchema.parse({
+    followCourtWindow: true,
+    days: [1],
+    startHour: 13,
+    endHour: 15,
+    price: 200000,
+  })
+  const slot = (day: string, hour: number) => ({
+    startAt: new Date(`${day}T${hour}:00:00Z`),
+    endAt: new Date(`${day}T${hour + 1}:00:00Z`),
+  })
+  const monday = slot('2026-11-02', 13)
+  const nextMonday = slot('2026-11-09', 13)
+  const courts = [
+    monday,
+    monday,
+    slot('2026-11-03', 13),
+    slot('2026-11-02', 15),
+  ]
+  const now = new Date('2026-11-01T00:00:00+07:00')
+  expect(buildRollingCoachingSlots(config, courts, now)).toEqual([
+    { ...monday, price: 200000 },
+  ])
+  expect(
+    buildRollingCoachingSlots(config, [...courts, nextMonday], now),
+  ).toEqual([
+    { ...monday, price: 200000 },
+    { ...nextMonday, price: 200000 },
+  ])
+  expect(
+    rollingCoachingScheduleSchema.safeParse({ ...config, endHour: 12 }).success,
+  ).toBe(false)
+})

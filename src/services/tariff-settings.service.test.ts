@@ -65,3 +65,10 @@ it('rejects an inactive or missing branch', async () => {
   )
   expect(mocks.upsert).not.toHaveBeenCalled()
 })
+
+it('persists coaching amounts with the effective tariff rule on both create and update', async () => {
+  const discounts = { happyCoachDiscount: 45000, peakCoachDiscount: 25000 }
+  await saveTariffPeriod('cemara', { ...input, ...discounts }, now)
+  expect(mocks.upsert.mock.calls[0][0].create).toMatchObject(discounts)
+  expect(mocks.upsert.mock.calls[0][0].update).toMatchObject(discounts)
+})

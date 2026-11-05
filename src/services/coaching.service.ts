@@ -1,3 +1,8 @@
+import { ensureRollingCourtSchedules } from './rolling-court-schedule.service'
+import { reconcileRollingServiceSchedule } from './rolling-service-schedule.service'
+import { rollingCoachingScheduleSchema } from '@/lib/coaching-policy'
+import { clubWallDateString, clubNowAsWallDate } from '@/lib/club-time'
+import { bookingWindowEnd } from '@/lib/rolling-booking-window'
 import {
   coachingGroupMembershipSelect,
   eligibleCoachingGroups,
@@ -37,6 +42,7 @@ export const coachingSelect = {
   coachProfile: true,
   coachingGroups: { select: coachingGroupMembershipSelect },
   isActive: true,
+  rollingServiceSchedule: true,
 } satisfies Prisma.StaffSelect
 
 export async function getCoachingPerson(
@@ -139,10 +145,14 @@ export async function saveCoachingSchedule(
 
 export async function coachingSchedule(
   staffId: string,
-  from: string,
-  to: string,
+  from?: string,
+  to?: string,
 ) {
-  await getCoachingPerson(db, staffId)
+  const person = await getCoachingPerson(db, staffId)
+  if (person.rollingServiceSchedule || !from || !to)
+    await ensureRollingCourtSchedules()
+  from ??= clubWallDateString(clubNowAsWallDate())
+  to ??= clubWallDateString(bookingWindowEnd(12))
   const slots = await db.slot.findMany({
     where: {
       staffId,
@@ -161,6 +171,7 @@ export async function coachingSchedule(
     ...s,
     startAt: formatClubWallClock(s.startAt),
     endAt: formatClubWallClock(s.endAt),
+    isAvailable: s.isAvailable && !s.scheduleClosed,
     booked: !!(bookingCoaches.length || bookingBallboys.length),
   }))
 }
@@ -191,6 +202,7 @@ export async function coachingAvailability(
   end: string,
   now = new Date(),
 ) {
+  await ensureRollingCourtSchedules(undefined, now)
   const detail = await coachingCourtDetail(db, detailId)
   const startAt = toClubWallDate(start),
     endAt = toClubWallDate(end)
@@ -604,5 +616,24 @@ export async function attachCoachingService(
       status: settled ? 'PAID' : invoice.status,
       dueDate,
     }
+  })
+}
+
+export async function saveRollingCoachingSchedule(
+  staffId: string,
+  input: z.infer<typeof rollingCoachingScheduleSchema>,
+  now = new Date(),
+) {
+  const config = rollingCoachingScheduleSchema.parse(input)
+  await getCoachingPerson(db, staffId)
+  await ensureRollingCourtSchedules(undefined, now)
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM staff WHERE id = ${staffId} FOR UPDATE`
+    await getCoachingPerson(tx, staffId)
+    const staff = await tx.staff.update({
+      where: { id: staffId },
+      data: { rollingServiceSchedule: config },
+    })
+    return reconcileRollingServiceSchedule(tx, staff, now, true)
   })
 }

@@ -45,6 +45,8 @@ export async function saveTariffPeriod(
         happyEnd: data.happyEnd,
         peakStart: data.peakStart,
         peakEnd: data.peakEnd,
+        happyCoachDiscount: data.happyCoachDiscount,
+        peakCoachDiscount: data.peakCoachDiscount,
       },
     })
     await refreshTariffCourtSchedules(

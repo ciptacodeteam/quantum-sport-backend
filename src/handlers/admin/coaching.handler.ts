@@ -24,6 +24,7 @@ import { assertCourtSportAtBranch } from '@/lib/court-branch-policy'
 import {
   coachingProfileSchema,
   coachingScheduleSchema,
+  rollingCoachingScheduleSchema,
 } from '@/lib/coaching-policy'
 import {
   coachingAvailability,
@@ -31,6 +32,7 @@ import {
   coachingSelect,
   getCoachingPerson,
   saveCoachingSchedule,
+  saveRollingCoachingSchedule,
   attachCoachingService,
 } from '@/services/coaching.service'
 import { formatClubWallClock, toClubWallDate } from '@/lib/club-time'
@@ -48,13 +50,17 @@ const wallDatetime = z
 const params = z.object({ id: z.string().min(1) })
 const dateRange = z
   .object({
-    fromDate: coachingScheduleSchema.shape.fromDate,
-    toDate: coachingScheduleSchema.shape.toDate,
+    fromDate: coachingScheduleSchema.shape.fromDate.optional(),
+    toDate: coachingScheduleSchema.shape.toDate.optional(),
   })
   .refine(
     (v) =>
-      +toClubWallDate(v.toDate) >= +toClubWallDate(v.fromDate) &&
-      +toClubWallDate(v.toDate) - +toClubWallDate(v.fromDate) <= 366 * 86400000,
+      (!v.fromDate && !v.toDate) ||
+      (!!v.fromDate &&
+        !!v.toDate &&
+        +toClubWallDate(v.toDate) >= +toClubWallDate(v.fromDate) &&
+        +toClubWallDate(v.toDate) - +toClubWallDate(v.fromDate) <=
+          366 * 86400000),
     'Periode maksimal 366 hari.',
   )
 export const listCoachingHandler = factory.createHandlers(async (c) => {
@@ -189,17 +195,22 @@ export const getCoachingScheduleHandler = factory.createHandlers(
 )
 export const saveCoachingScheduleHandler = factory.createHandlers(
   zValidator('param', params, validateHook),
-  zValidator('json', coachingScheduleSchema, validateHook),
-  async (c) =>
-    c.json(
-      ok(
-        await saveCoachingSchedule(
-          c.req.valid('param').id,
-          c.req.valid('json'),
-        ),
-      ),
-    ),
+  zValidator(
+    'json',
+    z.union([rollingCoachingScheduleSchema, coachingScheduleSchema]),
+    validateHook,
+  ),
+  async (c) => {
+    const id = c.req.valid('param').id
+    const input = c.req.valid('json')
+    const result =
+      'followCourtWindow' in input
+        ? await saveRollingCoachingSchedule(id, input)
+        : await saveCoachingSchedule(id, input)
+    return c.json(ok(result))
+  },
 )
+
 export const toggleCoachingSlotHandler = factory.createHandlers(
   zValidator('param', params, validateHook),
   zValidator(

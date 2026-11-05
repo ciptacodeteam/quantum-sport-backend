@@ -86,3 +86,43 @@ export function assertCoachingSport(
       'Olahraga coach tidak sesuai dengan lapangan.',
     )
 }
+
+/** Repeating service hours; dates come exclusively from rolling court slots. */
+export const rollingCoachingScheduleSchema = z
+  .object({
+    followCourtWindow: z.literal(true),
+    days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+    startHour: z.number().int().min(0).max(23),
+    endHour: z.number().int().min(1).max(24),
+    price: z.number().int().min(0).max(2147483647),
+  })
+  .strict()
+  .refine(
+    (v) => v.endHour > v.startHour,
+    'Jam selesai harus setelah jam mulai.',
+  )
+
+export function buildRollingCoachingSlots(
+  config: z.infer<typeof rollingCoachingScheduleSchema>,
+  courtSlots: { startAt: Date; endAt: Date }[],
+  now = new Date(),
+) {
+  const unique = new Map<
+    string,
+    { startAt: Date; endAt: Date; price: number }
+  >()
+  for (const slot of courtSlots) {
+    const wall = dayjs.utc(slot.startAt)
+    if (
+      slot.startAt <= courtBookingCutoff(now) ||
+      !config.days.includes(wall.day() || 7) ||
+      wall.hour() < config.startHour ||
+      wall.hour() >= config.endHour ||
+      wall.minute() !== 0 ||
+      +slot.endAt - +slot.startAt !== 3_600_000
+    )
+      continue
+    unique.set(slot.startAt.toISOString(), { ...slot, price: config.price })
+  }
+  return [...unique.values()]
+}

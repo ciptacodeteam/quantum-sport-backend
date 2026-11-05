@@ -26,21 +26,15 @@ export function getCourtCoachBundleDiscount(
   courtSlot: CourtBundleSlot,
   rules: TariffRule[] = [],
 ) {
-  const sport = courtSlot.court?.sport
-  if (sport === CourtSport.TENNIS) return 100_000
-
-  const band = tariffBand(
+  const bands = resolveTariffPeriod(
+    rules,
     courtSlot.startAt,
-    resolveTariffPeriod(
-      rules,
-      courtSlot.startAt,
-      courtSlot.branchId ?? branchContext.getStore()?.branchId ?? '',
-      sport ?? 'PADEL',
-    ),
-    courtSlot.endAt,
+    courtSlot.branchId ?? branchContext.getStore()?.branchId ?? '',
+    courtSlot.court?.sport ?? CourtSport.PADEL,
   )
-  if (band === 'happyHour') return 100_000
-  if (band === 'peakHour') return 70_000
+  const band = tariffBand(courtSlot.startAt, bands, courtSlot.endAt)
+  if (band === 'happyHour') return bands.happyCoachDiscount ?? 0
+  if (band === 'peakHour') return bands.peakCoachDiscount ?? 0
   return 0
 }
 
