@@ -165,3 +165,97 @@ it('caps the coaching discount at the paid court price', async () => {
     }),
   )
 })
+
+it('validates and saves the selected coaching group with the booked coach', async () => {
+  const [coach] = await mocks.tx.slot.findMany({ where: { type: 'COACH' } })
+  coach.staff.id = 'staff-coach'
+  coach.staff.coachingGroups = [
+    {
+      group: {
+        id: 'academy',
+        name: 'SR Academy',
+        isActive: true,
+        sports: ['PADEL'],
+        branches: [{ branchId: 'cemara' }],
+      },
+    },
+  ]
+  coach.branchId = 'cemara'
+  mocks.tx.$queryRaw = vi.fn()
+  mocks.tx.coachingGroup = {
+    findFirst: vi.fn().mockResolvedValue({ id: 'academy', name: 'SR Academy' }),
+  }
+  mocks.payload.coachGroups = [
+    { slotId: 'coach-slot', coachingGroupId: 'academy' },
+  ]
+  await checkout()
+  expect(mocks.tx.coachingGroup.findFirst).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        id: 'academy',
+        sports: { hasEvery: ['PADEL'] },
+        coaches: { some: { staffId: 'staff-coach' } },
+      }),
+    }),
+  )
+  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        coachingGroupId: 'academy',
+        coachingGroupName: 'SR Academy',
+        slotId: 'coach-slot',
+      }),
+    }),
+  )
+})
+it('refuses a group that does not contain the selected coach or match its branch and sport', async () => {
+  mocks.tx.$queryRaw = vi.fn()
+  mocks.tx.coachingGroup = { findFirst: vi.fn().mockResolvedValue(null) }
+  mocks.payload.coachGroups = [
+    { slotId: 'coach-slot', coachingGroupId: 'other-group' },
+  ]
+  await expect(checkout()).rejects.toThrow('Coach tidak tersedia di grup')
+  expect(mocks.tx.bookingCoach.create).not.toHaveBeenCalled()
+  expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
+})
+
+it.each(['PADEL', 'TENNIS'] as const)(
+  'books a %s ballboy only with matching court sport and saves the court assignment',
+  async (sport) => {
+    const [court] = await mocks.tx.slot.findMany({ where: { type: 'COURT' } })
+    court.court.sport = sport
+    const ballboy = {
+      ...range,
+      id: 'ballboy-slot',
+      staff: { coachType: sport },
+      price: 45000,
+      bookingBallboys: [],
+    }
+    mocks.tx.slot.findMany.mockImplementation(({ where }: any) =>
+      where.type === 'BALLBOY' ? [ballboy] : [court],
+    )
+    mocks.tx.bookingBallboy = { create: vi.fn() }
+    mocks.payload.coachSlots = []
+    mocks.payload.ballboySlots = [
+      { slotId: 'ballboy-slot', courtSlotId: 'court-slot' },
+    ]
+    await checkout()
+    expect(mocks.tx.bookingBallboy.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          slotId: 'ballboy-slot',
+          courtSlotId: 'court-slot',
+        }),
+      }),
+    )
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: 195000 }),
+      }),
+    )
+    ballboy.staff.coachType = sport === 'PADEL' ? 'TENNIS' : 'PADEL'
+    mocks.tx.bookingBallboy.create.mockClear()
+    await expect(checkout()).rejects.toThrow('Olahraga ballboy tidak sesuai')
+    expect(mocks.tx.bookingBallboy.create).not.toHaveBeenCalled()
+  },
+)

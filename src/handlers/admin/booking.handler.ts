@@ -1,3 +1,4 @@
+import { ballboySportWhere } from '@/lib/coaching-policy'
 import {
   courtBookingListSchema,
   getCourtBookingList,
@@ -83,12 +84,6 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
     },
   }
 
-  if (courtSport !== CourtSport.TENNIS) {
-    return {
-      OR: [courtBookingWhere, coachBookingWhere, inventoryBookingWhere],
-    }
-  }
-
   return {
     OR: [
       courtBookingWhere,
@@ -96,9 +91,14 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
       {
         ballboys: {
           some: {
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
+            status: { not: BookingStatus.CANCELLED },
+            OR: [
+              { courtSlot: { court: { sport: courtSport } } },
+              {
+                courtSlotId: null,
+                slot: { staff: ballboySportWhere(courtSport) },
+              },
+            ],
           },
         },
       },

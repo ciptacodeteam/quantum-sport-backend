@@ -13,6 +13,7 @@ import { db } from '@/lib/prisma'
 import { formatClubWallClock, toClubWallDate } from '@/lib/club-time'
 import {
   assertCoachingSport,
+  ballboySportWhere,
   buildCoachingSlots,
   coachingScheduleSchema,
 } from '@/lib/coaching-policy'
@@ -232,14 +233,14 @@ export async function coachingAvailability(
             coachType: { in: [sport, 'PADEL_TENNIS'] },
           },
         },
-        ...(sport === 'TENNIS'
-          ? [
-              {
-                type: 'BALLBOY' as const,
-                staff: { isActive: true, role: 'BALLBOY' as const },
-              },
-            ]
-          : []),
+        {
+          type: 'BALLBOY' as const,
+          staff: {
+            isActive: true,
+            role: 'BALLBOY' as const,
+            ...ballboySportWhere(sport),
+          },
+        },
       ],
     },
     include: { staff: { select: coachingSelect } },
@@ -255,20 +256,18 @@ export async function coachingAvailability(
     select: { staffId: true },
   })
   const busyIds = new Set(busy.map((s) => s.staffId))
-  const hasBallboy =
-    sport === 'TENNIS' &&
-    !!(await db.bookingBallboy.findFirst({
-      where: {
-        courtSlotId: detail.slotId,
-        OR: [
-          { bookingId: detail.bookingId },
-          { booking: { serviceForBookingId: detail.bookingId } },
-        ],
-        ...activeBallboys,
-        slot: { startAt: { lt: endAt }, endAt: { gt: startAt } },
-      },
-      select: { id: true },
-    }))
+  const hasBallboy = !!(await db.bookingBallboy.findFirst({
+    where: {
+      courtSlotId: detail.slotId,
+      OR: [
+        { bookingId: detail.bookingId },
+        { booking: { serviceForBookingId: detail.bookingId } },
+      ],
+      ...activeBallboys,
+      slot: { startAt: { lt: endAt }, endAt: { gt: startAt } },
+    },
+    select: { id: true },
+  }))
   return slots
     .filter(
       (s) =>
@@ -397,7 +396,7 @@ export async function attachCoachingService(
         )
       if (slot.startAt <= courtBookingCutoff(now))
         throw new BadRequestException('Slot melewati batas pemesanan 15 menit.')
-      // At most one ballboy for each tennis court interval.
+      // At most one ballboy for each court interval.
       if (
         slot.type === 'BALLBOY' &&
         (await tx.bookingBallboy.findFirst({

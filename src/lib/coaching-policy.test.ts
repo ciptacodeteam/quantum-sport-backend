@@ -53,9 +53,9 @@ describe('admin coaching rules', () => {
       buildCoachingSlots({ ...schedule, days: [1] }, new Date('2026-10-01')),
     ).toEqual([])
   })
-  it('restricts ballboys to tennis and matches coach sports', () => {
+  it('matches service sports and keeps legacy ballboys tennis-only', () => {
     expect(() => assertCoachingSport('BALLBOY', null, 'PADEL')).toThrow(
-      'tennis',
+      'sesuai',
     )
     expect(() => assertCoachingSport('COACH', 'PADEL', 'TENNIS')).toThrow(
       'sesuai',
@@ -102,4 +102,20 @@ it('builds repeating services only at matching court times and extends without a
   expect(
     rollingCoachingScheduleSchema.safeParse({ ...config, endHour: 12 }).success,
   ).toBe(false)
+})
+
+it('supports padel and dual-sport ballboys while rejecting the other sport', () => {
+  expect(() => assertCoachingSport('BALLBOY', 'PADEL', 'PADEL')).not.toThrow()
+  expect(() => assertCoachingSport('BALLBOY', 'TENNIS', 'PADEL')).toThrow(
+    'sesuai',
+  )
+  expect(() => assertCoachingSport('BALLBOY', 'PADEL', 'TENNIS')).toThrow(
+    'sesuai',
+  )
+  expect(() =>
+    assertCoachingSport('BALLBOY', 'PADEL_TENNIS', 'TENNIS'),
+  ).not.toThrow()
+  expect(() =>
+    assertCoachingSport('BALLBOY', 'PADEL_TENNIS', 'PADEL'),
+  ).not.toThrow()
 })

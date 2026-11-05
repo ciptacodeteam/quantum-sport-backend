@@ -1,3 +1,8 @@
+import { assertCoachingSport } from '@/lib/coaching-policy'
+import {
+  coachingGroupMembershipSelect,
+  resolveBookingCoachingGroup,
+} from '@/services/coaching-group.service'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
 import { courtBookingCutoff } from '@/lib/booking-time-policy'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
@@ -38,6 +43,16 @@ const adminCheckoutSchema = z
     totalHours: z.number().positive(),
     courtSlots: z.array(z.string()).optional(),
     coachSlots: z.array(z.string()).optional(),
+    coachGroups: z
+      .array(
+        z
+          .object({
+            slotId: z.string().min(1),
+            coachingGroupId: z.string().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     // Optional description for coach booking – e.g. names of up to 4 members
     coachDescription: z.string().max(500).optional(),
     adminNote: z.string().max(1000).optional(),
@@ -134,9 +149,14 @@ function timeRangesOverlap(
   )
 }
 
-function validateBallboysForTennisCourts(
+function validateBallboysForCourts(
   ballboySelections: BallboySelectionInput[],
-  ballboySlots: Array<{ id: string; startAt: Date; endAt: Date }>,
+  ballboySlots: Array<{
+    id: string
+    startAt: Date
+    endAt: Date
+    staff?: { coachType: string | null } | null
+  }>,
   courtSlots: Array<{
     id: string
     startAt: Date
@@ -151,15 +171,11 @@ function validateBallboysForTennisCourts(
   if (courtSlots.length === 0) {
     if (ballboySelections.some((selection) => selection.courtSlotId)) {
       throw new BadRequestException(
-        'Ballboy selection must match a selected tennis court booking slot',
+        'Ballboy selection must match a selected court booking slot',
       )
     }
 
     return
-  }
-
-  if (courtSlots.some((slot) => slot.court?.sport !== CourtSport.TENNIS)) {
-    throw new BadRequestException('Ballboy is only available for tennis courts')
   }
 
   const ballboyCountByCourtSlot = new Map<string, number>()
@@ -182,13 +198,13 @@ function validateBallboysForTennisCourts(
 
       if (!selectedCourtSlot) {
         throw new BadRequestException(
-          'Ballboy selection must match a selected tennis court booking slot',
+          'Ballboy selection must match a selected court booking slot',
         )
       }
 
       if (!ballboyCoversCourtSlot(ballboySlot, selectedCourtSlot)) {
         throw new BadRequestException(
-          'Ballboy slots must match selected tennis court booking times',
+          'Ballboy slots must match selected court booking times',
         )
       }
 
@@ -199,9 +215,16 @@ function validateBallboysForTennisCourts(
       )
     }
 
+    for (const court of matchingCourtSlots)
+      assertCoachingSport(
+        'BALLBOY',
+        ballboySlot.staff?.coachType ?? null,
+        court.court?.sport ?? 'PADEL',
+      )
+
     if (matchingCourtSlots.length === 0) {
       throw new BadRequestException(
-        'Ballboy slots must match selected tennis court booking times',
+        'Ballboy slots must match selected court booking times',
       )
     }
 
@@ -238,6 +261,7 @@ export const adminCheckoutHandler = factory.createHandlers(
       totalHours,
       courtSlots: rawCourtSlots,
       coachSlots: rawCoachSlots,
+      coachGroups,
       coachDescription,
       adminNote,
       useMembership,
@@ -247,6 +271,15 @@ export const adminCheckoutHandler = factory.createHandlers(
     } = c.req.valid('json') as AdminCheckoutSchema
     const courtSlots = uniqueSlotIds(rawCourtSlots)
     const coachSlots = uniqueSlotIds(rawCoachSlots)
+    if (
+      coachGroups &&
+      (new Set(coachGroups.map((item) => item.slotId)).size !==
+        coachGroups.length ||
+        coachGroups.some((item) => !coachSlots?.includes(item.slotId)))
+    )
+      throw new BadRequestException(
+        'Pilihan grup harus sesuai slot coach yang dipilih.',
+      )
     const ballboySelections = normalizeBallboySelections(rawBallboySlots)
     const ballboySlots = Array.from(
       new Set(ballboySelections.map((selection) => selection.slotId)),
@@ -548,6 +581,8 @@ export const adminCheckoutHandler = factory.createHandlers(
             include: {
               staff: {
                 select: {
+                  id: true,
+                  coachingGroups: { select: coachingGroupMembershipSelect },
                   coachType: true,
                 },
               },
@@ -586,7 +621,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             if (
               slotData.some(
                 (slot) =>
-                  slot.staff?.coachType &&
+                  !slot.staff?.coachType ||
                   !allowedCoachTypes.includes(slot.staff.coachType),
               )
             ) {
@@ -631,9 +666,21 @@ export const adminCheckoutHandler = factory.createHandlers(
           })
 
           for (const slot of slotData) {
+            const group = await resolveBookingCoachingGroup(
+              tx,
+              {
+                id: slot.staff?.id ?? slot.staffId!,
+                coachingGroups: slot.staff?.coachingGroups,
+              },
+              slot.branchId,
+              courtSportForMembership ? [courtSportForMembership] : [],
+              coachGroups?.find((item) => item.slotId === slot.id)
+                ?.coachingGroupId,
+            )
             totalPrice += slot.price
             await tx.bookingCoach.create({
               data: {
+                ...group,
                 bookingId: booking.id,
                 slotId: slot.id,
                 bookingCoachTypeId: defaultCoachType.id,
@@ -697,6 +744,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               isAvailable: true,
             },
             include: {
+              staff: { select: { coachType: true } },
               bookingBallboys: {
                 where: {
                   status: {
@@ -713,7 +761,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more ballboy slots not found or unavailable',
             )
           }
-          validateBallboysForTennisCourts(
+          validateBallboysForCourts(
             ballboySelections,
             slotData,
             selectedCourtSlots,

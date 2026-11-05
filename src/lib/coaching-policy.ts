@@ -1,3 +1,4 @@
+import type { CourtSport, Prisma } from '@prisma/client'
 import { BadRequestException } from '@/exceptions'
 import { toClubWallDate } from './club-time'
 import { courtBookingCutoff } from './booking-time-policy'
@@ -79,11 +80,10 @@ export function assertCoachingSport(
   coachType: string | null,
   sport: string,
 ) {
-  if (kind === 'BALLBOY' && sport !== 'TENNIS')
-    throw new BadRequestException('Ballboy hanya untuk lapangan tennis.')
-  if (kind === 'COACH' && coachType !== sport && coachType !== 'PADEL_TENNIS')
+  const effectiveType = kind === 'BALLBOY' ? (coachType ?? 'TENNIS') : coachType
+  if (effectiveType !== sport && effectiveType !== 'PADEL_TENNIS')
     throw new BadRequestException(
-      'Olahraga coach tidak sesuai dengan lapangan.',
+      `Olahraga ${kind === 'BALLBOY' ? 'ballboy' : 'coach'} tidak sesuai dengan lapangan.`,
     )
 }
 
@@ -125,4 +125,14 @@ export function buildRollingCoachingSlots(
     unique.set(slot.startAt.toISOString(), { ...slot, price: config.price })
   }
   return [...unique.values()]
+}
+
+/** Older ballboy profiles without a sport remain tennis-only. */
+export function ballboySportWhere(sport: CourtSport): Prisma.StaffWhereInput {
+  return {
+    OR: [
+      { coachType: { in: [sport, 'PADEL_TENNIS'] } },
+      ...(sport === 'TENNIS' ? [{ coachType: null }] : []),
+    ],
+  }
 }

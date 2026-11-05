@@ -18,14 +18,14 @@ Gunakan DATABASE_URL deployment yang sesuai. Migrasi bersifat additive dan dapat
 1. Pilih satu cabang, buka Master Data → Coaching atau Ballboy, lalu tambahkan profil.
 2. Buka Jadwal & Harga, tentukan tanggal, hari, jam, dan harga per jam (WIB). Slot terisi atau ditutup tidak ditimpa.
 3. Di Schedule, klik booking lapangan yang terkonfirmasi pada jam yang diinginkan.
-4. Pilih coach sesuai olahraga, atau ballboy untuk tennis, serta metode pembayaran. Klik **Tambah layanan & buat invoice**.
+4. Pilih coach sesuai olahraga, atau ballboy sesuai olahraga lapangan, serta metode pembayaran. Klik **Tambah layanan & buat invoice**.
 5. Invoice layanan dibuat terpisah dan dapat dibuka/disalin dari dialog maupun Kelola Pemesanan → Coach / Ballboy. Invoice lapangan tetap utuh.
 
 Layanan berbayar memakai pembayaran Midtrans yang sudah tersedia. Invoice berstatus menunggu pembayaran, slot staf ditahan 10 menit, lalu dikonfirmasi melalui rekonsiliasi gateway. Tidak ada konfirmasi lunas oleh admin. Layanan harga nol langsung dikonfirmasi dengan invoice nol tanpa pembayaran gateway.
 
 Profil ini hanya untuk layanan admin, bukan akun login staf. Profil baru disembunyikan dari katalog/availability pengguna. Pengguna tetap tidak bisa checkout add-on.
 
-Pemesanan memakai batas 15 menit sesudah jam mulai. Staf yang sama tidak bisa dipesan untuk jam bertumpuk, termasuk melalui checkout lama dan pembayaran terlambat. Ballboy dibatasi satu orang per interval lapangan tennis.
+Pemesanan memakai batas 15 menit sesudah jam mulai. Staf yang sama tidak bisa dipesan untuk jam bertumpuk, termasuk melalui checkout lama dan pembayaran terlambat. Ballboy dibatasi satu orang per interval lapangan Padel maupun Tennis sesuai tipe olahraga profil. Profil lama tanpa tipe tetap dianggap Tennis.
 
 ## Verifikasi
 

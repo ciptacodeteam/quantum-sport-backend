@@ -85,9 +85,9 @@ export const createCoachingHandler = factory.createHandlers(
         'Pilih satu cabang sebelum menambahkan layanan.',
       )
     assertCourtSportAtBranch(
-      input.kind === 'BALLBOY' || input.coachType === 'PADEL_TENNIS'
+      input.coachType === 'PADEL_TENNIS'
         ? 'TENNIS'
-        : input.coachType,
+        : (input.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : 'PADEL')),
       branchId,
     )
     await validateCoachGroups(
@@ -102,7 +102,8 @@ export const createCoachingHandler = factory.createHandlers(
         branchId,
         name: input.name,
         role: input.kind,
-        coachType: input.kind === 'COACH' ? input.coachType : null,
+        coachType:
+          input.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : undefined),
         coachProfile: input.coachProfile,
         phone: input.phone ? await formatPhone(input.phone) : null,
         isActive: input.isActive,
@@ -130,26 +131,31 @@ export const updateCoachingHandler = factory.createHandlers(
       const existing = await getCoachingPerson(tx, id)
       if (existing.role !== input.kind)
         throw new BadRequestException('Jenis layanan tidak dapat diganti.')
+      const nextSport =
+        input.coachType ??
+        existing.coachType ??
+        (input.kind === 'BALLBOY' ? 'TENNIS' : 'PADEL')
       assertCourtSportAtBranch(
-        input.kind === 'BALLBOY' || input.coachType === 'PADEL_TENNIS'
-          ? 'TENNIS'
-          : input.coachType,
+        nextSport === 'PADEL_TENNIS' ? 'TENNIS' : nextSport,
         existing.branchId,
       )
-      if (
-        existing.coachType !==
-          (input.kind === 'COACH' ? input.coachType : null) &&
-        (await tx.bookingCoach.count({
-          where: {
-            slot: { staffId: id },
-            status: { not: 'CANCELLED' },
-            booking: { status: { not: 'CANCELLED' } },
-          },
-        }))
-      )
-        throw new BadRequestException(
-          'Olahraga tidak dapat diganti setelah coach mempunyai booking. Nonaktifkan profil dan buat profil baru.',
-        )
+      const currentSport =
+        existing.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : null)
+      if (currentSport !== nextSport) {
+        const where = {
+          slot: { staffId: id },
+          status: { not: 'CANCELLED' as const },
+          booking: { status: { not: 'CANCELLED' as const } },
+        }
+        const booked =
+          input.kind === 'BALLBOY'
+            ? await tx.bookingBallboy.count({ where })
+            : await tx.bookingCoach.count({ where })
+        if (booked)
+          throw new BadRequestException(
+            'Olahraga tidak dapat diganti setelah layanan mempunyai booking. Nonaktifkan profil dan buat profil baru.',
+          )
+      }
       await validateCoachGroups(
         tx,
         input.groupIds,
@@ -173,7 +179,7 @@ export const updateCoachingHandler = factory.createHandlers(
             : {}),
           name: input.name,
           phone: input.phone ? await formatPhone(input.phone) : null,
-          coachType: input.kind === 'COACH' ? input.coachType : null,
+          coachType: nextSport,
           coachProfile: input.coachProfile,
           isActive: input.isActive,
         },

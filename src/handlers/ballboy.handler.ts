@@ -1,3 +1,5 @@
+import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
+import { ballboySportWhere } from '@/lib/coaching-policy'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -22,9 +24,7 @@ export const getAvailableBallboyHandler = factory.createHandlers(
       const startDateTime = toClubWallDate(startAt)
       const endDateTime = toClubWallDate(endAt)
 
-      if (courtSport && courtSport !== CourtSport.TENNIS) {
-        return c.json(ok([]), status.OK)
-      }
+      await ensureRollingCourtSchedules()
 
       // Find all available ballboy slots that overlap with the requested time range
       // A slot overlaps if: slot.startAt < request.endAt AND slot.endAt > request.startAt
@@ -34,6 +34,7 @@ export const getAvailableBallboyHandler = factory.createHandlers(
           scheduleClosed: false,
           staff: {
             role: Role.BALLBOY,
+            ...ballboySportWhere(courtSport ?? 'TENNIS'),
             isActive: true,
             ...(!c.req.path?.startsWith('/admin/')
               ? { adminServiceOnly: false }
@@ -57,6 +58,7 @@ export const getAvailableBallboyHandler = factory.createHandlers(
               status: {
                 not: BookingStatus.CANCELLED,
               },
+              booking: { status: { not: BookingStatus.CANCELLED } },
             },
           }, // ensure not already booked (excluding cancelled ballboy bookings)
         },
@@ -69,6 +71,7 @@ export const getAvailableBallboyHandler = factory.createHandlers(
               phone: true,
               image: true,
               role: true,
+              coachType: true,
             },
           },
         },
