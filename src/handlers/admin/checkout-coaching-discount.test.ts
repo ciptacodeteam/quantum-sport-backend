@@ -66,6 +66,7 @@ beforeEach(() => {
     },
   ]
   mocks.payload = {
+    paymentMethodId: 'cash',
     userId: 'customer',
     totalHours: 1,
     courtSlots: ['court-slot'],
@@ -73,6 +74,17 @@ beforeEach(() => {
     useMembership: false,
   }
   mocks.tx = {
+    $queryRaw: vi.fn(),
+    paymentMethod: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'cash',
+        name: 'Tunai Kasir',
+        isActive: true,
+        isOffline: true,
+        channel: null,
+      }),
+    },
+    payment: { create: vi.fn().mockResolvedValue({ id: 'recorded-payment' }) },
     user: { findUnique: vi.fn().mockResolvedValue({ id: 'customer' }) },
     slot: {
       findMany: vi
@@ -259,3 +271,64 @@ it.each(['PADEL', 'TENNIS'] as const)(
     expect(mocks.tx.bookingBallboy.create).not.toHaveBeenCalled()
   },
 )
+
+it('records the chosen offline method on the paid payment record and links it to the invoice', async () => {
+  await checkout()
+  expect(mocks.tx.paymentMethod.findFirst).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        id: 'cash',
+        isActive: true,
+        OR: expect.arrayContaining([{ isOffline: true }]),
+      }),
+    }),
+  )
+  expect(mocks.tx.payment.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        paymentMethodId: 'cash',
+        amount: 305000,
+        status: 'PAID',
+        fees: 0,
+        meta: expect.objectContaining({
+          source: 'ADMIN_COURT_BOOKING',
+          receivedBy: 'admin',
+        }),
+      }),
+    }),
+  )
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        paymentId: 'recorded-payment',
+        total: 305000,
+        status: 'PAID',
+      }),
+    }),
+  )
+})
+it('rejects paid bookings without an offline method', async () => {
+  delete mocks.payload.paymentMethodId
+  await expect(checkout()).rejects.toThrow('Pilih metode pembayaran offline')
+  expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
+  expect(mocks.tx.payment.create).not.toHaveBeenCalled()
+})
+it('rejects an unavailable, inactive or online-only method before creating the invoice', async () => {
+  mocks.tx.paymentMethod.findFirst.mockResolvedValue(null)
+  await expect(checkout()).rejects.toThrow('tidak tersedia atau nonaktif')
+  expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
+  expect(mocks.tx.payment.create).not.toHaveBeenCalled()
+})
+it('allows a free booking without recording a fictitious payment method', async () => {
+  const [court] = await mocks.tx.slot.findMany({ where: { type: 'COURT' } })
+  court.price = 0
+  mocks.payload.coachSlots = []
+  delete mocks.payload.paymentMethodId
+  await checkout()
+  expect(mocks.tx.payment.create).not.toHaveBeenCalled()
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ total: 0, status: 'PAID' }),
+    }),
+  )
+})

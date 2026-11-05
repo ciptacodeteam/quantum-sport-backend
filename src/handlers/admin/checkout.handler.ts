@@ -37,6 +37,7 @@ import { hashPassword } from '@/lib/password'
 
 const adminCheckoutSchema = z
   .object({
+    paymentMethodId: z.string().min(1).optional(),
     userId: z.string().optional(),
     name: z.string().min(1).optional(),
     phone: z.string().min(5).optional(),
@@ -255,6 +256,7 @@ export const adminCheckoutHandler = factory.createHandlers(
   zValidator('json', adminCheckoutSchema, validateHook),
   async (c) => {
     const {
+      paymentMethodId,
       userId: inputUserId,
       name,
       phone,
@@ -1047,6 +1049,53 @@ export const adminCheckoutHandler = factory.createHandlers(
           },
         })
 
+        if (totalPrice > 0 && !paymentMethodId)
+          throw new BadRequestException(
+            'Pilih metode pembayaran offline terlebih dahulu.',
+          )
+        let recordedPaymentId: string | undefined
+        if (paymentMethodId) {
+          await tx.$queryRaw`SELECT id FROM payment_methods WHERE id = ${paymentMethodId} FOR SHARE`
+          const method = await tx.paymentMethod.findFirst({
+            where: {
+              id: paymentMethodId,
+              isActive: true,
+              OR: [
+                { isOffline: true },
+                {
+                  channel: {
+                    in: ['CASH', 'EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'],
+                  },
+                },
+              ],
+            },
+          })
+          if (!method)
+            throw new BadRequestException(
+              'Metode pembayaran offline tidak tersedia atau nonaktif. Pilih ulang metode khusus admin.',
+            )
+          if (totalPrice > 0) {
+            const receivedAt = new Date()
+            const payment = await tx.payment.create({
+              data: {
+                paymentMethodId: method.id,
+                status: PaymentStatus.PAID,
+                amount: totalPrice,
+                fees: 0,
+                paidAt: receivedAt,
+                meta: {
+                  source: 'ADMIN_COURT_BOOKING',
+                  channel: method.channel ?? 'OFFLINE',
+                  methodName: method.name,
+                  receivedBy: cashierId,
+                  receivedAt: receivedAt.toISOString(),
+                },
+              },
+            })
+            recordedPaymentId = payment.id
+          }
+        }
+
         // Generate invoice (marked as PAID immediately)
         const invoiceNumber = await generateInvoiceNumber()
         const invoice = await tx.invoice.create({
@@ -1054,6 +1103,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             userId: resolvedUserId!,
             bookingId: booking.id,
             number: invoiceNumber,
+            paymentId: recordedPaymentId,
             subtotal: totalPrice,
             processingFee,
             total: totalPrice + processingFee,
@@ -1096,7 +1146,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             paymentStatus: PaymentStatus.PAID,
             bookedItems: result.bookedItems,
           },
-          'Admin checkout successful (payment bypassed)',
+          'Admin checkout successful (offline payment recorded)',
         ),
         status.OK,
       )
