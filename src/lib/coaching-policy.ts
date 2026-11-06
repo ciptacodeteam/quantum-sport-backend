@@ -91,6 +91,13 @@ export function assertCoachingSport(
 export const rollingCoachingScheduleSchema = z
   .object({
     followCourtWindow: z.literal(true),
+    additionalHourPrice: z
+      .number()
+      .int()
+      .min(0)
+      .max(2147483647)
+      .nullable()
+      .optional(),
     days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
     startHour: z.number().int().min(0).max(23),
     endHour: z.number().int().min(1).max(24),

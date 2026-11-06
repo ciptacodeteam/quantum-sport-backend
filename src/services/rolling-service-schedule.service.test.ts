@@ -104,7 +104,7 @@ it('preserves booked slots and manual closures while repricing only open matchin
   })
   expect(tx.slot.updateMany).toHaveBeenCalledWith({
     where: { id: { in: ['open'] }, isAvailable: true },
-    data: { price: 200000 },
+    data: { price: 200000, additionalHourPrice: null },
   })
   expect(
     tx.slot.updateMany.mock.calls.some(
@@ -134,4 +134,29 @@ it('closes unbooked slots outside the court window and restricts ballboys to ten
     data: { scheduleClosed: true },
   })
   expect(tx.slot.createMany).not.toHaveBeenCalled()
+})
+
+it('copies first and additional hour tariffs to open slots and newly generated coach slots', async () => {
+  const updated = {
+    ...staff,
+    rollingServiceSchedule: {
+      ...staff.rollingServiceSchedule,
+      additionalHourPrice: 100000,
+    },
+  }
+  tx.slot.findMany
+    .mockResolvedValueOnce([slot('court'), slot('next', '2026-11-09')])
+    .mockResolvedValueOnce([slot('open')])
+  await reconcileRollingServiceSchedule(tx, updated, now, true)
+  expect(tx.slot.updateMany).toHaveBeenCalledWith({
+    where: { id: { in: ['open'] }, isAvailable: true },
+    data: { price: 200000, additionalHourPrice: 100000 },
+  })
+  expect(tx.slot.createMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: [
+        expect.objectContaining({ price: 200000, additionalHourPrice: 100000 }),
+      ],
+    }),
+  )
 })

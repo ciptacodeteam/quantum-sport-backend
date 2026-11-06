@@ -1,0 +1,1 @@
+ALTER TABLE "slots" ADD COLUMN IF NOT EXISTS "additionalHourPrice" INTEGER;

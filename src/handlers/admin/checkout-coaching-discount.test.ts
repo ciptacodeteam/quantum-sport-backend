@@ -332,3 +332,78 @@ it('allows a free booking without recording a fictitious payment method', async 
     }),
   )
 })
+it.each([
+  { sport: 'PADEL', date: '2040-01-07', total: 1100000 },
+  { sport: 'TENNIS', date: '2040-01-07', total: 1100000 },
+  { sport: 'PADEL', date: '2040-01-09', total: 950000 },
+  { sport: 'TENNIS', date: '2040-01-09', total: 950000 },
+])(
+  'keeps $sport court discounts separate from coach prices on $date',
+  async ({ sport, date, total }) => {
+    const [baseCourt] = await mocks.tx.slot.findMany({
+      where: { type: 'COURT' },
+    })
+    const [baseCoach] = await mocks.tx.slot.findMany({
+      where: { type: 'COACH' },
+    })
+    const courts = Array.from({ length: 5 }, (_, i) => ({
+      ...baseCourt,
+      id: `court-${i}`,
+      branchId: 'cemara',
+      court: { sport },
+      startAt: new Date(`${date}T${String(13 + i).padStart(2, '0')}:00:00Z`),
+      endAt: new Date(`${date}T${String(14 + i).padStart(2, '0')}:00:00Z`),
+    }))
+    const coaches = courts.map((court, i) => ({
+      ...baseCoach,
+      id: `coach-${i}`,
+      staffId: 'coach-a',
+      staff: { coachType: sport },
+      startAt: court.startAt,
+      endAt: court.endAt,
+      additionalHourPrice: 100000,
+    }))
+    mocks.rules = [
+      {
+        ...mocks.rules[0],
+        sport,
+        happyCoachDiscount: 50000,
+        peakCoachDiscount: 100000,
+        happyAllDayDays: [6, 7],
+      },
+    ]
+    mocks.payload = {
+      ...mocks.payload,
+      totalHours: 5,
+      courtSlots: courts.map((s) => s.id),
+      coachSlots: coaches.map((s) => s.id).reverse(),
+    }
+    mocks.tx.slot.findMany.mockImplementation(({ where }: any) =>
+      where.type === 'COACH' ? coaches.reverse() : courts,
+    )
+    await checkout()
+    const charged = mocks.tx.bookingCoach.create.mock.calls.map(
+      ([args]: any) => args.data,
+    )
+    expect(charged.find((row: any) => row.slotId === 'coach-0').price).toBe(
+      200000,
+    )
+    expect(
+      charged
+        .filter((row: any) => row.slotId !== 'coach-0')
+        .every((row: any) => row.price === 100000),
+    ).toBe(true)
+    // Weekends use Happy Hour throughout; weekdays cross into Peak Hour at 15:00.
+    expect(mocks.tx.bookingDetail.update).toHaveBeenCalledTimes(5)
+    expect(mocks.tx.bookingDetail.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { discountPrice: { decrement: 50000 } },
+      }),
+    )
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total }),
+      }),
+    )
+  },
+)

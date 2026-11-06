@@ -1,3 +1,4 @@
+import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 import {
@@ -397,13 +398,14 @@ export const applyPromoCodeHandler = factory.createHandlers(
             )
           }
 
+          const coachPrices = priceCoachSessions(coachSlotData)
           for (const slot of coachSlotData) {
             if (slot.bookingCoaches.length > 0) {
               throw new BadRequestException(
                 'One or more coach slots are already booked',
               )
             }
-            totalPrice += slot.price
+            totalPrice += coachPrices.get(slot.id)!
           }
         }
 
@@ -958,6 +960,7 @@ export const checkoutHandler = factory.createHandlers(
             )
           }
 
+          const coachPrices = priceCoachSessions(coachSlotData)
           for (const slot of coachSlotData) {
             if (slot.bookingCoaches.length > 0) {
               throw new BadRequestException(
@@ -975,7 +978,7 @@ export const checkoutHandler = factory.createHandlers(
           })
 
           for (const slot of coachSlotData) {
-            totalPrice += slot.price
+            totalPrice += coachPrices.get(slot.id)!
 
             // Get coach type for the staff
             const coachTypes = await tx.bookingCoachType.findMany()
@@ -989,13 +992,13 @@ export const checkoutHandler = factory.createHandlers(
                 bookingId: booking.id,
                 slotId: slot.id,
                 bookingCoachTypeId: firstCoachType.id,
-                price: slot.price,
+                price: coachPrices.get(slot.id)!,
               },
             })
             xenditItems.push({
               name: `Coach session ${dayjs(slot.startAt).format('YYYY-MM-DD HH:mm')} - ${dayjs(slot.endAt).format('HH:mm')}`,
               quantity: 1,
-              price: slot.price,
+              price: coachPrices.get(slot.id)!,
             })
           }
         }

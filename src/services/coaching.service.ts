@@ -1,3 +1,4 @@
+import { linkedCoachSessionPrice } from './coach-session-pricing.service'
 import { ensureRollingCourtSchedules } from './rolling-court-schedule.service'
 import { reconcileRollingServiceSchedule } from './rolling-service-schedule.service'
 import { rollingCoachingScheduleSchema } from '@/lib/coaching-policy'
@@ -268,7 +269,7 @@ export async function coachingAvailability(
     },
     select: { id: true },
   }))
-  return slots
+  const options = slots
     .filter(
       (s) =>
         !busyIds.has(s.staffId) &&
@@ -296,9 +297,22 @@ export async function coachingAvailability(
             )
           : [],
       price: s.price,
+      additionalHourPrice: s.additionalHourPrice,
       startAt: formatClubWallClock(s.startAt),
       endAt: formatClubWallClock(s.endAt),
     }))
+  return Promise.all(
+    options.map(async (option) => {
+      const slot = slots.find((s) => s.id === option.slotId)!
+      return {
+        ...option,
+        price:
+          slot.type === 'COACH'
+            ? await linkedCoachSessionPrice(db, slot, detail.bookingId)
+            : slot.price,
+      }
+    }),
+  )
 }
 
 /** One atomic service booking and invoice for a coach and/or ballboy. */
@@ -445,7 +459,13 @@ export async function attachCoachingService(
           coachingGroupId,
         )
       : null
-    const price = selectedSlots.reduce((sum, s) => sum + s.price, 0)
+    const coachPrice = coach
+      ? await linkedCoachSessionPrice(tx, coach, detail.bookingId)
+      : 0
+    const price = selectedSlots.reduce(
+      (sum, s) => sum + (s.type === 'COACH' ? coachPrice : s.price),
+      0,
+    )
     const dueDate = paymentDeadline(now)
     const paid = price === 0 || !!manualPayment
     const method =
@@ -525,7 +545,7 @@ export async function attachCoachingService(
             courtSlotId: detail.slotId,
             bookingCoachTypeId: type.id,
             ...group,
-            price: slot.price,
+            price: coachPrice,
             status: paid ? 'CONFIRMED' : 'HOLD',
           },
         })

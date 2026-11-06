@@ -84,7 +84,11 @@ export async function reconcileRollingServiceSchedule(
   if (reprice && priceable.length)
     await tx.slot.updateMany({
       where: { id: { in: priceable.map((s) => s.id) }, isAvailable: true },
-      data: { price: config.price },
+      data: {
+        price: config.price,
+        additionalHourPrice:
+          staff.role === 'COACH' ? (config.additionalHourPrice ?? null) : null,
+      },
     })
   const ordered = [...existing].sort((a, b) => +a.startAt - +b.startAt)
   let cursor = 0
@@ -99,6 +103,10 @@ export async function reconcileRollingServiceSchedule(
     ? await tx.slot.createMany({
         data: fresh.map((s) => ({
           ...s,
+          additionalHourPrice:
+            staff.role === 'COACH'
+              ? (config.additionalHourPrice ?? null)
+              : null,
           branchId: staff.branchId,
           staffId: staff.id,
           type: staff.role === 'BALLBOY' ? 'BALLBOY' : 'COACH',

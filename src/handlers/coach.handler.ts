@@ -135,6 +135,7 @@ export const getAvailableCoachesHandler = factory.createHandlers(
         slotId: slot.id,
         coach: slot.staff,
         price: slot.price,
+        additionalHourPrice: slot.additionalHourPrice,
         startAt: formatClubWallClock(slot.startAt),
         endAt: formatClubWallClock(slot.endAt),
       }))

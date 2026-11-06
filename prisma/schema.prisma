@@ -346,6 +346,7 @@ model PromoCode {
 // Non-overlap is enforced via unique constraints per resource.
 
 model Slot {
+  additionalHourPrice Int? // COACH: each consecutive hour after the first; null uses normal price
   branchId      String   @default("cemara")
   branch        Branch   @relation(fields: [branchId], references: [id])
   id            String   @id @default(cuid())

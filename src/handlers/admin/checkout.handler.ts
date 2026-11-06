@@ -1,3 +1,4 @@
+import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { assertCoachingSport } from '@/lib/coaching-policy'
 import {
   coachingGroupMembershipSelect,
@@ -667,7 +668,9 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
           })
 
+          const coachPrices = priceCoachSessions(slotData)
           for (const slot of slotData) {
+            const coachPrice = coachPrices.get(slot.id)!
             const group = await resolveBookingCoachingGroup(
               tx,
               {
@@ -679,7 +682,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               coachGroups?.find((item) => item.slotId === slot.id)
                 ?.coachingGroupId,
             )
-            totalPrice += slot.price
+            totalPrice += coachPrice
             await tx.bookingCoach.create({
               data: {
                 ...group,
@@ -688,16 +691,16 @@ export const adminCheckoutHandler = factory.createHandlers(
                 bookingCoachTypeId: defaultCoachType.id,
                 // Store names of members joining this coach session (if provided)
                 description: coachDescription?.trim() || undefined,
-                price: slot.price,
+                price: coachPrice,
               },
             })
             bookedItems.coachSlots.push(slot.id)
             c.var.logger.info(
-              `Coach slot ${slot.id} booked successfully. Price: ${slot.price}`,
+              `Coach slot ${slot.id} booked successfully. Price: ${coachPrice}`,
             )
           }
           c.var.logger.info(
-            `Total coach slots booked: ${bookedItems.coachSlots.length}. Total coach price: ${slotData.reduce((sum, s) => sum + s.price, 0)}`,
+            `Total coach slots booked: ${bookedItems.coachSlots.length}. Total coach price: ${[...coachPrices.values()].reduce((sum, price) => sum + price, 0)}`,
           )
         }
 

@@ -328,3 +328,33 @@ it('does not send an offline catalog method to the online gateway without receip
   ).rejects.toThrow('metode pembayaran layanan')
   expect(mocks.gateway).not.toHaveBeenCalled()
 })
+
+it('charges the additional coach rate when attaching an adjacent hour to the same confirmed court booking', async () => {
+  mocks.tx.slot.findFirst.mockResolvedValue({
+    ...slots[0],
+    price: 200000,
+    additionalHourPrice: 100000,
+  })
+  mocks.tx.bookingCoach.findFirst = vi
+    .fn()
+    .mockResolvedValue({ id: 'previous-coach-hour' })
+  const result = await attachCoachingService(
+    'detail',
+    ['coach'],
+    'admin',
+    undefined,
+    now,
+    { method: 'EDC', received: true },
+  )
+  expect(result.total).toBe(100000)
+  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ price: 100000, bookingId: 'service' }),
+    }),
+  )
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ total: 100000, subtotal: 100000 }),
+    }),
+  )
+})
