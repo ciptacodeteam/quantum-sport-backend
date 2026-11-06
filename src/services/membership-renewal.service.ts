@@ -1,3 +1,7 @@
+import {
+  compareMembershipPurchases,
+  planMembershipDebtSettlement,
+} from '@/lib/membership-debt-settlement'
 import type { Prisma } from '@prisma/client'
 import { branchContext } from '@/lib/branch-context'
 
@@ -11,6 +15,84 @@ export function withCustomerWallet<T>(callback: () => Promise<T>): Promise<T> {
 /** Serialize all renewals and deferred usage for the same customer, across branches. */
 export async function lockCustomerWallet(tx: Tx, userId: string) {
   await tx.$queryRaw`SELECT id FROM "user" WHERE id = ${userId} FOR UPDATE`
+}
+
+/** Reconcile current paid balances under the same customer lock; never reset package dates. */
+export async function settleCustomerMembershipDebt(
+  tx: Tx,
+  userId: string,
+  now = new Date(),
+) {
+  return withCustomerWallet(async () => {
+    await lockCustomerWallet(tx, userId)
+    const packs = await tx.membershipUser.findMany({
+      where: { userId, invoice: { status: 'PAID' } },
+      include: {
+        membership: { select: { sport: true } },
+        invoice: { select: { status: true, paidAt: true } },
+        debtsReceived: { select: { sessions: true } },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    })
+    const plan = planMembershipDebtSettlement(packs, now)
+    const reroute = new Map<string, string>()
+    for (const transfer of plan.transfers) {
+      const { fromMembershipUserId, toMembershipUserId, sessions } = transfer
+      const payer = await tx.membershipUser.update({
+        where: {
+          id: toMembershipUserId,
+          userId,
+          remainingSessions: { gte: sessions },
+          isExpired: false,
+          isSuspended: false,
+          endDate: { gt: now },
+          invoice: { status: 'PAID' },
+        },
+        data: {
+          remainingSessions: { decrement: sessions },
+          debtSettledSessions: { increment: sessions },
+        },
+      })
+      if (payer.remainingSessions === 0)
+        await tx.membershipUser.update({
+          where: { id: payer.id },
+          data: { isExpired: true },
+        })
+      await tx.membershipUser.update({
+        where: {
+          id: fromMembershipUserId,
+          userId,
+          remainingSessions: { lte: -sessions },
+          invoice: { status: 'PAID' },
+        },
+        data: { remainingSessions: { increment: sessions }, isExpired: true },
+      })
+      await tx.membershipDebtTransfer.upsert({
+        where: {
+          fromMembershipUserId_toMembershipUserId: {
+            fromMembershipUserId,
+            toMembershipUserId,
+          },
+        },
+        create: transfer,
+        update: { sessions: { increment: sessions } },
+      })
+      reroute.set(fromMembershipUserId, toMembershipUserId)
+    }
+    for (const [from, to] of reroute)
+      await tx.recurringBooking.updateMany({
+        where: { userId, membershipUserId: from },
+        data: { membershipUserId: to },
+      })
+    return {
+      settledSessions: plan.transfers.reduce(
+        (sum, row) => sum + row.sessions,
+        0,
+      ),
+      transfers: plan.transfers,
+      reviewRequired: plan.reviewRequired,
+    }
+  })
 }
 
 /** Call inside the transaction that records payment, never during unpaid checkout. */
@@ -30,38 +112,33 @@ export async function applyPaidMembershipRenewal(
       where: { id: membershipUserId },
       include: {
         membership: { select: { sport: true } },
-        invoice: { select: { status: true } },
+        invoice: { select: { status: true, paidAt: true } },
       },
     })
     if (!target || target.invoice?.status !== 'PAID') return null
-    if (target.renewalAppliedAt) return target
+    await settleCustomerMembershipDebt(tx, target.userId, now)
+    if (target.renewalAppliedAt)
+      return tx.membershipUser.findUnique({
+        where: { id: target.id },
+        include: {
+          membership: { select: { sport: true } },
+          invoice: { select: { status: true, paidAt: true } },
+        },
+      })
 
-    const previous = await tx.membershipUser.findMany({
+    const previousCandidates = await tx.membershipUser.findMany({
       where: {
         userId: target.userId,
         id: { not: target.id },
         membership: { sport: target.membership.sport },
         invoice: { status: 'PAID' },
       },
+      include: { invoice: { select: { status: true, paidAt: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
-    let debt = 0
-    for (const source of previous) {
-      if (source.remainingSessions >= 0) continue
-      const sessions = -source.remainingSessions
-      await tx.membershipDebtTransfer.create({
-        data: {
-          fromMembershipUserId: source.id,
-          toMembershipUserId: target.id,
-          sessions,
-        },
-      })
-      await tx.membershipUser.update({
-        where: { id: source.id },
-        data: { remainingSessions: { increment: sessions }, isExpired: true },
-      })
-      debt += sessions
-    }
+    const previous = previousCandidates.filter(
+      (pack) => compareMembershipPurchases(pack, target) < 0,
+    )
     await tx.membershipUser.updateMany({
       where: {
         id: {
@@ -75,8 +152,6 @@ export async function applyPaidMembershipRenewal(
     const updated = await tx.membershipUser.update({
       where: { id: target.id },
       data: {
-        remainingSessions: { decrement: debt },
-        debtSettledSessions: debt,
         renewalAppliedAt: now,
       },
     })

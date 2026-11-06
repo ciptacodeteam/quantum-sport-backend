@@ -41,7 +41,7 @@ const membershipTransactionsQuerySchema = searchQuerySchema
       .describe('Filter by transaction source: cashier or online'),
     sport: z.nativeEnum(CourtSport).optional(),
     status: z.enum(membershipTransactionStatuses).optional(),
-    balance: z.enum(['nonnegative', 'negative']).default('nonnegative'),
+    balance: z.enum(['all', 'nonnegative', 'negative']).default('all'),
   })
   .refine(validBookingDateRange, bookingDateRangeError)
 
@@ -86,10 +86,12 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
           where: {
             AND: [
               where,
-              {
-                remainingSessions:
-                  query.balance === 'negative' ? { lt: 0 } : { gte: 0 },
-              },
+              query.balance === 'all'
+                ? {}
+                : {
+                    remainingSessions:
+                      query.balance === 'negative' ? { lt: 0 } : { gte: 0 },
+                  },
             ],
           },
           include: {
@@ -471,7 +473,7 @@ export const exportMembershipTransactionsToExcelHandler =
           BookingDateRange & {
             sport?: CourtSport
             status?: string
-            balance?: 'negative' | 'nonnegative'
+            balance?: 'all' | 'negative' | 'nonnegative'
           }
         const queryOptions = buildFindManyOptions(query, {
           defaultOrderBy: { createdAt: 'desc' },
@@ -497,10 +499,12 @@ export const exportMembershipTransactionsToExcelHandler =
             where: {
               AND: [
                 where,
-                {
-                  remainingSessions:
-                    query.balance === 'negative' ? { lt: 0 } : { gte: 0 },
-                },
+                query.balance === 'all'
+                  ? {}
+                  : {
+                      remainingSessions:
+                        query.balance === 'negative' ? { lt: 0 } : { gte: 0 },
+                    },
               ],
             },
             include: {

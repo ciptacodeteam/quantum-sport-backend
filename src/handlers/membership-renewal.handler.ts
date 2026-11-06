@@ -1,3 +1,4 @@
+import { planMembershipDebtSettlement } from '@/lib/membership-debt-settlement'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
@@ -18,23 +19,37 @@ export const membershipRenewalPreviewHandler = factory.createHandlers(
       select: { sport: true, sessions: true },
     })
     if (!membership) throw new NotFoundException('Paket tidak tersedia.')
-    const debt = await withCustomerWallet(() =>
-      db.membershipUser.aggregate({
+    const packs = await withCustomerWallet(() =>
+      db.membershipUser.findMany({
         where: {
           userId: user.id,
           membership: { sport: membership.sport },
-          remainingSessions: { lt: 0 },
           invoice: { status: 'PAID' },
         },
-        _sum: { remainingSessions: true },
+        include: {
+          membership: { select: { sport: true } },
+          invoice: { select: { status: true, paidAt: true } },
+          debtsReceived: { select: { sessions: true } },
+        },
       }),
     )
-    const debtSessions = -(debt._sum.remainingSessions ?? 0)
+    const plan = planMembershipDebtSettlement(packs)
+    const debtSessions = [...plan.balances.values()].reduce(
+      (sum, balance) => sum + Math.max(0, -balance),
+      0,
+    )
+    const reviewRequired = plan.reviewRequired.length > 0
+    const debtSettledSessions = reviewRequired
+      ? 0
+      : Math.min(membership.sessions, debtSessions)
     return c.json(
       ok({
         packageSessions: membership.sessions,
         debtSessions,
-        remainingAfterPurchase: membership.sessions - debtSessions,
+        debtSettledSessions,
+        remainingAfterPurchase: membership.sessions - debtSettledSessions,
+        unsettledDebtSessions: debtSessions - debtSettledSessions,
+        reviewRequired,
       }),
     )
   },

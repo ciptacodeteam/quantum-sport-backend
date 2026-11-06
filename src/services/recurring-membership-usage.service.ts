@@ -1,5 +1,6 @@
 import {
   lockCustomerWallet,
+  settleCustomerMembershipDebt,
   withCustomerWallet,
 } from './membership-renewal.service'
 import { clubNowAsWallDate } from '@/lib/club-time'
@@ -86,6 +87,7 @@ export async function chargeDueRecurringMembershipSessions(now = new Date()) {
               data: { remainingSessions: { decrement: sessions } },
             }),
           )
+          await settleCustomerMembershipDebt(tx, detail.booking.userId, now)
           await tx.booking.update({
             where: { id: detail.bookingId },
             data: { membershipSessionsUsed: { increment: sessions } },

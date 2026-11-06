@@ -51,7 +51,10 @@ export async function activateMembershipAfterPayment(
       return false
     }
 
-    if (membershipUser.renewalAppliedAt) return true
+    if (membershipUser.renewalAppliedAt) {
+      await applyPaidMembershipRenewal(tx, membershipUserId, now)
+      return true
+    }
     const startDate = now
     const endDate = dayjs(now)
       .add(membershipUser.membership.duration, 'days')

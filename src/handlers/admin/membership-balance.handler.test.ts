@@ -30,15 +30,13 @@ beforeEach(() => {
     return []
   })
 })
-it('keeps negative balances out of the ordinary transaction list', async () => {
+it('keeps all purchases visible regardless of their current remaining quota', async () => {
   const r = await withBranchContext(
     { branchId: 'cemara', isAdmin: true, isSuperAdmin: false },
     () => app.request('/'),
   )
   expect(r.status).toBe(200)
-  expect(mocks.find.mock.calls[0][0].where.AND).toContainEqual({
-    remainingSessions: { gte: 0 },
-  })
+  expect(mocks.find.mock.calls[0][0].where.AND[1]).toEqual({})
   expect(mocks.contexts).toEqual(['cemara'])
 })
 it('shows the shared negative wallet separately across purchase branches', async () => {
@@ -65,7 +63,7 @@ it('exports exactly the shared debt scope rather than the normal sales list', as
   expect(mocks.contexts).toEqual([undefined])
 })
 
-it.each(['nonnegative', 'negative'])(
+it.each(['all', 'nonnegative', 'negative'])(
   'applies full WIB purchase days consistently to the %s balance list and Excel export',
   async (balance) => {
     const params = `balance=${balance}&sport=TENNIS&dateFrom=2026-11-03&dateTo=2026-11-03`
@@ -80,9 +78,14 @@ it.each(['nonnegative', 'negative'])(
           lt: new Date('2026-11-03T17:00:00Z'),
         },
       })
-      expect(where.AND[1]).toEqual({
-        remainingSessions: balance === 'negative' ? { lt: 0 } : { gte: 0 },
-      })
+      expect(where.AND[1]).toEqual(
+        balance === 'all'
+          ? {}
+          : {
+              remainingSessions:
+                balance === 'negative' ? { lt: 0 } : { gte: 0 },
+            },
+      )
     }
   },
 )

@@ -1,3 +1,4 @@
+import { reconcileMembershipDebtBalances } from './membership-debt-reconciliation.service'
 import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
 import { Queue, Worker } from 'bullmq'
 import { db } from '@/lib/prisma'
@@ -366,6 +367,22 @@ export function startSchedulerWorker() {
         await ensureRollingCourtSchedules().catch((error) =>
           log.error(`Rolling schedule generation failed: ${error}`),
         )
+        await reconcileMembershipDebtBalances()
+          .then((result) => {
+            if (result.settledSessions)
+              log.info(
+                { settledSessions: result.settledSessions },
+                'Membership debt reconciled',
+              )
+            if (result.reviewRequired.length)
+              log.warn(
+                { membershipUserIds: result.reviewRequired },
+                'Membership debt requires ledger review',
+              )
+          })
+          .catch((error) =>
+            log.error({ error }, 'Membership debt reconciliation failed'),
+          )
         const [expiredResult, inventoryResult] = await Promise.all([
           checkExpiredTransactions(),
           restoreCompletedInventorySessions(),

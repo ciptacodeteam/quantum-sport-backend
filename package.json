@@ -48,6 +48,7 @@
     "db:recurring-bookings": "prisma db execute --schema prisma/schema.prisma --file prisma/recurring-bookings.sql",
     "db:admin-payment-methods": "prisma db execute --schema prisma/schema.prisma --file prisma/admin-payment-methods.sql",
     "db:coaching-admin": "prisma db execute --schema prisma/schema.prisma --file prisma/coaching-admin.sql",
+    "db:reconcile-membership-debt": "bun scripts/reconcile-membership-debt.ts",
     "db:membership-renewal": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-renewal.sql",
     "db:staff-password-reset": "prisma db execute --schema prisma/schema.prisma --file prisma/staff-password-reset.sql",
     "db:coaching-groups": "prisma db execute --schema prisma/schema.prisma --file prisma/coaching-groups.sql",

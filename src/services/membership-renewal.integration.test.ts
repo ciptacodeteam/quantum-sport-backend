@@ -351,7 +351,7 @@ run('paid package renewal against PostgreSQL', () => {
         .remainingSessions,
     ).toBe(1)
   })
-  it('carries insufficient purchases as a negative new balance and handles subsequent purchases', async () => {
+  it('caps debt settlement at the new quota and handles subsequent purchases', async () => {
     const debtPack = `${prefix}-large-debt`,
       small = `${prefix}-small`,
       refill = `${prefix}-refill`
@@ -363,19 +363,19 @@ run('paid package renewal against PostgreSQL', () => {
     await pack(debtPack, 'PADEL', 1, -12)
     await pack(small, 'PADEL', 10, 10)
     await asA(() =>
-      db.$transaction((tx) => applyPaidMembershipRenewal(tx, small)),
+      db.$transaction((tx) => activateMembershipAfterPayment(tx, small)),
     )
     expect(
       (await db.membershipUser.findUniqueOrThrow({ where: { id: small } }))
         .remainingSessions,
-    ).toBe(-2)
+    ).toBe(0)
     await pack(refill, 'PADEL', 10, 10)
     await Promise.all([
       asA(() =>
-        db.$transaction((tx) => applyPaidMembershipRenewal(tx, refill)),
+        db.$transaction((tx) => activateMembershipAfterPayment(tx, refill)),
       ),
       asA(() =>
-        db.$transaction((tx) => applyPaidMembershipRenewal(tx, refill)),
+        db.$transaction((tx) => activateMembershipAfterPayment(tx, refill)),
       ),
     ])
     expect(
