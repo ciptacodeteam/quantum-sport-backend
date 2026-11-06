@@ -41,6 +41,7 @@ it('saves and refreshes the same branch and sport atomically from the effective 
   expect(mocks.lock).toHaveBeenCalled()
   expect(mocks.upsert.mock.calls[0][0].create).toEqual({
     ...input,
+    happyAllDayDays: [],
     branchId: 'cemara',
     effectiveFrom: new Date('2026-11-01T00:00:00Z'),
   })
@@ -129,4 +130,44 @@ it('compares hours against the rule effective on the playing date, rather than a
     now,
   )
   expect(mocks.refresh).toHaveBeenCalledOnce()
+})
+
+it('refreshes slots when full Happy Hour days change even with unchanged hour bands', async () => {
+  mocks.list.mockResolvedValue([
+    { ...input, branchId: 'cemara', happyAllDayDays: [] },
+  ])
+  await saveTariffPeriod('cemara', { ...input, happyAllDayDays: [6, 7] }, now)
+  expect(mocks.refresh).toHaveBeenCalledOnce()
+  expect(mocks.upsert.mock.calls[0][0].update.happyAllDayDays).toEqual([6, 7])
+})
+it('compares raw hour bands on weekends and skips discount-only regeneration', async () => {
+  mocks.list.mockResolvedValue([
+    { ...input, branchId: 'cemara', happyAllDayDays: [6, 7] },
+  ])
+  await saveTariffPeriod(
+    'cemara',
+    { ...input, happyAllDayDays: [7, 6], happyCoachDiscount: 50000 },
+    now,
+  )
+  expect(mocks.refresh).not.toHaveBeenCalled()
+})
+it('refreshes slots when weekend Happy Hour is turned off', async () => {
+  mocks.list.mockResolvedValue([
+    { ...input, branchId: 'cemara', happyAllDayDays: [6, 7] },
+  ])
+  await saveTariffPeriod('cemara', { ...input, happyAllDayDays: [] }, now)
+  expect(mocks.refresh).toHaveBeenCalledOnce()
+})
+
+it('preserves day rules when an older client saves a new date without that field', async () => {
+  mocks.list.mockResolvedValue([
+    { ...input, branchId: 'cemara', happyAllDayDays: [6, 7] },
+  ])
+  await saveTariffPeriod(
+    'cemara',
+    { ...input, effectiveFrom: '2026-11-08' },
+    now,
+  )
+  expect(mocks.upsert.mock.calls[0][0].create.happyAllDayDays).toEqual([6, 7])
+  expect(mocks.refresh).not.toHaveBeenCalled()
 })

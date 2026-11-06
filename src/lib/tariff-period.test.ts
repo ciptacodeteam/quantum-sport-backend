@@ -131,7 +131,8 @@ describe('effective-dated tariff periods', () => {
     const slots = buildRollingCourtSlots(config, 'cemara', now, now, [rule])
     const at = (date: string) =>
       slots.find(
-        (slot) => formatClubWallClock(slot.startAt, 'YYYY-MM-DD HH:mm') === date,
+        (slot) =>
+          formatClubWallClock(slot.startAt, 'YYYY-MM-DD HH:mm') === date,
       )
     expect(at('2026-10-31 16:00')?.price).toBe(200)
     expect(at('2026-11-01 16:00')?.price).toBe(100)
@@ -167,3 +168,64 @@ describe('effective-dated tariff periods', () => {
   })
 })
 
+it.each(['2026-11-07', '2026-11-08'])(
+  'uses Happy Hour for all open hours on %s',
+  (date) => {
+    const weekendRule = { ...rule, happyAllDayDays: [6, 7] }
+    const bands = resolveTariffPeriod([weekendRule], date, 'cemara', 'PADEL')
+    expect(tariffBand(`${date}T20:00:00Z`, bands, `${date}T21:00:00Z`)).toBe(
+      'happyHour',
+    )
+    expect(tariffBand(`${date}T07:00:00Z`, bands)).toBeNull()
+    expect(tariffBand(`${date}T23:00:00Z`, bands)).toBeNull()
+    expect(weekendRule.happyEnd).toBe(17)
+    const weekday = resolveTariffPeriod(
+      [weekendRule],
+      '2026-11-09',
+      'cemara',
+      'PADEL',
+    )
+    expect(tariffBand('2026-11-09T20:00:00Z', weekday)).toBe('peakHour')
+  },
+)
+it('generates Happy Hour weekend prices, keeps closed hours and midnight boundaries', () => {
+  const config = rollingCourtPricingSchema.parse({
+    courtId: 'court',
+    months: 1,
+    days: [1, 2, 3, 4, 5, 6, 7],
+    happyHourPrice: 150000,
+    peakHourPrice: 300000,
+    closedHours: [12],
+  })
+  const now = new Date('2026-11-06T00:00:00Z')
+  const slots = buildRollingCourtSlots(config, 'cemara', now, now, [
+    { ...rule, peakEnd: 24, happyAllDayDays: [6, 7] },
+  ])
+  const at = (date: string) =>
+    slots.find(
+      (slot) => formatClubWallClock(slot.startAt, 'YYYY-MM-DD HH:mm') === date,
+    )
+  expect(at('2026-11-07 20:00')?.price).toBe(150000)
+  expect(at('2026-11-08 20:00')?.price).toBe(150000)
+  expect(at('2026-11-09 20:00')?.price).toBe(300000)
+  expect(at('2026-11-07 12:00')).toBeUndefined()
+  expect(at('2026-11-07 07:00')).toBeUndefined()
+  expect(formatClubWallClock(at('2026-11-07 23:00')!.endAt)).toBe(
+    '2026-11-08 00:00:00',
+  )
+})
+it.each([{ days: [0] }, { days: [8] }, { days: [6, 6] }, { days: [1.5] }])(
+  'rejects invalid or repeated weekdays $days',
+  ({ days }) => {
+    expect(
+      tariffPeriodSchema.safeParse({ ...rule, happyAllDayDays: days }).success,
+    ).toBe(false)
+  },
+)
+
+it('accepts empty, weekend and full-week day selections', () => {
+  for (const days of [[], [6, 7], [1, 2, 3, 4, 5, 6, 7]])
+    expect(
+      tariffPeriodSchema.safeParse({ ...rule, happyAllDayDays: days }).success,
+    ).toBe(true)
+})

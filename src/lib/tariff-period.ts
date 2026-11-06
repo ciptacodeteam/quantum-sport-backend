@@ -12,7 +12,9 @@ export type CoachingDiscounts = {
   happyCoachDiscount?: number
   peakCoachDiscount?: number
 }
+export type TariffDays = { happyAllDayDays?: number[] }
 export type TariffRule = TariffBands &
+  TariffDays &
   CoachingDiscounts & {
     branchId: string
     sport: string
@@ -21,6 +23,14 @@ export type TariffRule = TariffBands &
 export const tariffPeriodSchema = z
   .object({
     sport: z.enum(['PADEL', 'TENNIS']),
+    happyAllDayDays: z
+      .array(z.number().int().min(1).max(7))
+      .max(7)
+      .refine(
+        (days) => new Set(days).size === days.length,
+        'Hari tidak boleh berulang.',
+      )
+      .optional(),
     effectiveFrom: z
       .string()
       .refine(
@@ -71,9 +81,10 @@ export function resolveTariffPeriod(
   startAt: Date | string,
   branchId: string,
   sport: string,
-): TariffBands & CoachingDiscounts {
+  applyDay = true,
+): TariffBands & CoachingDiscounts & TariffDays {
   const date = clubWallTime(startAt).format('YYYY-MM-DD')
-  return (
+  const rule =
     rules
       .filter(
         (rule) =>
@@ -84,7 +95,23 @@ export function resolveTariffPeriod(
       .sort((a, b) =>
         dateKey(b.effectiveFrom).localeCompare(dateKey(a.effectiveFrom)),
       )[0] ?? defaultTariffPeriod
-  )
+  if (
+    applyDay &&
+    'happyAllDayDays' in rule &&
+    (rule.happyAllDayDays as number[] | undefined)?.includes(
+      clubWallTime(startAt).day() || 7,
+    )
+  ) {
+    const end = Math.max(rule.happyEnd, rule.peakEnd)
+    return {
+      ...rule,
+      happyStart: Math.min(rule.happyStart, rule.peakStart),
+      happyEnd: end,
+      peakStart: end,
+      peakEnd: end,
+    }
+  }
+  return rule
 }
 export function tariffBand(
   startAt: Date | string,

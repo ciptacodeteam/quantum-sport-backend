@@ -41,7 +41,13 @@ export async function saveTariffPeriod(
       effectiveFrom,
       branchId,
       data.sport,
+      false,
     )
+    const happyAllDayDays =
+      data.happyAllDayDays ?? previous.happyAllDayDays ?? []
+    const daysChanged =
+      JSON.stringify([...happyAllDayDays].sort()) !==
+      JSON.stringify([...(previous.happyAllDayDays ?? [])].sort())
     const hoursChanged = (
       ['happyStart', 'happyEnd', 'peakStart', 'peakEnd'] as const
     ).some((field) => previous[field] !== data[field])
@@ -53,8 +59,9 @@ export async function saveTariffPeriod(
           effectiveFrom,
         },
       },
-      create: { ...data, effectiveFrom, branchId },
+      create: { ...data, happyAllDayDays, effectiveFrom, branchId },
       update: {
+        happyAllDayDays,
         happyStart: data.happyStart,
         happyEnd: data.happyEnd,
         peakStart: data.peakStart,
@@ -63,7 +70,7 @@ export async function saveTariffPeriod(
         peakCoachDiscount: data.peakCoachDiscount,
       },
     })
-    if (hoursChanged)
+    if (hoursChanged || daysChanged)
       await refreshTariffCourtSchedules(
         tx,
         branchId,

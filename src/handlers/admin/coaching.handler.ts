@@ -141,7 +141,11 @@ export const updateCoachingHandler = factory.createHandlers(
       )
       const currentSport =
         existing.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : null)
-      if (currentSport !== nextSport) {
+      // Adding a sport preserves compatibility with every existing booking.
+      const expandsSports =
+        nextSport === 'PADEL_TENNIS' &&
+        (currentSport === 'PADEL' || currentSport === 'TENNIS')
+      if (currentSport !== nextSport && !expandsSports) {
         const where = {
           slot: { staffId: id },
           status: { not: 'CANCELLED' as const },

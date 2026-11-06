@@ -118,6 +118,7 @@ for sql in \
   /app/prisma/coaching-groups.sql \
   /app/prisma/rolling-service-schedule.sql \
   /app/prisma/admin-coaching-discounts.sql \
+  /app/prisma/tariff-day-rules.sql \
   /app/prisma/admin-payment-methods.sql \
   /app/prisma/offline-payment-methods.sql \
   /app/prisma/staff-password-reset.sql

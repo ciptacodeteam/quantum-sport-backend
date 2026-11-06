@@ -71,3 +71,26 @@ it('rejects negative, fractional and overflowing discount amounts', () => {
       }).success,
     ).toBe(false)
 })
+
+it('uses Happy Hour coaching discount on weekend evenings and Peak Hour on weekday evenings', () => {
+  const rules = [
+    {
+      ...rule,
+      happyAllDayDays: [6, 7],
+      happyCoachDiscount: 50000,
+      peakCoachDiscount: 100000,
+    },
+  ]
+  expect(getCourtCoachBundleDiscount(court(20, '2026-11-07'), rules)).toBe(
+    50000,
+  )
+  expect(getCourtCoachBundleDiscount(court(20, '2026-11-08'), rules)).toBe(
+    50000,
+  )
+  expect(getCourtCoachBundleDiscount(court(20, '2026-11-09'), rules)).toBe(
+    100000,
+  )
+  expect(getCourtCoachBundleDiscount(court(20, '2026-11-07'), [rule])).toBe(
+    25000,
+  )
+})

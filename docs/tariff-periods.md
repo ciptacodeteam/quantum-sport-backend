@@ -101,3 +101,33 @@ bun run db:generate
 ```
 
 Nominal awal adalah 0. Admin perlu mengisi potongan yang diinginkan lalu menyimpan aturan jam tarif. Tanggal mulai berlaku mengikuti **tanggal bermain**.
+
+## Happy Hour sepanjang hari pada hari tertentu
+
+Pada formulir Pengaturan Jam Tarif, pilih hari di **Hari Happy Hour Sepanjang Hari**.
+Untuk kebutuhan akhir pekan, centang **Sabtu** dan **Minggu**, lalu tentukan tanggal
+mulai berlaku. Hari lain mengikuti rentang Happy/Peak biasa. Aturan berlaku per
+cabang, olahraga, dan tanggal bermain; tidak menebak kategori dari nominal harga.
+
+Hari terpilih memakai kategori Happy Hour dari awal sampai akhir gabungan rentang
+operasional. Harga dasar, potongan coaching khusus admin, dan kelayakan Value Pack
+memakai kategori yang sama. Jam tutup tetap tertutup, bulk pricing yang eksplisit
+tetap didahulukan, dan booking yang sudah ada tidak dihitung ulang. Potongan
+coaching tetap hanya untuk checkout admin dengan coach pada slot yang sama.
+
+API menyimpan `happyAllDayDays` sebagai array hari ISO (Senin=1, Minggu=7).
+Array kosong mengembalikan seluruh hari ke aturan jam biasa. Aturan lama tetap
+berperilaku sama sampai admin mengaktifkan hari khusus. Perubahan pilihan hari
+memperbarui slot rolling dari tanggal efektif; perubahan diskon saja tidak
+membangun ulang jadwal. Lapangan tanpa rolling memakai aturan saat jadwal
+harganya disimpan kembali.
+
+Sebelum menjalankan backend baru pada database yang sudah ada, jalankan:
+
+```sh
+bun run db:tariff-day-rules
+bun run db:generate
+```
+
+SQL penambahan kolom aman diulang. Deployment Docker menjalankannya otomatis
+melalui entrypoint. Pengujian integrasi database tetap memerlukan database aktif.

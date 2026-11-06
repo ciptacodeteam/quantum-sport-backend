@@ -995,6 +995,7 @@ model Branch {
 
 // Effective-dated court tariff bands, in whole hours of Asia/Jakarta.
 model TariffPeriod {
+  happyAllDayDays Int[] @default([])
   happyCoachDiscount Int @default(0)
   peakCoachDiscount Int @default(0)
   id             String    @id @default(cuid())

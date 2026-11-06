@@ -481,6 +481,7 @@ it('uses the effective branch tariff instead of the old 15:00 boundary at custom
   ])
   vi.mocked(getTariffPeriods).mockResolvedValueOnce([
     {
+      happyAllDayDays: [],
       happyCoachDiscount: 0,
       peakCoachDiscount: 0,
       id: 'rule',
