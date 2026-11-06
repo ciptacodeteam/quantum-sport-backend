@@ -1,6 +1,11 @@
 import type { Prisma } from '@prisma/client'
 
-export const bookingCheckoutTypes = ['regular', 'membership'] as const
+export const bookingCheckoutTypes = [
+  'regular',
+  'membership',
+  'coach_training',
+  'event',
+] as const
 export type BookingCheckoutType = (typeof bookingCheckoutTypes)[number]
 
 /** Classify the actual checkout, rather than whether the customer owns a membership. */
@@ -15,6 +20,12 @@ export function bookingCheckoutWhere(
       ],
     }
   if (type === 'regular')
-    return { membershipUserId: null, membershipSessionsUsed: 0 }
+    return {
+      purpose: 'REGULAR',
+      membershipUserId: null,
+      membershipSessionsUsed: 0,
+    }
+  if (type === 'coach_training') return { purpose: 'COACH_TRAINING' }
+  if (type === 'event') return { purpose: 'EVENT' }
   return {}
 }

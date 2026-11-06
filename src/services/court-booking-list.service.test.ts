@@ -90,6 +90,7 @@ it('exports all matching rows with the same search and order, without the page l
   expect(query.where.details.some.court.sport).toBe('TENNIS')
   expect(query.where.AND).toContainEqual(courtBookingSearchWhere('Budi'))
   expect(query.where.AND).toContainEqual({
+    purpose: 'REGULAR',
     membershipUserId: null,
     membershipSessionsUsed: 0,
   })

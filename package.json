@@ -11,6 +11,7 @@
     "format": "prettier -w .",
     "test": "vitest run",
     "db:generate": "prisma generate",
+    "db:internal-court-bookings": "prisma db execute --schema prisma/schema.prisma --file prisma/internal-court-bookings.sql",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:fresh": "prisma db push --force-reset && bun prisma/seed.ts",

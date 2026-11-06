@@ -123,6 +123,7 @@ for sql in \
   /app/prisma/customer-activation.sql \
   /app/prisma/admin-payment-methods.sql \
   /app/prisma/offline-payment-methods.sql \
+  /app/prisma/internal-court-bookings.sql \
   /app/prisma/staff-password-reset.sql
 do
   echo "   Applying $(basename "$sql")..."

@@ -50,6 +50,7 @@ export function courtBookingSearchWhere(
       { user: { phone: contains } },
       { user: { email: contains } },
       { invoice: { number: contains } },
+      { activityName: contains },
     ],
   }
 }

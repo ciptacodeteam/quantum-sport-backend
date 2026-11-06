@@ -999,6 +999,10 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             throw new NotFoundException('Booked court not found')
           }
 
+          const isInternalBooking =
+            bookingDetail.booking.purpose === 'COACH_TRAINING' ||
+            bookingDetail.booking.purpose === 'EVENT'
+
           if (bookingDetail.booking.status !== BookingStatus.CONFIRMED) {
             throw new BadRequestException(
               'Hanya booking terkonfirmasi yang dapat dijadwalkan ulang.',
@@ -1101,7 +1105,7 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             newSlot.discountPrice && newSlot.discountPrice > 0
               ? newSlot.discountPrice
               : newSlot.price
-          if (!usesMembership && oldCashPrice !== newCashPrice) {
+          if (!isInternalBooking && !usesMembership && oldCashPrice !== newCashPrice) {
             throw new BadRequestException(
               'Pilih jadwal pengganti dengan harga yang sama. Perubahan biaya tidak dapat diproses melalui reschedule.',
             )
@@ -1210,7 +1214,7 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             where: { id: bookingDetailId },
             data: {
               slotId: newSlot.id,
-              price: newSlot.price,
+              price: isInternalBooking ? 0 : newSlot.price,
               courtId: newSlot.courtId,
             },
             include: {

@@ -1557,6 +1557,8 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
           return {
             booking: {
               id: booking.id,
+              purpose: booking.purpose,
+              activityName: booking.activityName,
               userId: booking.userId,
               status: booking.status,
               totalPrice: booking.totalPrice,

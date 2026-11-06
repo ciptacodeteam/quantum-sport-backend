@@ -16,9 +16,11 @@ import {
   getOngoingBookingScheduleHandler,
 } from '@/handlers/admin/booking.handler'
 import { cancelBookingHandler } from '@/handlers/admin/booked-court.handler'
+import { createInternalCourtBookingHandler } from '@/handlers/admin/internal-court-booking.handler'
 
 const adminBookingRoute = createRouter()
   .basePath('/bookings')
+  .post('/internal', ...createInternalCourtBookingHandler)
   .get('/', ...getAllBookingTransactionsHandler)
   .get('/table', ...getCourtBookingTableHandler)
   .get('/schedule', ...getAllBookingScheduleHandler)

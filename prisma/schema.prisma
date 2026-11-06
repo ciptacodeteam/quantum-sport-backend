@@ -47,8 +47,14 @@ enum PaymentStatus {
 
 enum BookingStatus {
   HOLD // temporary hold on slots before payment (expiry)
-  CONFIRMED // paid; slots locked
+  CONFIRMED // confirmed; slots locked (internal bookings do not require payment)
   CANCELLED
+}
+
+enum BookingPurpose {
+  REGULAR
+  COACH_TRAINING
+  EVENT
 }
 
 enum SlotType {
@@ -498,6 +504,8 @@ model Invoice {
 // Booking (Courts + optional add-ons)
 // ------------------------------
 model Booking {
+  purpose                BookingPurpose @default(REGULAR)
+  activityName           String?
   branchId               String        @default("cemara")
   branch                 Branch        @relation(fields: [branchId], references: [id])
   id                     String        @id @default(cuid())

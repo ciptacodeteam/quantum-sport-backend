@@ -32,12 +32,17 @@ it('uses recorded membership usage, including legacy usage, rather than membersh
     ],
   })
   expect(bookingCheckoutWhere('regular')).toEqual({
+    purpose: 'REGULAR',
     membershipUserId: null,
     membershipSessionsUsed: 0,
   })
   expect(bookingCheckoutWhere()).toEqual({})
+  expect(bookingCheckoutWhere('coach_training')).toEqual({
+    purpose: 'COACH_TRAINING',
+  })
+  expect(bookingCheckoutWhere('event')).toEqual({ purpose: 'EVENT' })
 })
-it.each(['regular', 'membership'] as const)(
+it.each(['regular', 'membership', 'coach_training', 'event'] as const)(
   'applies the same %s checkout filter to the table and Excel export without losing sport filters',
   async (checkoutType) => {
     await (getAllBookingTransactionsHandler[1] as any)(
