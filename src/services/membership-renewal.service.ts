@@ -226,7 +226,7 @@ export async function restoreRecurringMembershipDebits(
         recurringOccurrences: { take: 1, select: { id: true } },
       },
     })
-    if (!booking?.recurringOccurrences.length) return null
+    if (!booking?.recurringOccurrences.length || !booking.userId) return null
     await lockCustomerWallet(tx, booking.userId)
     const debits = await tx.membershipSessionDebit.findMany({
       where: { detail: { bookingId }, reversedAt: null },

@@ -17,11 +17,16 @@ export const internalCourtBookingSchema = z
     adminNote: z.string().trim().max(1000).optional(),
   })
   .strict()
-  .refine((input) => input.userId || (input.name && input.phone), {
-    message:
-      'Pilih pelanggan atau isi nama dan nomor telepon penanggung jawab.',
-    path: ['userId'],
-  })
+  .refine(
+    (input) =>
+      !!input.userId ||
+      (!input.name && !input.phone) ||
+      (!!input.name && !!input.phone),
+    {
+      message: 'Jika mengisi walk-in, lengkapi nama dan nomor telepon.',
+      path: ['userId'],
+    },
+  )
 
 export async function createInternalCourtBooking(
   input: z.infer<typeof internalCourtBookingSchema>,
@@ -59,14 +64,14 @@ export async function createInternalCourtBooking(
         'Slot lapangan sudah tidak tersedia. Silakan pilih ulang.',
     })
 
-    let userId = input.userId
+    let userId = input.userId ?? null
     if (userId) {
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { id: true },
       })
       if (!user) throw new NotFoundException('Pelanggan tidak ditemukan.')
-    } else {
+    } else if (input.name && input.phone) {
       const phone = await formatPhone(input.phone!)
       const existing = await tx.user.findUnique({
         where: { phone },

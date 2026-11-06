@@ -288,8 +288,10 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
                   userId: {
                     in: Array.from(
                       new Set(
-                        ballboysNeedingCourtInference.map(
-                          (ballboy) => ballboy.booking.user.id,
+                        ballboysNeedingCourtInference.flatMap((ballboy) =>
+                          ballboy.booking.userId
+                            ? [ballboy.booking.userId]
+                            : [],
                         ),
                       ),
                     ),
@@ -341,7 +343,8 @@ export const getAllBookedInventoriesHandler = factory.createHandlers(
 
         const matches = inferredCourtDetails.filter(
           (detail) =>
-            detail.booking.userId === ballboy.booking.user.id &&
+            !!ballboy.booking.userId &&
+            detail.booking.userId === ballboy.booking.userId &&
             timeRangesOverlap(ballboy.slot, detail.slot),
         )
 

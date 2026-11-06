@@ -1,12 +1,12 @@
 # Training coach and event court bookings
 
-Admin uses the existing Booking Lapangan screen, selects a customer or walk-in
-responsible contact, and selects the court slots as usual. Choose **Training Coach**
+Admin uses the existing Booking Lapangan screen and selects the court slots as
+usual. A customer or walk-in responsible contact is optional. Choose **Training Coach**
 or **Event**, fill the coach/event name, then **Simpan Booking**. These bookings
 skip add-ons and payment. No check-in or attendance feature is involved.
 
 `POST /admin/bookings/internal` accepts `purpose` (`COACH_TRAINING` or `EVENT`),
-`activityName`, `courtSlots`, `userId` or walk-in `name` and `phone`, and optional
+`activityName`, `courtSlots`, optional `userId` or walk-in `name` and `phone`, and optional
 `adminNote`. It requires an authenticated admin and the existing branch scope.
 
 The transaction claims slots using the same atomic availability checks, rolling
@@ -29,6 +29,10 @@ npm run db:generate
 The additive, idempotent SQL adds `BookingPurpose` and `bookings.purpose` /
 `bookings.activityName`. Existing bookings default to `REGULAR`. The Docker
 entrypoint also applies this SQL during deployment.
+
+Re-run this migration for existing installations: it also makes `bookings.userId`
+nullable for internal reservations. A database check keeps customers mandatory for
+regular bookings. Empty internal identities create no artificial customer records.
 
 ## Verification
 

@@ -36,6 +36,7 @@ export async function chargeDueRecurringMembershipSessions(now = new Date()) {
       },
       () =>
         db.$transaction(async (tx) => {
+          if (!candidate.booking.userId) return
           await lockCustomerWallet(tx, candidate.booking.userId)
           // Cancellation also updates this row; whichever gets the lock first wins.
           await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${candidate.bookingId} FOR UPDATE`
@@ -59,6 +60,7 @@ export async function chargeDueRecurringMembershipSessions(now = new Date()) {
             detail.membershipDebit ||
             detail.booking.status !== 'CONFIRMED' ||
             !detail.booking.membershipUserId ||
+            !detail.booking.userId ||
             detail.slot.startAt > nowWall
           )
             return

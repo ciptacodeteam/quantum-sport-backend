@@ -346,6 +346,11 @@ export async function attachCoachingService(
   const number = await generateInvoiceNumber()
   return db.$transaction(async (tx) => {
     const detail = await coachingCourtDetail(tx, detailId)
+    const customerId = detail.booking.userId
+    if (!customerId)
+      throw new BadRequestException(
+        'Layanan berbayar memerlukan booking dengan pelanggan.',
+      )
     // Serialize additions/cancellation to this court booking as well as staff claims.
     await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${detail.bookingId} FOR UPDATE`
     await coachingCourtDetail(tx, detailId)
@@ -518,7 +523,7 @@ export async function attachCoachingService(
     const booking = await tx.booking.create({
       data: {
         branchId: detail.booking.branchId,
-        userId: detail.booking.userId,
+        userId: customerId,
         serviceForBookingId: detail.bookingId,
         cashierId,
         status: paid ? 'CONFIRMED' : 'HOLD',
@@ -564,7 +569,7 @@ export async function attachCoachingService(
       data: {
         branchId: detail.booking.branchId,
         bookingId: booking.id,
-        userId: detail.booking.userId,
+        userId: customerId,
         number,
         subtotal: price,
         processingFee: fee,
@@ -598,7 +603,7 @@ export async function attachCoachingService(
       })
     } else if (method) {
       const customer = await tx.user.findUniqueOrThrow({
-        where: { id: detail.booking.userId },
+        where: { id: customerId },
         select: { name: true, email: true, phone: true },
       })
       const init = await midtransService.initiateCheckoutPayment({

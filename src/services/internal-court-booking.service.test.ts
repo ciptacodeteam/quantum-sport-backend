@@ -143,12 +143,13 @@ it('supports the same walk-in identity flow without requiring payment', async ()
   expect(mocks.create.mock.calls[0][0].data.userId).toBe('walk-in')
 })
 
-it('requires a valid purpose, activity, identity and selected slots; rejects financial overrides', () => {
+it('requires a valid purpose, activity and selected slots; rejects financial overrides', () => {
   for (const change of [
     { purpose: 'REGULAR' },
     { activityName: '   ' },
     { courtSlots: [] },
-    { userId: undefined },
+    { userId: undefined, name: 'Andi' },
+    { userId: undefined, phone: '08123456789' },
     { totalPrice: 100000 },
     { paymentMethodId: 'cash' },
   ])
@@ -160,3 +161,23 @@ it('requires a valid purpose, activity, identity and selected slots; rejects fin
       .activityName,
   ).toBe('Coach Andi')
 })
+
+it.each(['COACH_TRAINING', 'EVENT'] as const)(
+  'saves %s without creating or requiring a customer',
+  async (purpose) => {
+    const payload = internalCourtBookingSchema.parse({
+      ...input,
+      userId: undefined,
+      purpose,
+    })
+    const booking = await createInternalCourtBooking(payload, 'cashier')
+    expect(booking).toMatchObject({
+      userId: null,
+      purpose,
+      status: 'CONFIRMED',
+      totalPrice: 0,
+    })
+    expect(mocks.user).not.toHaveBeenCalled()
+    expect(mocks.createUser).not.toHaveBeenCalled()
+  },
+)

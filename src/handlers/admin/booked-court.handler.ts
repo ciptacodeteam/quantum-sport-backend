@@ -186,13 +186,15 @@ export const getAllBookedCourtsHandler = factory.createHandlers(
           cancelledAt: detail.booking.cancelledAt,
           cancellationReason: detail.booking.cancellationReason,
         },
-        customer: {
-          id: detail.booking.user.id,
-          name: detail.booking.user.name,
-          email: detail.booking.user.email,
-          phone: detail.booking.user.phone,
-          image: detail.booking.user.image,
-        },
+        customer: detail.booking.user
+          ? {
+              id: detail.booking.user.id,
+              name: detail.booking.user.name,
+              email: detail.booking.user.email,
+              phone: detail.booking.user.phone,
+              image: detail.booking.user.image,
+            }
+          : null,
         invoice: detail.booking.invoice
           ? {
               id: detail.booking.invoice.id,
@@ -518,6 +520,7 @@ export const getBookedCourtsSummaryHandler = factory.createHandlers(
           booking: {
             select: {
               status: true,
+              activityName: true,
               user: {
                 select: {
                   name: true,
@@ -596,7 +599,10 @@ export const getBookedCourtsSummaryHandler = factory.createHandlers(
           recentBookings: recentBookings.map((booking) => ({
             id: booking.id,
             courtName: booking.court?.name || 'Unknown Court',
-            customerName: booking.booking.user.name,
+            customerName:
+              booking.booking.user?.name ??
+              booking.booking.activityName ??
+              'Tanpa pelanggan',
             date: dayjs(booking.slot.startAt).format('YYYY-MM-DD'),
             startTime: dayjs(booking.slot.startAt).format('HH:mm'),
             endTime: dayjs(booking.slot.endAt).format('HH:mm'),
@@ -734,7 +740,7 @@ export const cancelBookingHandler = factory.createHandlers(
           where: { id: bookingId },
           select: { userId: true },
         })
-        if (identity) await lockCustomerWallet(tx, identity.userId)
+        if (identity?.userId) await lockCustomerWallet(tx, identity.userId)
         await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${bookingId} FOR UPDATE`
         // 1. Fetch the booking with all related data
         const booking = await tx.booking.findUnique({
@@ -1105,7 +1111,11 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             newSlot.discountPrice && newSlot.discountPrice > 0
               ? newSlot.discountPrice
               : newSlot.price
-          if (!isInternalBooking && !usesMembership && oldCashPrice !== newCashPrice) {
+          if (
+            !isInternalBooking &&
+            !usesMembership &&
+            oldCashPrice !== newCashPrice
+          ) {
             throw new BadRequestException(
               'Pilih jadwal pengganti dengan harga yang sama. Perubahan biaya tidak dapat diproses melalui reschedule.',
             )

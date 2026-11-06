@@ -1197,9 +1197,10 @@ export const exportBookingTransactionsToExcelHandler = factory.createHandlers(
         return {
           'Booking ID': booking.id,
           'Invoice Number': booking.invoice?.number || 'N/A',
-          'Customer Name': booking.user.name,
-          'Customer Email': booking.user.email || 'N/A',
-          'Customer Phone': booking.user.phone,
+          'Customer Name':
+            booking.user?.name ?? booking.activityName ?? 'Tanpa pelanggan',
+          'Customer Email': booking.user?.email || 'N/A',
+          'Customer Phone': booking.user?.phone || 'N/A',
           'Booking Status': booking.status,
           'Payment Status': booking.invoice?.status || 'N/A',
           'Payment Method': booking.invoice?.payment?.method.name || 'N/A',

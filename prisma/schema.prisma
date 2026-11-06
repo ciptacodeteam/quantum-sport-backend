@@ -509,7 +509,7 @@ model Booking {
   branchId               String        @default("cemara")
   branch                 Branch        @relation(fields: [branchId], references: [id])
   id                     String        @id @default(cuid())
-  userId                 String
+  userId                 String?
   serviceForBookingId    String?
   serviceForBooking      Booking? @relation("CourtBookingServices", fields: [serviceForBookingId], references: [id], onDelete: SetNull)
   serviceBookings        Booking[] @relation("CourtBookingServices")
@@ -532,7 +532,7 @@ model Booking {
 
   cashierId String? // cashier who handled the payment
 
-  user           User               @relation(fields: [userId], references: [id])
+  user           User?              @relation(fields: [userId], references: [id])
   cashier        Staff?             @relation(fields: [cashierId], references: [id])
   promoCode      PromoCode?         @relation(fields: [promoCodeId], references: [id])
   membershipUser MembershipUser?    @relation("BookingMembershipUsage", fields: [membershipUserId], references: [id], onDelete: SetNull)

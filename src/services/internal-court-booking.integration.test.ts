@@ -81,7 +81,7 @@ run('internal court bookings against local PostgreSQL', () => {
     })
   })
   afterAll(async () => {
-    await db.booking.deleteMany({ where: { userId } })
+    await db.booking.deleteMany({ where: { branchId } })
     await db.slot.deleteMany({ where: { id: { in: slotIds } } })
     await db.court.deleteMany({ where: { id: courtId } })
     await db.staff.deleteMany({ where: { id: staffId } })
@@ -96,7 +96,7 @@ run('internal court bookings against local PostgreSQL', () => {
       app.request('/internal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input(slotIds[0])),
+        body: JSON.stringify({ ...input(slotIds[0]), userId: undefined }),
       }),
     )
     expect(response.status, await response.clone().text()).toBe(201)
@@ -106,6 +106,7 @@ run('internal court bookings against local PostgreSQL', () => {
       include: { details: true, invoice: true },
     })
     expect(saved).toMatchObject({
+      userId: null,
       branchId,
       purpose: 'COACH_TRAINING',
       activityName: 'Coach Andi',

@@ -206,7 +206,8 @@ export async function getCourtPerformance(
             bookingId: booking.id,
             invoiceId: booking.invoice?.id ?? null,
             invoiceNumber: booking.invoice?.number ?? null,
-            customer: booking.user.name,
+            customer:
+              booking.user?.name ?? booking.activityName ?? 'Tanpa pelanggan',
             courtId: court.id,
             court: court.name,
             branchId: court.branchId,

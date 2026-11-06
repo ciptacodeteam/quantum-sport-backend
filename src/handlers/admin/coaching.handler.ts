@@ -405,8 +405,8 @@ export const listCoachingBookingsHandler = factory.createHandlers(
           name: item.slot.staff?.name ?? '-',
           coachingGroupName:
             'coachingGroupName' in item ? item.coachingGroupName : null,
-          customer: item.booking.user.name,
-          phone: item.booking.user.phone,
+          customer: item.booking.user?.name ?? 'Tanpa pelanggan',
+          phone: item.booking.user?.phone ?? '',
           startAt: formatClubWallClock(item.slot.startAt),
           endAt: formatClubWallClock(item.slot.endAt),
           court: item.courtSlot?.court?.name ?? '-',
