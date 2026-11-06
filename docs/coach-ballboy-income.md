@@ -1,6 +1,6 @@
 # Coach & ballboy income
 
-Admin menu: **Analytics → Pendapatan Coach & Ballboy**.
+Admin menu: **Analytics → Income Layanan**.
 
 The report calculates club entitlements, not transfers or settlement status. The
 club receives 100% of paid service amounts after order-level promo allocation.

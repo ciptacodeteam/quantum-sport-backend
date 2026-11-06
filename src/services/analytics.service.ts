@@ -222,34 +222,47 @@ export async function getPaymentMethodAnalytics(
   endDate: Date,
   source?: 'cashier' | 'online',
 ) {
-  const paymentWhere: any = {
+  // Use the same paid invoice date and branch scope for both cards and details.
+  const invoiceWhere: any = {
     status: PaymentStatus.PAID,
-    createdAt: { gte: startDate, lte: endDate },
+    paidAt: { gte: startDate, lte: endDate },
   }
-
-  if (source === 'cashier') {
-    paymentWhere.invoice = {
-      isNot: null,
-      booking: { cashierId: { not: null } },
-    }
-  } else if (source === 'online') {
-    paymentWhere.invoice = { isNot: null, booking: { cashierId: null } }
-  }
+  if (source === 'cashier') invoiceWhere.booking = { cashierId: { not: null } }
+  else if (source === 'online') invoiceWhere.booking = { cashierId: null }
 
   const payments = await db.payment.findMany({
-    where: paymentWhere,
+    where: { status: PaymentStatus.PAID, invoice: { is: invoiceWhere } },
     include: {
       method: { select: { id: true, name: true, logo: true } },
-      invoice: { select: { total: true, processingFee: true } },
+      invoice: {
+        select: {
+          id: true,
+          number: true,
+          total: true,
+          processingFee: true,
+          paidAt: true,
+          branchId: true,
+          branch: { select: { name: true } },
+          user: { select: { name: true } },
+          booking: { select: { cashierId: true } },
+          classBookingId: true,
+          membershipUserId: true,
+        },
+      },
     },
+    orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
   })
 
   const methodAnalytics: Map<string, any> = new Map()
 
   let totalAmount = 0
   let totalProcessingFees = 0
+  let totalTransactions = 0
 
   for (const payment of payments) {
+    const invoice = payment.invoice
+    if (!invoice) continue
+    totalTransactions++
     const amt = payment.invoice?.total || 0
     const procFee = payment.invoice?.processingFee || 0
     totalAmount += amt
@@ -278,10 +291,24 @@ export async function getPaymentMethodAnalytics(
     methodData.total += amt
     methodData.processingFee += procFee
     methodData.transactions.push({
-      id: payment.id,
+      id: invoice.id,
+      invoiceNumber: invoice.number,
+      customerName: invoice.user?.name ?? 'Customer tidak tersedia',
+      branchName: invoice.branch?.name ?? invoice.branchId,
+      source: invoice.booking
+        ? invoice.booking.cashierId
+          ? 'Cashier'
+          : 'Online'
+        : invoice.classBookingId
+          ? 'Class Bookings'
+          : invoice.membershipUserId
+            ? 'Membership'
+            : 'Other',
+      paymentMethod: payment.method?.name ?? null,
+      paidAt: invoice.paidAt,
       amount: amt,
       processingFee: procFee,
-      date: payment.createdAt,
+      netAmount: amt - procFee,
     })
   }
 
@@ -297,7 +324,7 @@ export async function getPaymentMethodAnalytics(
     summary: {
       totalAmount,
       totalProcessingFees,
-      totalTransactions: payments.length,
+      totalTransactions,
       methodCount: methodsArray.length,
     },
     methods: methodsArray,
