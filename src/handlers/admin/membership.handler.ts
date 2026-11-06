@@ -21,7 +21,6 @@ import { CourtSport, PaymentStatus, UserSource } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
-import { hashPassword } from '@/lib/password'
 
 const membershipQuerySchema = searchQuerySchema.extend({
   sport: z.nativeEnum(CourtSport).optional(),
@@ -276,12 +275,11 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
         if (existingUser) {
           resolvedUserId = existingUser.id
         } else {
-          const hashedPassword = await hashPassword(formattedPhone)
           const createdUser = await db.user.create({
             data: {
               name: name!,
               phone: formattedPhone,
-              password: hashedPassword,
+              password: null,
               source: UserSource.WALK_IN,
             },
             select: { id: true },

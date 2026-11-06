@@ -48,6 +48,22 @@ export async function validateOtp(
     )
   }
 
+  const attempt = await db.phoneVerification.updateMany({
+    where: {
+      id: verificationRecord.id,
+      phone,
+      requestId,
+      isUsed: false,
+      attempts: { lt: 5 },
+      expiresAt: { gt: new Date() },
+    },
+    data: { attempts: { increment: 1 } },
+  })
+  if (attempt.count !== 1)
+    throw new BadRequestException(
+      'Batas percobaan OTP tercapai atau OTP sudah tidak berlaku. Silakan kirim ulang OTP.',
+    )
+
   // Fazpass /otp/request returns a MASKED otp — never compare it locally in production.
   // Always verify with Fazpass using the code the user received.
   if (isDeployedEnv()) {

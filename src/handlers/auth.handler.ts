@@ -1,6 +1,16 @@
+import {
+  getRegistrationGrant,
+  registrationGrantWhere,
+  verifyRegistrationOtp,
+} from '@/services/registration-otp.service'
+import { customerAccountAction } from '@/lib/customer-account-state'
 import { DEFAULT_OTP_CODE } from '@/constants'
 import { env, isDeployedEnv } from '@/env'
-import { UnauthorizedException } from '@/exceptions'
+import {
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { hashPassword, verifyPassword } from '@/lib/password'
@@ -75,13 +85,15 @@ export const checkAccountHandler = factory.createHandlers(
       const existingUser = await db.user.findUnique({
         where: { phone: formattedPhone },
       })
-      const verifiedAccountExists = !!existingUser?.phoneVerified
+      const nextAction = customerAccountAction(existingUser)
+      const verifiedAccountExists = nextAction === 'LOGIN'
 
       return c.json(
         ok(
           {
             phone: formattedPhone,
             exists: verifiedAccountExists,
+            nextAction,
           },
           verifiedAccountExists ? 'Account exists' : 'Account does not exist',
         ),
@@ -114,10 +126,19 @@ export const loginHandler = factory.createHandlers(
         )
       }
 
-      const validPassword = await verifyPassword(
-        password,
-        existingUser.password!,
-      )
+      if (customerAccountAction(existingUser) === 'ACTIVATE') {
+        return c.json(
+          err(
+            'Verifikasi nomor WhatsApp dan buat password untuk mengaktifkan akun Anda.',
+            status.CONFLICT,
+            { nextAction: 'ACTIVATE', phone: formattedPhone },
+          ),
+          status.CONFLICT,
+        )
+      }
+      const validPassword = existingUser.password
+        ? await verifyPassword(password, existingUser.password)
+        : false
 
       if (!validPassword) {
         c.var.logger.error(
@@ -181,48 +202,105 @@ export const loginHandler = factory.createHandlers(
   },
 )
 
+export const verifyRegistrationOtpHandler = factory.createHandlers(
+  zValidator('json', verifyOtpSchema, validateHook),
+  async (c) => {
+    const { phone, requestId, code } = c.req.valid('json')
+    return c.json(
+      ok(
+        await verifyRegistrationOtp(await formatPhone(phone), requestId, code),
+      ),
+    )
+  },
+)
+
 export const registerHandler = factory.createHandlers(
   zValidator('json', registerSchema, validateHook),
   async (c) => {
     try {
       const validated = c.req.valid('json') as RegisterSchema
-      const { phone, code, requestId, password, name } = validated
+      const {
+        phone,
+        code,
+        requestId,
+        password,
+        firstName,
+        lastName,
+        registrationToken,
+      } = validated
+      const name = firstName
+        ? [firstName, lastName].filter(Boolean).join(' ')
+        : validated.name!
 
       const formattedPhone = await formatPhone(phone)
 
+      // Verify ownership and hash outside the transaction; account changes happen only after verification.
+      const record = registrationToken
+        ? await getRegistrationGrant(
+            formattedPhone,
+            requestId,
+            registrationToken,
+          )
+        : await validateOtp(
+            formattedPhone,
+            requestId,
+            code!,
+            PhoneVerificationType.REGISTER,
+          )
+      const hashPwd = await hashPassword(password)
       const { token, refreshToken } = await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "user" WHERE phone = ${formattedPhone} FOR UPDATE`
         const existingUser = await tx.user.findUnique({
           where: { phone: formattedPhone },
         })
 
-        if (existingUser?.phoneVerified) {
-          c.var.logger.error(
-            `User already exists with phone number: ${formattedPhone}`,
+        if (customerAccountAction(existingUser) === 'LOGIN')
+          throw new BadRequestException(
+            'Nomor WhatsApp sudah terdaftar. Silakan login atau gunakan lupa password.',
           )
-          throw new Error('User already exists')
-        }
-
-        await validateOtp(formattedPhone, requestId, code)
-
-        // Mark the OTP as used
-        await tx.phoneVerification.updateMany({
-          where: {
-            requestId,
-            phone: formattedPhone,
-          },
-          data: {
-            type: PhoneVerificationType.REGISTER,
-            isUsed: true,
-          },
-        })
-
-        const hashPwd = await hashPassword(password)
+        if (
+          existingUser?.banned &&
+          (!existingUser.banExpires || existingUser.banExpires > new Date())
+        )
+          throw new ForbiddenException(
+            'Akun ini sedang dinonaktifkan. Hubungi admin.',
+          )
+        // Claim the exact verified request once, including concurrent submissions and resends.
+        const consumed = registrationToken
+          ? await tx.phoneVerification.deleteMany({
+              where: {
+                id: record.id,
+                ...registrationGrantWhere(
+                  formattedPhone,
+                  requestId,
+                  registrationToken,
+                ),
+              },
+            })
+          : await tx.phoneVerification.updateMany({
+              where: {
+                id: record.id,
+                requestId,
+                phone: formattedPhone,
+                type: PhoneVerificationType.REGISTER,
+                code: record.code,
+                isUsed: false,
+                expiresAt: { gt: new Date() },
+              },
+              data: { isUsed: true },
+            })
+        if (consumed.count !== 1)
+          throw new BadRequestException(
+            'OTP sudah digunakan atau tidak berlaku. Silakan kirim ulang OTP.',
+          )
 
         const user = existingUser
           ? await tx.user.update({
               where: { id: existingUser.id },
               data: {
                 name,
+                firstName,
+                lastName,
                 password: hashPwd,
                 phoneVerified: true,
               },
@@ -230,6 +308,8 @@ export const registerHandler = factory.createHandlers(
           : await tx.user.create({
               data: {
                 name,
+                firstName,
+                lastName,
                 phone: formattedPhone,
                 password: hashPwd,
                 phoneVerified: true, // Phone is verified since OTP was validated during registration
@@ -243,6 +323,9 @@ export const registerHandler = factory.createHandlers(
           )
           throw new Error('User creation failed')
         }
+
+        if (existingUser)
+          await tx.authToken.deleteMany({ where: { userId: existingUser.id } })
 
         const token = await generateJwtToken({
           id: user.id,
@@ -457,6 +540,7 @@ export const forgotPasswordHandler = factory.createHandlers(
           requestId,
           code,
           isUsed: false,
+          attempts: 0,
           type: PhoneVerificationType.FORGOT_PASSWORD,
           expiresAt,
           createdAt: new Date(),
@@ -466,6 +550,7 @@ export const forgotPasswordHandler = factory.createHandlers(
           phone: formattedPhone,
           code,
           isUsed: false,
+          attempts: 0,
           type: PhoneVerificationType.FORGOT_PASSWORD,
           expiresAt,
         },

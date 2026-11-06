@@ -69,7 +69,10 @@ export async function resetPasswordWithOtpToken(
       where: { ...where, expiresAt: { gt: new Date() } },
     })
     if (consumed.count !== 1) throw invalidReset()
-    const user = await tx.user.update({ where: { phone }, data: { password } })
+    const user = await tx.user.update({
+      where: { phone },
+      data: { password, phoneVerified: true },
+    })
     await tx.authToken.deleteMany({ where: { userId: user.id } })
   })
 }

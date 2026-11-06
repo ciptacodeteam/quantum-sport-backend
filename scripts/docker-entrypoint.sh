@@ -120,6 +120,7 @@ for sql in \
   /app/prisma/admin-coaching-discounts.sql \
   /app/prisma/tariff-day-rules.sql \
   /app/prisma/coach-session-pricing.sql \
+  /app/prisma/customer-activation.sql \
   /app/prisma/admin-payment-methods.sql \
   /app/prisma/offline-payment-methods.sql \
   /app/prisma/staff-password-reset.sql

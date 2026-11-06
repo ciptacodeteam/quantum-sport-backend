@@ -35,12 +35,27 @@ export const loginSchema = phoneSchema.extend({
 
 export type LoginSchema = z.infer<typeof loginSchema>
 
-export const registerSchema = phoneSchema.extend({
-  name: z.string().min(3).max(100),
-  code: z.string().length(4),
-  requestId: z.string(),
-  password: z.string().min(6).max(100),
-})
+export const registerSchema = phoneSchema
+  .extend({
+    name: z.string().trim().min(1).max(100).optional(),
+    firstName: z.string().trim().min(1).max(50).optional(),
+    lastName: z.string().trim().max(49).optional(),
+    code: z.string().length(4).optional(),
+    registrationToken: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    requestId: z.string(),
+    password: z.string().min(6).max(100),
+  })
+  .refine((value) => !!value.firstName || !!value.name, {
+    path: ['firstName'],
+    message: 'Nama depan wajib diisi.',
+  })
+  .refine((value) => !!value.code !== !!value.registrationToken, {
+    path: ['registrationToken'],
+    message: 'Verifikasi nomor WhatsApp terlebih dahulu.',
+  })
 
 export type RegisterSchema = z.infer<typeof registerSchema>
 

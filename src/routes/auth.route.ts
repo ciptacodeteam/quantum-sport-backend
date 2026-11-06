@@ -8,6 +8,7 @@ import {
   logoutHandler,
   refreshTokenHandler,
   registerHandler,
+  verifyRegistrationOtpHandler,
   requestEmailChangeHandler,
   resetPasswordHandler,
   verifyResetPasswordOtpHandler,
@@ -22,6 +23,7 @@ const authRoute = createRouter()
   .post('/check-account', ...checkAccountHandler) // USE FOR CHECKING ACCOUNT EXISTS
   .post('/login', ...loginHandler)
   .post('/register', ...registerHandler)
+  .post('/verify-registration-otp', ...verifyRegistrationOtpHandler)
   .post('/login/email', ...loginWithEmailHandler)
   .post('/logout', ...logoutHandler)
   .post('/refresh-token', ...refreshTokenHandler)

@@ -1,10 +1,10 @@
+import { customerAccountAction } from '@/lib/customer-account-state'
 import { DEFAULT_OTP_CODE } from '@/constants'
 import { isDeployedEnv } from '@/env'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
 import { err, ok } from '@/lib/response'
-import { hashPassword } from '@/lib/password'
 import { formatPhone } from '@/lib/utils'
 import {
   phoneSchema,
@@ -12,15 +12,18 @@ import {
   verifyOtpSchema,
   VerifyOtpSchema,
 } from '@/lib/validation'
-import { sendPhoneOtp, verifyPhoneOtp } from '@/services/phone.service'
+import { sendPhoneOtp } from '@/services/phone.service'
+import { validateOtp } from '@/services/otp.service'
+import { BadRequestException } from '@/exceptions'
 import { zValidator } from '@hono/zod-validator'
 import dayjs from 'dayjs'
-import { PhoneVerificationType, UserSource } from '@prisma/client'
+import { PhoneVerificationType } from '@prisma/client'
 import status from 'http-status'
 import z from 'zod'
 
 const sendPhoneOtpSchema = phoneSchema.extend({
-  name: z.string().min(3).max(100).optional(),
+  purpose: z.enum(['REGISTER', 'VERIFY_PHONE']).optional(),
+  name: z.string().trim().min(1).max(100).optional(),
   password: z.string().min(6).max(100).optional(),
 })
 
@@ -31,46 +34,41 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
       const validated = c.req.valid('json') as PhoneSchema & {
         name?: string
         password?: string
+        purpose?: 'REGISTER' | 'VERIFY_PHONE'
       }
       const { phone, name, password } = validated
 
       const formattedPhone = await formatPhone(phone)
-      const isRegisterRequest = !!name && !!password
+      const isRegisterRequest =
+        validated.purpose === 'REGISTER' || (!!name && !!password)
+      const otpType = isRegisterRequest
+        ? PhoneVerificationType.REGISTER
+        : PhoneVerificationType.VERIFY_PHONE
 
       if (isRegisterRequest) {
         const existingUser = await db.user.findUnique({
           where: { phone: formattedPhone },
-          select: { id: true, phoneVerified: true },
+          select: {
+            id: true,
+            phoneVerified: true,
+            source: true,
+            password: true,
+            googleId: true,
+          },
         })
 
-        if (existingUser?.phoneVerified) {
+        if (customerAccountAction(existingUser) === 'LOGIN') {
           return c.json(
-            err('User already exists', status.BAD_REQUEST),
+            err(
+              'Nomor WhatsApp sudah terdaftar. Silakan login atau gunakan lupa password.',
+              status.BAD_REQUEST,
+              { nextAction: 'LOGIN', phone: formattedPhone },
+            ),
             status.BAD_REQUEST,
           )
         }
 
-        const hashedPassword = await hashPassword(password)
-
-        if (existingUser) {
-          await db.user.update({
-            where: { id: existingUser.id },
-            data: {
-              name,
-              password: hashedPassword,
-            },
-          })
-        } else {
-          await db.user.create({
-            data: {
-              name,
-              phone: formattedPhone,
-              password: hashedPassword,
-              phoneVerified: false,
-              source: UserSource.ONLINE,
-            },
-          })
-        }
+        // Sending an OTP must never create or mutate customer credentials.
       }
 
       const existingRecord = await db.phoneVerification.findFirst({
@@ -126,7 +124,8 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
           requestId,
           code,
           isUsed: false,
-          type: PhoneVerificationType.VERIFY_PHONE,
+          attempts: 0,
+          type: otpType,
           expiresAt,
           createdAt: new Date(),
         },
@@ -135,7 +134,8 @@ export const sendPhoneVerificationOtpHandler = factory.createHandlers(
           phone: formattedPhone,
           code,
           isUsed: false,
-          type: PhoneVerificationType.VERIFY_PHONE,
+          attempts: 0,
+          type: otpType,
           expiresAt,
         },
       })
@@ -163,92 +163,28 @@ export const verifyPhoneVerificationOtpHandler = factory.createHandlers(
 
       const phoneNumber = await formatPhone(phone)
 
-      c.var.logger.info(
-        `Verifying phone OTP for ${phoneNumber}, requestId: ${requestId}`,
+      const record = await validateOtp(
+        phoneNumber,
+        requestId,
+        code,
+        PhoneVerificationType.VERIFY_PHONE,
       )
-
-      const verificationRecord = await db.phoneVerification.findFirst({
+      const consumed = await db.phoneVerification.updateMany({
         where: {
+          id: record.id,
+          phone: phoneNumber,
           requestId,
-          phone: phoneNumber,
+          type: PhoneVerificationType.VERIFY_PHONE,
+          code: record.code,
           isUsed: false,
+          expiresAt: { gt: new Date() },
         },
+        data: { isUsed: true },
       })
-
-      if (!verificationRecord) {
-        c.var.logger.error(
-          `No verification record found for phone ${phoneNumber} with requestId ${requestId}`,
+      if (consumed.count !== 1)
+        throw new BadRequestException(
+          'OTP sudah digunakan atau tidak berlaku. Silakan kirim ulang OTP.',
         )
-        return c.json(
-          err(
-            'Permintaan OTP tidak valid. Silakan kirim ulang OTP.',
-            status.BAD_REQUEST,
-          ),
-          status.BAD_REQUEST,
-        )
-      }
-
-      const normalizedCode = String(code).trim()
-
-      if (verificationRecord.isUsed) {
-        c.var.logger.error(
-          `OTP code already used for phone ${phoneNumber}, requestId: ${requestId}`,
-        )
-
-        return c.json(
-          err('Kode OTP sudah digunakan', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
-
-      if (verificationRecord.expiresAt < dayjs().toDate()) {
-        c.var.logger.error(
-          `OTP code expired for phone ${phoneNumber}, requestId: ${requestId}`,
-        )
-
-        return c.json(
-          err('Kode OTP sudah kadaluarsa. Silakan kirim ulang.', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
-
-      if (isDeployedEnv()) {
-        // Fazpass request API masks the OTP; verify with provider, not local DB code
-        const result = await verifyPhoneOtp(requestId, normalizedCode)
-
-        if (!result.success) {
-          c.var.logger.error(
-            `Failed to verify OTP with Fazpass for phone ${phoneNumber}, requestId: ${requestId}, message: ${result.message}`,
-          )
-
-          return c.json(
-            err(result.message, status.BAD_REQUEST),
-            status.BAD_REQUEST,
-          )
-        }
-      } else if (verificationRecord.code !== normalizedCode) {
-        c.var.logger.error(
-          `Invalid OTP code for phone ${phoneNumber}, requestId: ${requestId}`,
-        )
-
-        return c.json(
-          err('Kode OTP salah', status.BAD_REQUEST),
-          status.BAD_REQUEST,
-        )
-      }
-
-      await db.phoneVerification.update({
-        where: {
-          phone: phoneNumber,
-        },
-        data: {
-          isUsed: true,
-        },
-      })
-
-      c.var.logger.info(
-        `Phone OTP verified for ${phoneNumber}, requestId: ${requestId}`,
-      )
 
       return c.json(ok(null, 'Phone number verified successfully'))
     } catch (err) {

@@ -34,7 +34,6 @@ import type { Membership, MembershipUser } from '@prisma/client'
 import dayjs from 'dayjs'
 import status from 'http-status'
 import { z } from 'zod'
-import { hashPassword } from '@/lib/password'
 
 const adminCheckoutSchema = z
   .object({
@@ -324,13 +323,12 @@ export const adminCheckoutHandler = factory.createHandlers(
           if (existingByPhone) {
             resolvedUserId = existingByPhone.id
           } else {
-            // Create new user with password set to phone number
-            const hashed = await hashPassword(formattedPhone)
+            // Walk-ins activate via WhatsApp OTP before setting their password.
             const created = await tx.user.create({
               data: {
                 name: name!,
                 phone: formattedPhone,
-                password: hashed,
+                password: null,
                 source: UserSource.WALK_IN,
               },
               select: { id: true },

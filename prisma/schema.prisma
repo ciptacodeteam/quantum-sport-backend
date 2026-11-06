@@ -118,6 +118,8 @@ enum NotificationType {
 // Users & Auth
 // ------------------------------
 model User {
+  firstName String?
+  lastName String?
   id            String  @id @default(cuid())
   name          String
   email         String? @unique
@@ -154,6 +156,7 @@ model User {
 }
 
 model PhoneVerification {
+  attempts Int @default(0)
   id        String                 @id @default(cuid())
   phone     String                 @unique
   type      PhoneVerificationType?

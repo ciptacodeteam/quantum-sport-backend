@@ -42,13 +42,18 @@ let queue: Promise<unknown>
 const matches = (where: Record<string, any>) =>
   row &&
   Object.entries(where).every(([key, value]) =>
-    key === 'expiresAt' ? row!.expiresAt > value.gt : row![key] === value,
+    key === 'expiresAt'
+      ? row!.expiresAt > value.gt
+      : key === 'attempts'
+        ? row!.attempts < value.lt
+        : row![key] === value,
   )
 
 beforeEach(() => {
   vi.resetAllMocks()
   row = {
     id: 'otp-row',
+    attempts: 0,
     phone,
     requestId,
     code: 'MASKED',
@@ -63,7 +68,13 @@ beforeEach(() => {
   )
   mocks.updateMany.mockImplementation(async ({ where, data }) => {
     if (!matches(where)) return { count: 0 }
-    row = { ...row, ...data }
+    row = {
+      ...row,
+      ...data,
+      ...(data.attempts?.increment
+        ? { attempts: row!.attempts + data.attempts.increment }
+        : {}),
+    }
     return { count: 1 }
   })
   mocks.deleteMany.mockImplementation(async ({ where }) => {
@@ -135,7 +146,8 @@ describe('password reset authorization', () => {
     await expect(
       verifyPasswordResetOtp(phone, requestId, '9999'),
     ).rejects.toThrow('Kode OTP salah')
-    expect(mocks.updateMany).not.toHaveBeenCalled()
+    expect(row!.isUsed).toBe(false)
+    expect(row!.attempts).toBe(1)
   })
 
   it('fails closed when the OTP provider is unavailable', async () => {
@@ -143,7 +155,8 @@ describe('password reset authorization', () => {
     await expect(
       verifyPasswordResetOtp(phone, requestId, '1234'),
     ).rejects.toThrow()
-    expect(mocks.updateMany).not.toHaveBeenCalled()
+    expect(row!.isUsed).toBe(false)
+    expect(row!.attempts).toBe(1)
   })
 
   it('issues a random capability only after provider verification and stores its digest', async () => {
@@ -186,6 +199,11 @@ describe('password reset authorization', () => {
       'Password123!',
     )
     expect(password).toBe('new-hash')
+    expect(mocks.userUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { password: 'new-hash', phoneVerified: true },
+      }),
+    )
     expect(row).toBeNull()
     expect(mocks.revoke).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
     await expect(
