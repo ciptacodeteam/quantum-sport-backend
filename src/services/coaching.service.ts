@@ -1,4 +1,8 @@
-import { linkedCoachSessionPrice } from './coach-session-pricing.service'
+import { ensureServiceScheduleRange } from './service-schedule-range.service'
+import {
+  linkedCoachSessionPrice,
+  linkedCoachSessionPrices,
+} from './coach-session-pricing.service'
 import { ensureRollingCourtSchedules } from './rolling-court-schedule.service'
 import { reconcileRollingServiceSchedule } from './rolling-service-schedule.service'
 import { rollingCoachingScheduleSchema } from '@/lib/coaching-policy'
@@ -204,7 +208,6 @@ export async function coachingAvailability(
   end: string,
   now = new Date(),
 ) {
-  await ensureRollingCourtSchedules(undefined, now)
   const detail = await coachingCourtDetail(db, detailId)
   const startAt = toClubWallDate(start),
     endAt = toClubWallDate(end)
@@ -218,57 +221,79 @@ export async function coachingAvailability(
     )
   if (startAt <= courtBookingCutoff(now)) return []
   const sport = detail.slot.court!.sport
-  const slots = await db.slot.findMany({
-    where: {
-      branchId: detail.booking.branchId,
-      startAt,
-      endAt,
-      isAvailable: true,
-      scheduleClosed: false,
-      OR: [
-        {
-          type: 'COACH',
-          staff: {
-            isActive: true,
-            role: 'COACH',
-            coachType: { in: [sport, 'PADEL_TENNIS'] },
+  const excludedStaffIds = await ensureServiceScheduleRange(
+    detail.booking.branchId,
+    sport,
+    startAt,
+    endAt,
+    now,
+  )
+  const [slots, hasBallboyRow] = await Promise.all([
+    db.slot.findMany({
+      where: {
+        branchId: detail.booking.branchId,
+        ...(excludedStaffIds.length
+          ? { staffId: { notIn: excludedStaffIds } }
+          : {}),
+        startAt,
+        endAt,
+        isAvailable: true,
+        scheduleClosed: false,
+        OR: [
+          {
+            type: 'COACH',
+            staff: {
+              isActive: true,
+              role: 'COACH',
+              coachType: { in: [sport, 'PADEL_TENNIS'] },
+            },
           },
-        },
-        {
-          type: 'BALLBOY' as const,
-          staff: {
-            isActive: true,
-            role: 'BALLBOY' as const,
-            ...ballboySportWhere(sport),
+          {
+            type: 'BALLBOY' as const,
+            staff: {
+              isActive: true,
+              role: 'BALLBOY' as const,
+              ...ballboySportWhere(sport),
+            },
           },
-        },
-      ],
-    },
-    include: { staff: { select: coachingSelect } },
-    orderBy: [{ price: 'asc' }, { staffId: 'asc' }],
-  })
-  const busy = await db.slot.findMany({
-    where: {
-      staffId: { in: slots.map((s) => s.staffId!) },
-      startAt: { lt: endAt },
-      endAt: { gt: startAt },
-      ...occupied,
-    },
-    select: { staffId: true },
-  })
+        ],
+      },
+      include: { staff: { select: coachingSelect } },
+      orderBy: [{ price: 'asc' }, { staffId: 'asc' }],
+    }),
+    db.bookingBallboy.findFirst({
+      where: {
+        courtSlotId: detail.slotId,
+        OR: [
+          { bookingId: detail.bookingId },
+          { booking: { serviceForBookingId: detail.bookingId } },
+        ],
+        ...activeBallboys,
+        slot: { startAt: { lt: endAt }, endAt: { gt: startAt } },
+      },
+      select: { id: true },
+    }),
+  ])
+  if (!slots.length) return []
+  const [busy, coachPrices] = await Promise.all([
+    db.slot.findMany({
+      where: {
+        staffId: { in: slots.map((s) => s.staffId!) },
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+        ...occupied,
+      },
+      select: { staffId: true },
+    }),
+    linkedCoachSessionPrices(
+      db,
+      slots.filter((slot) => slot.type === 'COACH'),
+      detail.bookingId,
+    ),
+  ])
   const busyIds = new Set(busy.map((s) => s.staffId))
-  const hasBallboy = !!(await db.bookingBallboy.findFirst({
-    where: {
-      courtSlotId: detail.slotId,
-      OR: [
-        { bookingId: detail.bookingId },
-        { booking: { serviceForBookingId: detail.bookingId } },
-      ],
-      ...activeBallboys,
-      slot: { startAt: { lt: endAt }, endAt: { gt: startAt } },
-    },
-    select: { id: true },
-  }))
+  const hasBallboy = !!hasBallboyRow
+
   const options = slots
     .filter(
       (s) =>
@@ -301,18 +326,11 @@ export async function coachingAvailability(
       startAt: formatClubWallClock(s.startAt),
       endAt: formatClubWallClock(s.endAt),
     }))
-  return Promise.all(
-    options.map(async (option) => {
-      const slot = slots.find((s) => s.id === option.slotId)!
-      return {
-        ...option,
-        price:
-          slot.type === 'COACH'
-            ? await linkedCoachSessionPrice(db, slot, detail.bookingId)
-            : slot.price,
-      }
-    }),
-  )
+  return options.map((option) => ({
+    ...option,
+    price:
+      option.kind === 'COACH' ? coachPrices.get(option.slotId)! : option.price,
+  }))
 }
 
 /** One atomic service booking and invoice for a coach and/or ballboy. */

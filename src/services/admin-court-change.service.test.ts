@@ -25,9 +25,9 @@ vi.mock('@/services/membership-renewal.service', () => ({
   lockCustomerWallet: mocks.wallet,
 }))
 import {
-  changeCustomerCourt,
-  getCustomerCourtChangeOptions,
-} from './customer-court-change.service'
+  changeAdminCourt,
+  getAdminCourtChangeOptions,
+} from './admin-court-change.service'
 
 const now = new Date('2030-01-01T00:00:00+07:00')
 const input = { sourceSlotId: 'old', newSlotId: 'new' }
@@ -65,7 +65,7 @@ const target = () => ({
   startAt: source().slot.startAt,
   endAt: source().slot.endAt,
 })
-const execute = () => changeCustomerCourt('me', 'cemara', 'detail', input, now)
+const execute = () => changeAdminCourt('admin', 'cemara', 'detail', input, now)
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.detail.mockResolvedValue(source())
@@ -93,7 +93,7 @@ it('moves only the court, preserves paid amounts, relinks add-ons, and claims be
   })
   expect(mocks.detail).toHaveBeenCalledWith(
     expect.objectContaining({
-      where: { id: 'detail', booking: { userId: 'me', branchId: 'cemara' } },
+      where: { id: 'detail', booking: { branchId: 'cemara' } },
     }),
   )
   expect(mocks.target.mock.calls[0][0].where).toMatchObject({
@@ -148,7 +148,7 @@ it('moves only the court, preserves paid amounts, relinks add-ons, and claims be
     adminNote: expect.stringContaining('Existing note\n'),
   })
 })
-it('rejects another user or branch without exposing or mutating the booking', async () => {
+it('rejects a booking outside the selected branch without exposing or mutating it', async () => {
   mocks.detail.mockResolvedValue(null)
   await expect(execute()).rejects.toMatchObject({ status: 404 })
   expect(mocks.target).not.toHaveBeenCalled()
@@ -171,8 +171,8 @@ it.each([
 })
 it('uses WIB when blocking a booking that has already started', async () => {
   await expect(
-    changeCustomerCourt(
-      'me',
+    changeAdminCourt(
+      'admin',
       'cemara',
       'detail',
       input,
@@ -237,6 +237,40 @@ it('excludes booked legacy overlaps and different tariffs from the available cho
     ])
     .mockResolvedValueOnce([{ courtId: 'b' }])
   expect(
-    await getCustomerCourtChangeOptions('me', 'cemara', 'detail', now),
+    await getAdminCourtChangeOptions('admin', 'cemara', 'detail', now),
   ).toEqual([{ slotId: 'free', courtId: 'free-court', courtName: 'Court B' }])
+})
+
+it('lets an admin move a customer booking in the selected branch while locking the customer wallet', async () => {
+  expect(
+    await changeAdminCourt('admin', 'cemara', 'detail', input, now),
+  ).toMatchObject({ slotId: 'new' })
+  expect(mocks.detail.mock.calls[0][0].where).toEqual({
+    id: 'detail',
+    booking: { branchId: 'cemara' },
+  })
+  expect(mocks.detail.mock.calls[1][0].where.booking).toEqual({
+    branchId: 'cemara',
+  })
+  expect(mocks.wallet).toHaveBeenCalledWith(expect.anything(), 'me')
+  expect(mocks.booking.mock.calls[0][0].data.adminNote).toContain(
+    'Admin admin pindah lapangan',
+  )
+})
+it('rejects an admin request for a booking outside the selected branch before writing', async () => {
+  mocks.detail.mockResolvedValue(null)
+  await expect(
+    changeAdminCourt('admin', 'other', 'detail', input, now),
+  ).rejects.toMatchObject({ status: 404 })
+  expect(mocks.transaction).not.toHaveBeenCalled()
+})
+it('offers admin court choices without requiring a customer login', async () => {
+  mocks.targets.mockResolvedValueOnce([target()]).mockResolvedValueOnce([])
+  expect(
+    await getAdminCourtChangeOptions('admin', 'cemara', 'detail', now),
+  ).toEqual([{ slotId: 'new', courtId: 'b', courtName: 'Court B' }])
+  expect(mocks.detail.mock.calls[1][0].where).toEqual({
+    id: 'detail',
+    booking: { branchId: 'cemara' },
+  })
 })

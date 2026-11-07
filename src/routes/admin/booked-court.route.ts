@@ -1,3 +1,7 @@
+import {
+  adminCourtChangeOptionsHandler,
+  adminChangeCourtHandler,
+} from '@/handlers/admin/court-change.handler'
 import { createRouter } from '@/lib/create-app'
 import {
   getAllBookedCourtsHandler,
@@ -15,6 +19,8 @@ const adminBookedCourtRoute = createRouter()
   .get('/:id', ...getBookedCourtDetailHandler)
   .get('/by-court/:id', ...getBookingsByCourtHandler)
   .put('/:id/cancel', ...cancelBookingHandler)
+  .get('/:id/change-court-options', ...adminCourtChangeOptionsHandler)
+  .put('/:id/change-court', ...adminChangeCourtHandler)
   .put('/:id/reschedule', ...rescheduleCourtBookingHandler)
 
 export default adminBookedCourtRoute

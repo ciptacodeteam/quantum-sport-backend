@@ -1,5 +1,8 @@
 import { expect, it, vi } from 'vitest'
-import { linkedCoachSessionPrice } from './coach-session-pricing.service'
+import {
+  linkedCoachSessionPrice,
+  linkedCoachSessionPrices,
+} from './coach-session-pricing.service'
 const slot = {
   price: 200000,
   additionalHourPrice: 100000,
@@ -36,4 +39,36 @@ it('preserves flat pricing without a configured extension rate', async () => {
     ),
   ).toBe(200000)
   expect(findFirst).not.toHaveBeenCalled()
+})
+
+it('batches confirmed adjacent-hour prices and preserves zero-priced extensions', async () => {
+  const findMany = vi
+    .fn()
+    .mockResolvedValue([{ slot: { staffId: 'coach', endAt: slot.startAt } }])
+  const prices = await linkedCoachSessionPrices(
+    { bookingCoach: { findMany } } as never,
+    [
+      { ...slot, id: 'a', additionalHourPrice: 0 },
+      { ...slot, id: 'b', staffId: 'other' },
+      { ...slot, id: 'c', additionalHourPrice: null },
+    ],
+    'root',
+  )
+  expect(Object.fromEntries(prices)).toEqual({ a: 0, b: 200000, c: 200000 })
+  expect(findMany).toHaveBeenCalledTimes(1)
+  expect(findMany.mock.calls[0][0].where).toMatchObject({
+    status: 'CONFIRMED',
+    booking: { status: 'CONFIRMED' },
+    OR: [{ bookingId: 'root' }, { booking: { serviceForBookingId: 'root' } }],
+  })
+})
+it('does not query adjacent bookings when none of the offers has extension pricing', async () => {
+  const findMany = vi.fn()
+  const prices = await linkedCoachSessionPrices(
+    { bookingCoach: { findMany } } as never,
+    [{ ...slot, id: 'a', additionalHourPrice: null }],
+    'root',
+  )
+  expect(prices.get('a')).toBe(200000)
+  expect(findMany).not.toHaveBeenCalled()
 })

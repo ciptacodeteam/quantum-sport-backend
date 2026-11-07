@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { HTTPException } from 'hono/http-exception'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
+import { branchContext, withBranchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
 import { clubNowAsWallDate, formatClubWallClock } from '@/lib/club-time'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
@@ -67,14 +68,13 @@ function samePrice(
   )
 }
 
-export async function getCustomerCourtChangeOptions(
-  userId: string,
+async function getCourtChangeOptions(
   branchId: string,
   detailId: string,
   now = new Date(),
 ) {
   const detail = await db.bookingDetail.findFirst({
-    where: { id: detailId, booking: { userId, branchId } },
+    where: { id: detailId, booking: { branchId } },
     include: detailInclude,
   })
   if (!detail) throw new NotFoundException('Booking tidak ditemukan.')
@@ -106,8 +106,8 @@ export async function getCustomerCourtChangeOptions(
     }))
 }
 
-export async function changeCustomerCourt(
-  userId: string,
+async function changeCourt(
+  adminId: string,
   branchId: string,
   detailId: string,
   input: { sourceSlotId: string; newSlotId: string },
@@ -117,16 +117,22 @@ export async function changeCustomerCourt(
     return await db.$transaction(
       async (tx) => {
         // Match cancellation/renewal lock order: customer wallet, then booking.
-        await lockCustomerWallet(tx, userId)
         const owned = await tx.bookingDetail.findFirst({
-          where: { id: detailId, booking: { userId, branchId } },
-          select: { bookingId: true },
+          where: { id: detailId, booking: { branchId } },
+          select: {
+            bookingId: true,
+            booking: {
+              select: { userId: true, invoice: { select: { userId: true } } },
+            },
+          },
         })
         if (!owned) throw new NotFoundException('Booking tidak ditemukan.')
+        const ownerId = owned.booking.userId ?? owned.booking.invoice?.userId
+        if (ownerId) await lockCustomerWallet(tx, ownerId)
         // Shared booking lock serializes changes with cancellation and other moves.
         await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${owned.bookingId} FOR UPDATE`
         const detail = await tx.bookingDetail.findFirst({
-          where: { id: detailId, booking: { userId, branchId } },
+          where: { id: detailId, booking: { branchId } },
           include: detailInclude,
         })
         if (!detail) throw new NotFoundException('Booking tidak ditemukan.')
@@ -211,7 +217,7 @@ export async function changeCustomerCourt(
           },
           data: { isAvailable: true },
         })
-        const audit = `[${evaluatedAt.toISOString()}] User ${userId} pindah lapangan: ${detail.slotId} → ${target.id}; ${formatClubWallClock(target.startAt)} WIB; tanggal, jam dan biaya tetap.`
+        const audit = `[${evaluatedAt.toISOString()}] Admin ${adminId} pindah lapangan: ${detail.slotId} → ${target.id}; ${formatClubWallClock(target.startAt)} WIB; tanggal, jam dan biaya tetap.`
         await tx.booking.update({
           where: { id: detail.bookingId },
           data: {
@@ -239,4 +245,44 @@ export async function changeCustomerCourt(
       throw conflict()
     throw error
   }
+}
+
+async function inAdminBookingBranch<T>(
+  detailId: string,
+  branchId: string | null,
+  callback: (id: string) => Promise<T>,
+) {
+  const detail = await db.bookingDetail.findFirst({
+    where: { id: detailId, ...(branchId ? { booking: { branchId } } : {}) },
+    select: { booking: { select: { branchId: true } } },
+  })
+  if (!detail) throw new NotFoundException('Booking tidak ditemukan.')
+  const actualBranch = detail.booking.branchId
+  const context = branchContext.getStore()
+  if (context && !context.branchId && context.isSuperAdmin)
+    return withBranchContext({ ...context, branchId: actualBranch }, () =>
+      callback(actualBranch),
+    )
+  return callback(actualBranch)
+}
+export function getAdminCourtChangeOptions(
+  _adminId: string,
+  branchId: string | null,
+  detailId: string,
+  now = new Date(),
+) {
+  return inAdminBookingBranch(detailId, branchId, (actualBranch) =>
+    getCourtChangeOptions(actualBranch, detailId, now),
+  )
+}
+export function changeAdminCourt(
+  adminId: string,
+  branchId: string | null,
+  detailId: string,
+  input: { sourceSlotId: string; newSlotId: string },
+  now?: Date,
+) {
+  return inAdminBookingBranch(detailId, branchId, (actualBranch) =>
+    changeCourt(adminId, actualBranch, detailId, input, now),
+  )
 }
