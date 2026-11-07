@@ -6,11 +6,18 @@ import { courtBookingCutoff } from '@/lib/booking-time-policy'
 import { formatPhone } from '@/lib/utils'
 import { claimSlotsAtomically } from './slot-claim.service'
 
+export const MAX_INTERNAL_COURT_BOOKING_SLOTS = 1000
+
 export const internalCourtBookingSchema = z
   .object({
     purpose: z.enum(['COACH_TRAINING', 'EVENT']),
     activityName: z.string().trim().min(1).max(200),
-    courtSlots: z.array(z.string().min(1)).min(1).max(100),
+    courtSlots: z
+      .array(z.string().min(1))
+      .min(1)
+      .max(MAX_INTERNAL_COURT_BOOKING_SLOTS, {
+        error: 'Maksimal 1.000 slot lapangan dalam satu pemesanan.',
+      }),
     userId: z.string().min(1).optional(),
     name: z.string().trim().min(1).max(200).optional(),
     phone: z.string().trim().min(5).max(30).optional(),

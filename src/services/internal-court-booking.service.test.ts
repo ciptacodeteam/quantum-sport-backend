@@ -181,3 +181,56 @@ it.each(['COACH_TRAINING', 'EVENT'] as const)(
     expect(mocks.createUser).not.toHaveBeenCalled()
   },
 )
+
+it.each(['EVENT', 'COACH_TRAINING'] as const)(
+  'accepts and saves all 144 slots across November 21 and 22 for %s in one transaction',
+  async (purpose) => {
+    const slots = Array.from({ length: 144 }, (_, index) => {
+      const day = 21 + Math.floor(index / 72)
+      const court = Math.floor((index % 72) / 18)
+      const hour = 6 + (index % 18)
+      return {
+        id: `slot-${day}-${court}-${hour}`,
+        courtId: `court-${court}`,
+        price: 250000,
+        discountPrice: 0,
+        startAt: new Date(Date.UTC(2026, 10, day, hour)),
+        endAt: new Date(Date.UTC(2026, 10, day, hour + 1)),
+      }
+    })
+    const payload = internalCourtBookingSchema.parse({
+      ...input,
+      purpose,
+      courtSlots: slots.map((slot) => slot.id),
+    })
+    mocks.slots.mockResolvedValue(slots)
+    const booking = await createInternalCourtBooking(payload, 'cashier')
+    expect(mocks.transaction).toHaveBeenCalledOnce()
+    expect(mocks.claim.mock.calls[0][1].slotIds).toEqual(
+      slots.map((slot) => slot.id),
+    )
+    expect(mocks.create.mock.calls[0][0].data.details.create).toHaveLength(144)
+    expect(booking.totalPrice).toBe(0)
+    expect(
+      new Set(slots.map((slot) => slot.startAt.toISOString().slice(0, 10)))
+        .size,
+    ).toBe(2)
+  },
+)
+it('allows up to 1000 slots and explains the bulk booking limit when exceeded', () => {
+  const slots = Array.from({ length: 1000 }, (_, index) => `slot-${index}`)
+  expect(
+    internalCourtBookingSchema.safeParse({ ...input, courtSlots: slots })
+      .success,
+  ).toBe(true)
+  const invalid = internalCourtBookingSchema.safeParse({
+    ...input,
+    courtSlots: [...slots, 'extra'],
+  })
+  expect(invalid.success).toBe(false)
+  if (!invalid.success)
+    expect(invalid.error.issues[0]).toMatchObject({
+      path: ['courtSlots'],
+      message: 'Maksimal 1.000 slot lapangan dalam satu pemesanan.',
+    })
+})
