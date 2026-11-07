@@ -1,5 +1,5 @@
 import { filterAvailableBallboySlots } from '@/services/ballboy-availability.service'
-import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
+import { ensureBallboySchedules } from '@/services/ballboy-schedule.service'
 import { ballboySportWhere } from '@/lib/coaching-policy'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -9,7 +9,7 @@ import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
 import { toClubWallDate, formatClubWallClock } from '@/lib/club-time'
-import { BookingStatus, CourtSport, Role, SlotType } from '@prisma/client'
+import { CourtSport, Role, SlotType } from '@prisma/client'
 
 // GET /ballboys/availability?startAt=YYYY-MM-DDTHH:mm&endAt=YYYY-MM-DDTHH:mm
 export const getAvailableBallboyHandler = factory.createHandlers(
@@ -25,7 +25,7 @@ export const getAvailableBallboyHandler = factory.createHandlers(
       const startDateTime = toClubWallDate(startAt)
       const endDateTime = toClubWallDate(endAt)
 
-      await ensureRollingCourtSchedules()
+      await ensureBallboySchedules()
 
       // Find all available ballboy slots that overlap with the requested time range
       // A slot overlaps if: slot.startAt < request.endAt AND slot.endAt > request.startAt
@@ -53,15 +53,6 @@ export const getAvailableBallboyHandler = factory.createHandlers(
               },
             },
           ],
-          isAvailable: true,
-          bookingBallboys: {
-            none: {
-              status: {
-                not: BookingStatus.CANCELLED,
-              },
-              booking: { status: { not: BookingStatus.CANCELLED } },
-            },
-          }, // ensure not already booked (excluding cancelled ballboy bookings)
         },
         include: {
           staff: {
@@ -79,7 +70,23 @@ export const getAvailableBallboyHandler = factory.createHandlers(
         orderBy: { price: 'asc' },
       })
 
-      const available = await filterAvailableBallboySlots(slots)
+      // Keep booked/manual-unavailable hours in the timetable, but never closed hours.
+      const hours = [
+        ...new Set(
+          slots
+            .filter(
+              (slot) =>
+                slot.startAt >= startDateTime &&
+                slot.endAt <= endDateTime &&
+                slot.startAt.getUTCMinutes() === 0 &&
+                +slot.endAt - +slot.startAt === 3600000,
+            )
+            .map((slot) => formatClubWallClock(slot.startAt, 'HH:mm')),
+        ),
+      ].sort()
+      const available = await filterAvailableBallboySlots(
+        slots.filter((slot) => slot.isAvailable),
+      )
       const ballboys = available.map((slot) => ({
         slotId: slot.id,
         ballboy: slot.staff,
@@ -88,7 +95,7 @@ export const getAvailableBallboyHandler = factory.createHandlers(
         endAt: formatClubWallClock(slot.endAt),
       }))
 
-      return c.json(ok(ballboys), status.OK)
+      return c.json({ ...ok(ballboys), hours }, status.OK)
     } catch (error) {
       c.var.logger.fatal(`Error in getAvailableBallboyHandler: ${error}`)
       throw error

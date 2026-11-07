@@ -123,11 +123,14 @@ export async function reconcileRollingServiceSchedule(
 }
 
 /** Extend services whenever the court rolling window advances; staff lock preserves manual edits. */
-export async function ensureRollingServiceSchedules(now = new Date()) {
+export async function ensureRollingServiceSchedules(
+  now = new Date(),
+  role?: 'COACH' | 'BALLBOY',
+) {
   const staff = await db.staff.findMany({
     where: {
       isActive: true,
-      role: { in: ['COACH', 'BALLBOY'] },
+      role: role ?? { in: ['COACH', 'BALLBOY'] },
       rollingServiceSchedule: { not: Prisma.AnyNull },
     },
   })
