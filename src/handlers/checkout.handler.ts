@@ -1,3 +1,5 @@
+import { ballboySportWhere } from '@/lib/coaching-policy'
+import { clubNowAsWallDate } from '@/lib/club-time'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
@@ -7,7 +9,7 @@ import {
   PAYMENT_WINDOW_MINUTES,
 } from '@/lib/booking-time-policy'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
-import { assertClientCheckoutHasNoAddOns } from '@/lib/client-checkout-policy'
+import { assertClientCheckoutAddOnsAllowed } from '@/lib/client-checkout-policy'
 import { consumeMembershipHours } from '@/services/membership-checkout.service'
 import { env } from '@/env'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -156,9 +158,11 @@ function validateBallboysForTennisCourts(
   }
 
   if (courtSlots.length === 0) {
-    throw new BadRequestException(
-      'Ballboy can only be added with tennis court bookings',
-    )
+    if (ballboySelections.some((selection) => selection.courtSlotId))
+      throw new BadRequestException(
+        'Ballboy selection must match a selected tennis court booking slot',
+      )
+    return
   }
 
   if (courtSlots.some((slot) => slot.court?.sport !== CourtSport.TENNIS)) {
@@ -259,7 +263,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
       }
 
       const validated = c.req.valid('json') as ApplyPromoCodeSchema
-      assertClientCheckoutHasNoAddOns(validated)
+      assertClientCheckoutAddOnsAllowed(validated)
       const {
         promoCode: rawPromoCode,
         courtSlots: rawCourtSlots,
@@ -415,6 +419,14 @@ export const applyPromoCodeHandler = factory.createHandlers(
               id: { in: ballboySlots },
               type: SlotType.BALLBOY,
               isAvailable: true,
+              scheduleClosed: false,
+              startAt: { gt: clubNowAsWallDate() },
+              staff: {
+                role: 'BALLBOY',
+                isActive: true,
+                adminServiceOnly: false,
+                ...ballboySportWhere('TENNIS'),
+              },
             },
             include: {
               bookingBallboys: {
@@ -553,7 +565,7 @@ export const checkoutHandler = factory.createHandlers(
       }
 
       const validated = c.req.valid('json') as any
-      assertClientCheckoutHasNoAddOns(validated)
+      assertClientCheckoutAddOnsAllowed(validated)
       const {
         bookingId,
         paymentMethodId,
@@ -1010,6 +1022,14 @@ export const checkoutHandler = factory.createHandlers(
               id: { in: ballboySlots },
               type: SlotType.BALLBOY,
               isAvailable: true,
+              scheduleClosed: false,
+              startAt: { gt: clubNowAsWallDate() },
+              staff: {
+                role: 'BALLBOY',
+                isActive: true,
+                adminServiceOnly: false,
+                ...ballboySportWhere('TENNIS'),
+              },
             },
             include: {
               bookingBallboys: {
@@ -1031,7 +1051,9 @@ export const checkoutHandler = factory.createHandlers(
           }
           if (
             ballboySlotData.some(
-              (slot) => slot.startAt.getTime() <= checkoutStartedAt.getTime(),
+              (slot) =>
+                slot.startAt.getTime() <=
+                clubNowAsWallDate(checkoutStartedAt).getTime(),
             )
           ) {
             throw new BadRequestException(
@@ -1062,7 +1084,7 @@ export const checkoutHandler = factory.createHandlers(
           await claimSlotsAtomically(tx, {
             slotIds: ballboySlots,
             type: SlotType.BALLBOY,
-            startsAfter: checkoutStartedAt,
+            startsAfter: clubNowAsWallDate(checkoutStartedAt),
             unavailableMessage:
               'One or more ballboy slots not found or unavailable',
           })

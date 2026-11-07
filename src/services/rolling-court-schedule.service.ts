@@ -260,6 +260,7 @@ export async function saveRollingCourtSlotRule(
 export async function ensureRollingCourtSchedules(
   courtId?: string,
   now = new Date(),
+  { includeServices = true }: { includeServices?: boolean } = {},
 ) {
   const courts = await db.court.findMany({
     where: {
@@ -291,5 +292,5 @@ export async function ensureRollingCourtSchedules(
     }
   }
   await ensureRecurringBookings(now)
-  await ensureRollingServiceSchedules(now)
+  if (includeServices) await ensureRollingServiceSchedules(now)
 }

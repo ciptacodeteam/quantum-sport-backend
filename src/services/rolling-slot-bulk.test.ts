@@ -2,10 +2,7 @@ vi.mock('@/services/tariff-policy.service', () => ({
   getTariffPeriods: vi.fn().mockResolvedValue([]),
 }))
 import { beforeEach, expect, it, vi } from 'vitest'
-import dayjs, {
-  clubWallTime,
-  formatClubWallClock,
-} from '@/lib/club-time'
+import dayjs, { clubWallTime, formatClubWallClock } from '@/lib/club-time'
 import {
   bookingWindowEnd,
   rollingCourtPricingSchema,
@@ -155,9 +152,9 @@ it('keeps pricing and disable rules when extending the window into new dates', a
     ),
   ).toBe(true)
   expect(mocks.createSlots.mock.calls[0][0].skipDuplicates).toBe(true)
-  expect(formatClubWallClock(mocks.court.slotsGeneratedThrough, 'YYYY-MM-DD')).toBe(
-    formatClubWallClock(bookingWindowEnd(1, later), 'YYYY-MM-DD'),
-  )
+  expect(
+    formatClubWallClock(mocks.court.slotsGeneratedThrough, 'YYYY-MM-DD'),
+  ).toBe(formatClubWallClock(bookingWindowEnd(1, later), 'YYYY-MM-DD'))
 })
 
 it('preserves bulk rules when changing the main duration and base prices', async () => {
@@ -190,4 +187,22 @@ it('rejects rolling bulk rules for a court without an automatic schedule', async
   await expect(saveRollingCourtSlotRule('court', rule, now)).rejects.toThrow(
     'jadwal otomatis',
   )
+})
+
+it('keeps court and recurring booking generation on reads without rebuilding coach and ballboy schedules', async () => {
+  mocks.court.slotsGeneratedThrough = null
+  const { ensureRecurringBookings } =
+    await import('@/services/recurring-booking.service')
+  const { ensureRollingServiceSchedules } =
+    await import('./rolling-service-schedule.service')
+  await ensureRollingCourtSchedules('court', now, { includeServices: false })
+  expect(ensureRecurringBookings).toHaveBeenCalledWith(now)
+  expect(ensureRollingServiceSchedules).not.toHaveBeenCalled()
+  expect(mocks.createSlots).toHaveBeenCalled()
+})
+it('still reconciles service schedules for the worker and service availability callers', async () => {
+  const { ensureRollingServiceSchedules } =
+    await import('./rolling-service-schedule.service')
+  await ensureRollingCourtSchedules('court', now)
+  expect(ensureRollingServiceSchedules).toHaveBeenCalledWith(now)
 })

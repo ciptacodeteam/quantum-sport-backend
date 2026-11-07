@@ -1,20 +1,26 @@
 import { expect, it } from 'vitest'
-import { assertClientCheckoutHasNoAddOns } from './client-checkout-policy'
+import { assertClientCheckoutAddOnsAllowed } from './client-checkout-policy'
 it('allows court-only selections and empty legacy add-on arrays', () => {
-  expect(() => assertClientCheckoutHasNoAddOns({})).not.toThrow()
+  expect(() => assertClientCheckoutAddOnsAllowed({})).not.toThrow()
   expect(() =>
-    assertClientCheckoutHasNoAddOns({
+    assertClientCheckoutAddOnsAllowed({
       inventories: [],
       coachSlots: [],
       ballboySlots: [],
     }),
   ).not.toThrow()
 })
-it.each(['coachSlots', 'ballboySlots', 'inventories'])(
+it.each(['coachSlots', 'inventories'])(
   'rejects %s in customer promo or checkout selections',
   (key) => {
     expect(() =>
-      assertClientCheckoutHasNoAddOns({ [key]: ['selected-item'] }),
-    ).toThrow('Add-ons hanya dapat dipesan melalui admin.')
+      assertClientCheckoutAddOnsAllowed({ [key]: ['selected-item'] }),
+    ).toThrow('Coach dan perlengkapan hanya dapat dipesan melalui admin.')
   },
 )
+
+it('allows customers to purchase ballboy slots independently', () => {
+  expect(() =>
+    assertClientCheckoutAddOnsAllowed({ ballboySlots: ['ballboy-slot'] }),
+  ).not.toThrow()
+})

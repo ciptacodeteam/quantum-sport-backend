@@ -214,7 +214,6 @@ it('rejects a membership balance lost to a concurrent checkout', async () => {
 it.each([
   { inventories: [{ inventoryId: 'towel', quantity: 1 }] },
   { coachSlots: ['coach-slot'] },
-  { ballboySlots: [{ slotId: 'ballboy-slot', courtSlotId: 'court-slot' }] },
 ])(
   'rejects add-on ordering from the customer checkout before changing stock or payments',
   async (selection) => {
@@ -225,7 +224,9 @@ it.each([
         paymentMethodId: 'qris',
         ...selection,
       }),
-    ).rejects.toThrow('Add-ons hanya dapat dipesan melalui admin.')
+    ).rejects.toThrow(
+      'Coach dan perlengkapan hanya dapat dipesan melalui admin.',
+    )
     expect(mocks.db.$transaction).not.toHaveBeenCalled()
     expect(mocks.gateway.charge).not.toHaveBeenCalled()
   },
@@ -534,4 +535,174 @@ it('rejects a direct customer checkout with an offline payment ID even if its ch
   ).rejects.toThrow('offline hanya tersedia melalui admin')
   expect(mocks.db.$transaction).not.toHaveBeenCalled()
   expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+
+function publicBallboySlot() {
+  return {
+    id: 'ballboy-slot',
+    staffId: 'ballboy',
+    type: 'BALLBOY',
+    price: 45000,
+    startAt: new Date('2030-10-23T08:00:00Z'),
+    endAt: new Date('2030-10-23T09:00:00Z'),
+    staff: {
+      id: 'ballboy',
+      role: 'BALLBOY',
+      isActive: true,
+      adminServiceOnly: false,
+    },
+    bookingBallboys: [],
+  }
+}
+it('checks out a standalone ballboy at the server price without a court or membership deduction', async () => {
+  const slot = publicBallboySlot()
+  tx.slot.findMany.mockResolvedValue([slot])
+  tx.slot.findFirst = vi.fn().mockResolvedValue(null)
+  tx.$queryRaw = vi.fn().mockResolvedValue([])
+  tx.bookingBallboy = { create: vi.fn() }
+  const response = await checkout({
+    ballboySlots: ['ballboy-slot'],
+    paymentMethodId: 'qris',
+    useMembership: false,
+  })
+  expect(tx.bookingBallboy.create).toHaveBeenCalledWith({
+    data: {
+      bookingId: 'booking',
+      slotId: 'ballboy-slot',
+      courtSlotId: undefined,
+      price: 45000,
+    },
+  })
+  expect(tx.bookingDetail.create).not.toHaveBeenCalled()
+  expect(tx.membershipUser.updateMany).not.toHaveBeenCalled()
+  expect(tx.slot.findMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        type: 'BALLBOY',
+        scheduleClosed: false,
+        startAt: { gt: expect.any(Date) },
+        staff: expect.objectContaining({
+          role: 'BALLBOY',
+          isActive: true,
+          adminServiceOnly: false,
+        }),
+      }),
+    }),
+  )
+  expect(tx.slot.updateMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        type: 'BALLBOY',
+        scheduleClosed: false,
+        startAt: { gt: expect.any(Date) },
+      }),
+    }),
+  )
+  expect(response.data.total).toBe(46110)
+  expect(mocks.gateway.charge).toHaveBeenCalled()
+})
+it('rejects a ballboy slot that was booked before checkout', async () => {
+  tx.slot.findMany.mockResolvedValue([
+    { ...publicBallboySlot(), bookingBallboys: [{ id: 'other-booking' }] },
+  ])
+  await expect(
+    checkout({
+      ballboySlots: ['ballboy-slot'],
+      paymentMethodId: 'qris',
+      useMembership: false,
+    }),
+  ).rejects.toThrow('already booked')
+  expect(tx.invoice.create).not.toHaveBeenCalled()
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+it('rejects an unavailable or non-public ballboy slot before payment', async () => {
+  tx.slot.findMany.mockResolvedValue([])
+  await expect(
+    checkout({
+      ballboySlots: ['ballboy-slot'],
+      paymentMethodId: 'qris',
+      useMembership: false,
+    }),
+  ).rejects.toThrow('not found or unavailable')
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+it('rejects a court reference on a standalone ballboy order', async () => {
+  tx.slot.findMany.mockResolvedValue([publicBallboySlot()])
+  await expect(
+    checkout({
+      ballboySlots: [{ slotId: 'ballboy-slot', courtSlotId: 'not-in-cart' }],
+      paymentMethodId: 'qris',
+      useMembership: false,
+    }),
+  ).rejects.toThrow('must match a selected tennis court')
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+it('rejects started ballboy hours using Jakarta wall time', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2030-10-23T02:00:00Z')) // 09:00 WIB
+  tx.slot.findMany.mockResolvedValue([publicBallboySlot()]) // 08:00 WIB
+  try {
+    await expect(
+      checkout({
+        ballboySlots: ['ballboy-slot'],
+        paymentMethodId: 'qris',
+        useMembership: false,
+      }),
+    ).rejects.toThrow('already started')
+    expect(mocks.gateway.charge).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+it('rejects another overlapping slot for the same ballboy before charging', async () => {
+  tx.slot.findMany.mockResolvedValue([publicBallboySlot()])
+  tx.slot.findFirst = vi.fn().mockResolvedValue({ id: 'overlapping-booking' })
+  tx.$queryRaw = vi.fn().mockResolvedValue([])
+  await expect(
+    checkout({
+      ballboySlots: ['ballboy-slot'],
+      paymentMethodId: 'qris',
+      useMembership: false,
+    }),
+  ).rejects.toThrow('sudah dipesan pada waktu yang sama')
+  expect(tx.invoice.create).not.toHaveBeenCalled()
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+
+it('pays tennis courts and linked ballboys together in one checkout', async () => {
+  const ballboy = publicBallboySlot()
+  const court = {
+    id: 'court-slot',
+    courtId: 'tennis-court',
+    price: 200000,
+    discountPrice: 0,
+    startAt: ballboy.startAt,
+    endAt: ballboy.endAt,
+    court: { sport: 'TENNIS' },
+    bookingDetails: [],
+  }
+  tx.slot.findMany.mockImplementation(async ({ where }: any) =>
+    where.type === 'BALLBOY' ? [ballboy] : [court],
+  )
+  tx.slot.findFirst = vi.fn().mockResolvedValue(null)
+  tx.$queryRaw = vi.fn().mockResolvedValue([])
+  tx.bookingBallboy = { create: vi.fn() }
+  const response = await checkout({
+    courtSlots: ['court-slot'],
+    ballboySlots: [{ slotId: 'ballboy-slot', courtSlotId: 'court-slot' }],
+    paymentMethodId: 'qris',
+    useMembership: false,
+  })
+  expect(tx.bookingDetail.create).toHaveBeenCalledOnce()
+  expect(tx.bookingBallboy.create).toHaveBeenCalledWith({
+    data: {
+      bookingId: 'booking',
+      slotId: 'ballboy-slot',
+      courtSlotId: 'court-slot',
+      price: 45000,
+    },
+  })
+  expect(tx.invoice.create).toHaveBeenCalledOnce()
+  expect(response.data.total).toBe(246110)
+  expect(mocks.gateway.charge).toHaveBeenCalledOnce()
 })

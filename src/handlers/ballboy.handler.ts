@@ -1,3 +1,4 @@
+import { filterAvailableBallboySlots } from '@/services/ballboy-availability.service'
 import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
 import { ballboySportWhere } from '@/lib/coaching-policy'
 import { validateHook } from '@/helpers/validate-hook'
@@ -78,7 +79,8 @@ export const getAvailableBallboyHandler = factory.createHandlers(
         orderBy: { price: 'asc' },
       })
 
-      const ballboys = slots.map((slot) => ({
+      const available = await filterAvailableBallboySlots(slots)
+      const ballboys = available.map((slot) => ({
         slotId: slot.id,
         ballboy: slot.staff,
         price: slot.price,

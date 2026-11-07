@@ -62,7 +62,9 @@ export const getAllCourtHandler = factory.createHandlers(
   ),
   async (c) => {
     try {
-      await ensureRollingCourtSchedules()
+      await ensureRollingCourtSchedules(undefined, new Date(), {
+        includeServices: false,
+      })
       const query = c.req.valid('query') as SearchQuerySchema & {
         startAt?: string
         endAt?: string
@@ -173,8 +175,10 @@ export const getCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
-      await ensureRollingCourtSchedules()
       const { id: courtId } = c.req.valid('param') as IdSchema
+      await ensureRollingCourtSchedules(courtId, new Date(), {
+        includeServices: false,
+      })
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema
 
       // Verify court exists
@@ -256,7 +260,9 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
-      await ensureRollingCourtSchedules()
+      await ensureRollingCourtSchedules(undefined, new Date(), {
+        includeServices: false,
+      })
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
         courtSport?: 'PADEL' | 'TENNIS'
@@ -317,7 +323,16 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
           startAt: 'asc',
         },
         include: {
-          court: true,
+          // Avoid repeating private rolling pricing/rules JSON for every hour.
+          court: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              description: true,
+              sport: true,
+            },
+          },
           bookingDetails: {
             where: { booking: { status: { not: BookingStatus.CANCELLED } } },
             select: { booking: { select: { status: true } } },
@@ -325,15 +340,31 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         },
       })
 
-      // Transform court images
-      for (const slot of slots) {
-        if (slot.court?.image) {
-          slot.court.image = await getFileUrl(slot.court.image)
-        }
-      }
+      const images = [
+        ...new Set(
+          slots
+            .map((slot) => slot.court?.image)
+            .filter((image): image is string => !!image),
+        ),
+      ]
+      const imageUrls = new Map(
+        await Promise.all(
+          images.map(
+            async (image) => [image, await getFileUrl(image)] as const,
+          ),
+        ),
+      )
 
       const formattedSlots = slots.map(({ bookingDetails, ...slot }) => ({
         ...slot,
+        court: slot.court
+          ? {
+              ...slot.court,
+              image: slot.court.image
+                ? imageUrls.get(slot.court.image)!
+                : slot.court.image,
+            }
+          : null,
         availabilityStatus: getCourtSlotStatus(
           slot.isAvailable,
           bookingDetails.map((detail) => detail.booking.status),
