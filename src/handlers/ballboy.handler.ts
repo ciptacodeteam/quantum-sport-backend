@@ -95,3 +95,18 @@ export const getAvailableBallboyHandler = factory.createHandlers(
     }
   },
 )
+
+// Public booking catalog: keep unavailable ballboys visible in the timetable.
+export const getBallboysHandler = factory.createHandlers(async (c) => {
+  const ballboys = await db.staff.findMany({
+    where: {
+      role: Role.BALLBOY,
+      isActive: true,
+      adminServiceOnly: false,
+      ...ballboySportWhere('TENNIS'),
+    },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+  return c.json(ok(ballboys), status.OK)
+})

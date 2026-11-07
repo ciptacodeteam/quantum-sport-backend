@@ -1,10 +1,12 @@
 import { createRouter } from '@/lib/create-app'
-import { getAvailableBallboyHandler } from '@/handlers/ballboy.handler'
+import {
+  getAvailableBallboyHandler,
+  getBallboysHandler,
+} from '@/handlers/ballboy.handler'
 
 const ballboyRoute = createRouter()
-	.basePath('/ballboys')
-	.get('/availability', ...getAvailableBallboyHandler)
+  .basePath('/ballboys')
+  .get('/', ...getBallboysHandler)
+  .get('/availability', ...getAvailableBallboyHandler)
 
 export default ballboyRoute
-
-
