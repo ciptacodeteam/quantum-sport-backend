@@ -1,7 +1,22 @@
-vi.mock('@/services/rolling-court-schedule.service', () => ({ ensureRollingCourtSchedules: vi.fn() }))
+vi.mock('@/services/rolling-court-schedule.service', () => ({
+  ensureRollingCourtSchedules: vi.fn(),
+}))
 import { beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ slots: vi.fn(), oneSlot: vi.fn(), update: vi.fn(), fetched: vi.fn() }))
-vi.mock('@/lib/prisma', () => ({ db: { slot: { findMany: mocks.slots, findUnique: mocks.oneSlot }, $transaction: (fn: any) => fn({ slot: { updateMany: mocks.update, findUniqueOrThrow: mocks.fetched } }) } }))
+const mocks = vi.hoisted(() => ({
+  slots: vi.fn(),
+  oneSlot: vi.fn(),
+  update: vi.fn(),
+  fetched: vi.fn(),
+}))
+vi.mock('@/lib/prisma', () => ({
+  db: {
+    slot: { findMany: mocks.slots, findUnique: mocks.oneSlot },
+    $transaction: (fn: any) =>
+      fn({
+        slot: { updateMany: mocks.update, findUniqueOrThrow: mocks.fetched },
+      }),
+  },
+}))
 vi.mock('@/lib/create-app', () => ({
   factory: { createHandlers: (...handlers: unknown[]) => handlers },
 }))
@@ -14,7 +29,11 @@ vi.mock('@/services/costing.service', () => ({
   bulkUpdateCourtSlotPricing: vi.fn(),
   updateSlotPricing: vi.fn(),
 }))
-import { getAvailableCourtSlotsHandler, updateCourtSlotAvailabilityHandler } from './court.handler'
+import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
+import {
+  getAvailableCourtSlotsHandler,
+  updateCourtSlotAvailabilityHandler,
+} from './court.handler'
 
 beforeEach(() => vi.clearAllMocks())
 const slot = {
@@ -77,15 +96,32 @@ it('preserves the available-only default for other callers', async () => {
 })
 
 async function toggle(isAvailable = true) {
-  return (updateCourtSlotAvailabilityHandler.at(-1) as any)({
-    req: { valid: (target: string) => target === 'param' ? { id: 'slot' } : { isAvailable } },
-    var: { logger: { fatal: vi.fn() } }, json: (body: any) => body,
-  }, vi.fn())
+  return (updateCourtSlotAvailabilityHandler.at(-1) as any)(
+    {
+      req: {
+        valid: (target: string) =>
+          target === 'param' ? { id: 'slot' } : { isAvailable },
+      },
+      var: { logger: { fatal: vi.fn() } },
+      json: (body: any) => body,
+    },
+    vi.fn(),
+  )
 }
 it('rejects manually reopening slots with active bookings or weekly rule closures', async () => {
-  mocks.oneSlot.mockResolvedValue({ ...slot, type: 'COURT', isAvailable: false, bookingDetails: [{ id: 'booking-detail' }] })
+  mocks.oneSlot.mockResolvedValue({
+    ...slot,
+    type: 'COURT',
+    isAvailable: false,
+    bookingDetails: [{ id: 'booking-detail' }],
+  })
   await expect(toggle()).rejects.toThrow('active bookings')
-  mocks.oneSlot.mockResolvedValue({ ...slot, type: 'COURT', isAvailable: false, scheduleClosed: true })
+  mocks.oneSlot.mockResolvedValue({
+    ...slot,
+    type: 'COURT',
+    isAvailable: false,
+    scheduleClosed: true,
+  })
   await expect(toggle()).rejects.toThrow('aturan jadwal')
   expect(mocks.update).not.toHaveBeenCalled()
 })
@@ -94,7 +130,42 @@ it('rejects a manual toggle if a checkout changed availability concurrently', as
   mocks.update.mockResolvedValue({ count: 0 })
   await expect(toggle(false)).rejects.toThrow('Status slot sudah berubah')
   expect(mocks.update).toHaveBeenCalledWith({
-    where: { id: 'slot', isAvailable: true, bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } } },
+    where: {
+      id: 'slot',
+      isAvailable: true,
+      bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } },
+    },
     data: { isAvailable: false },
   })
+})
+
+it('keeps slot reads independent from coach and ballboy synchronization and strips heavy pricing configuration', async () => {
+  mocks.slots.mockResolvedValue([
+    {
+      ...slot,
+      court: {
+        ...slot.court,
+        rollingPricing: {
+          closedHours: [13],
+          bulkRules: [{ kind: 'pricing', note: 'large configuration' }],
+        },
+      },
+    },
+    {
+      ...slot,
+      id: 'closed-hour',
+      startAt: new Date('2026-10-27T13:00:00Z'),
+      endAt: new Date('2026-10-27T14:00:00Z'),
+      court: { ...slot.court, rollingPricing: { closedHours: [13] } },
+    },
+  ])
+  const response = await request('true')
+  expect(ensureRollingCourtSchedules).toHaveBeenCalledWith(
+    undefined,
+    expect.any(Date),
+    { includeServices: false },
+  )
+  expect(response.data).toHaveLength(1)
+  expect(response.data[0].court).toMatchObject({ id: 'court', name: 'Court 1' })
+  expect(response.data[0].court).not.toHaveProperty('rollingPricing')
 })

@@ -72,4 +72,10 @@ it('exports a readable Excel workbook using exactly the same report filters', as
     'Definisi',
   ])
   expect(mocks.report).toHaveBeenCalledWith('2026-10-01', '2026-10-31', 'c1')
+  const definitions = XLSX.utils.sheet_to_json<{ Keterangan: string }>(
+    wb.Sheets.Definisi,
+  )
+  expect(definitions[0].Keterangan).toContain(
+    'Event dan Training Coach dikecualikan',
+  )
 })

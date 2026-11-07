@@ -80,7 +80,7 @@ export async function getCourtPerformance(
   const createdStart = clubTime(startDate).startOf('day').toDate()
   const createdEnd = clubTime(endDate).add(1, 'day').startOf('day').toDate()
   const window = { startAt: { lt: end }, endAt: { gt: start } }
-  const [courts, slots, bookings, rules, packages] = await Promise.all([
+  const [courts, slots, loadedBookings, rules, packages] = await Promise.all([
     db.court.findMany({
       orderBy: { name: 'asc' },
       include: { branch: { select: { name: true } } },
@@ -95,7 +95,7 @@ export async function getCourtPerformance(
         isAvailable: true,
         scheduleClosed: true,
         bookingDetails: {
-          where: { booking: { status: 'HOLD' } },
+          where: { booking: { status: 'HOLD', purpose: 'REGULAR' } },
           select: { id: true },
           take: 1,
         },
@@ -104,6 +104,7 @@ export async function getCourtPerformance(
     db.booking.findMany({
       where: {
         status: 'CONFIRMED',
+        purpose: 'REGULAR',
         ...(courtId ? { details: { some: { slot: { courtId } } } } : {}),
         OR: [
           {
@@ -119,6 +120,11 @@ export async function getCourtPerformance(
     getTariffPeriods(),
     db.membership.findMany({ orderBy: { sequence: 'asc' } }),
   ])
+  // Event/training reservations block availability, but are not customer sales
+  // or playing activity in this report (including all export aggregates).
+  const bookings = loadedBookings.filter(
+    (booking) => booking.purpose === 'REGULAR',
+  )
   const now = clubNowAsWallDate()
   const createdBookingHours = bookings
     .filter(

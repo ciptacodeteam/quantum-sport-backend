@@ -42,6 +42,7 @@ const slot = (id: string, hour: number, available = false) => ({
 const booking = (overrides: Record<string, unknown> = {}) =>
   ({
     id: 'b1',
+    purpose: 'REGULAR',
     user: { name: 'Customer' },
     invoice: { id: 'i1', number: 'INV-1', status: 'PAID' },
     membershipUserId: null,
@@ -420,3 +421,91 @@ it('compares branches using playing location and weighted capacity, including cr
     report.summary.revenue,
   )
 })
+
+it('excludes event and training reservations from every performance metric, category and branch total', async () => {
+  const regular = booking({ createdAt: new Date('2026-09-30T18:00:00Z') })
+  mocks.bookings.mockResolvedValue([regular])
+  const expected = await getCourtPerformance('2026-10-01', '2026-10-01')
+  const internal = ['EVENT', 'COACH_TRAINING'].map((purpose, index) =>
+    booking({
+      purpose,
+      id: `internal-${index}`,
+      createdAt: regular.createdAt,
+      courtDiscountPrice: 900000,
+      totalPrice: 900000,
+      details: [
+        {
+          ...regular.details[0],
+          id: `internal-detail-${index}`,
+          slotId: `internal-slot-${index}`,
+          price: 900000,
+          slot: slot(`internal-slot-${index}`, 9 + index),
+        },
+      ],
+      ...(purpose === 'COACH_TRAINING'
+        ? {
+            membershipUserId: 'internal-pack',
+            courtDiscountPrice: 0,
+            membershipUser: {
+              membershipId: 'internal-pack',
+              membership: { name: 'Internal pack', sessions: 10 },
+              invoice: { status: 'PAID', total: 10000000, processingFee: 0 },
+            },
+          }
+        : {}),
+    }),
+  )
+  mocks.slots.mockResolvedValue([
+    slot('s1', 6),
+    slot('s2', 7, true),
+    { ...slot('s3', 8), scheduleClosed: true },
+    ...internal.flatMap((item) => item.details.map((detail) => detail.slot)),
+  ])
+  // Intentionally include internal rows despite the database filter to protect
+  // aggregation from future query changes and historical bad financial data.
+  mocks.bookings.mockResolvedValue([regular, ...internal])
+  const report = await getCourtPerformance('2026-10-01', '2026-10-01')
+  expect(mocks.bookings.mock.calls.at(-1)![0].where).toMatchObject({
+    status: 'CONFIRMED',
+    purpose: 'REGULAR',
+  })
+  expect(
+    mocks.slots.mock.calls.at(-1)![0].select.bookingDetails.where.booking,
+  ).toEqual({ status: 'HOLD', purpose: 'REGULAR' })
+  expect(report).toEqual(expected)
+  expect(report.summary.createdBookingHours).toBe(1)
+  expect(report.rows.map((row) => row.bookingId)).toEqual(['b1'])
+})
+it.each(['EVENT', 'COACH_TRAINING'] as const)(
+  'returns no customer revenue or playing metrics for an internal-only %s period',
+  async (purpose) => {
+    mocks.bookings.mockResolvedValue([
+      booking({ purpose, createdAt: new Date('2026-09-30T18:00:00Z') }),
+    ])
+    const report = await getCourtPerformance('2026-10-01', '2026-10-01')
+    expect(report.rows).toEqual([])
+    expect(report.summary).toMatchObject({
+      hours: 0,
+      createdBookingHours: 0,
+      bookings: 0,
+      paidRevenue: 0,
+      membershipAllocation: 0,
+      revenue: 0,
+      realizedRevenue: 0,
+      nonMembershipHours: 0,
+      membershipHours: 0,
+      occupiedHours: 0,
+      occupancy: 0,
+    })
+    expect(
+      report.courtSummary.every(
+        (court) => court.hours === 0 && court.revenue === 0,
+      ),
+    ).toBe(true)
+    expect(
+      report.branchSummary.every(
+        (branch) => branch.bookings === 0 && branch.revenue === 0,
+      ),
+    ).toBe(true)
+  },
+)

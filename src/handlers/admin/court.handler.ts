@@ -291,7 +291,9 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
   zValidator('query', availableCourtSlotsQuerySchema, validateHook),
   async (c) => {
     try {
-      await ensureRollingCourtSchedules()
+      await ensureRollingCourtSchedules(undefined, new Date(), {
+        includeServices: false,
+      })
       const query = c.req.valid('query') as AvailableCourtSlotsQuerySchema & {
         courtId?: string
         courtSport?: 'PADEL' | 'TENNIS'
@@ -352,7 +354,18 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
           startAt: 'asc',
         },
         include: {
-          court: true,
+          court: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              description: true,
+              sport: true,
+              branchId: true,
+              isActive: true,
+              rollingPricing: true,
+            },
+          },
           bookingDetails: {
             where: { booking: { status: { not: BookingStatus.CANCELLED } } },
             select: { booking: { select: { status: true } } },
@@ -369,15 +382,46 @@ export const getAvailableCourtSlotsHandler = factory.createHandlers(
         return !closedHours.includes(clubWallTime(slot.startAt).hour())
       })
 
-      // Transform court images
-      for (const slot of openSlots) {
-        if (slot.court?.image) {
-          slot.court.image = await getFileUrl(slot.court.image)
-        }
-      }
+      const images = [
+        ...new Set(
+          openSlots
+            .map((slot) => slot.court?.image)
+            .filter((image): image is string => !!image),
+        ),
+      ]
+      const imageUrls = new Map(
+        await Promise.all(
+          images.map(
+            async (image) => [image, await getFileUrl(image)] as const,
+          ),
+        ),
+      )
+      // Retain closed-hour filtering above, but don't repeat potentially large
+      // pricing rules for every hour in the booking response.
+      const courtSummaries = new Map(
+        openSlots.flatMap((slot) => {
+          if (!slot.court) return []
+          const court = slot.court
+          return [
+            [
+              court.id,
+              {
+                id: court.id,
+                name: court.name,
+                description: court.description,
+                sport: court.sport,
+                branchId: court.branchId,
+                isActive: court.isActive,
+                image: court.image ? imageUrls.get(court.image)! : court.image,
+              },
+            ] as const,
+          ]
+        }),
+      )
 
       const formattedSlots = openSlots.map(({ bookingDetails, ...slot }) => ({
         ...slot,
+        court: slot.court ? courtSummaries.get(slot.court.id)! : null,
         availabilityStatus: getCourtSlotStatus(
           slot.isAvailable,
           bookingDetails.map((detail) => detail.booking.status),
@@ -403,7 +447,9 @@ export const getCostHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   async (c) => {
     try {
-      await ensureRollingCourtSchedules(c.req.valid('param').id)
+      await ensureRollingCourtSchedules(c.req.valid('param').id, new Date(), {
+        includeServices: false,
+      })
       const { id } = c.req.valid('param') as IdSchema
 
       if (!(await db.court.findUnique({ where: { id } })))

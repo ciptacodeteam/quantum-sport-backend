@@ -80,7 +80,7 @@ export const courtPerformanceExportHandler = factory.createHandlers(
     append('Definisi', [
       {
         Keterangan:
-          'Jam dipakai berdasarkan tanggal main WIB, hanya booking confirmed. Total jam dipesan (createdBookingHours) berdasarkan tanggal pembuatan booking WIB dalam periode pilihan, termasuk jadwal main di luar periode. Pembayaran lapangan dibagi proporsional setelah promo, tidak termasuk biaya proses dan add-on. Value Pack dialokasikan dari harga pembelian dibayar per jam paket, bukan penerimaan kas baru. Complimentary adalah non-membership dengan nilai lapangan nol. Kapasitas adalah gabungan slot terbit tersedia dan slot confirmed; slot tutup tidak dihitung. Kapasitas belum terbit tidak diestimasi.',
+          'Jam dipakai berdasarkan tanggal main WIB, hanya booking pelanggan confirmed (purpose REGULAR). Event dan Training Coach dikecualikan dari revenue, alokasi paket, jam bermain, jumlah booking dan okupansi. Total jam dipesan (createdBookingHours) berdasarkan tanggal pembuatan booking WIB dalam periode pilihan, termasuk jadwal main di luar periode. Pembayaran lapangan dibagi proporsional setelah promo, tidak termasuk biaya proses dan add-on. Value Pack dialokasikan dari harga pembelian dibayar per jam paket, bukan penerimaan kas baru. Complimentary adalah non-membership dengan nilai lapangan nol. Kapasitas adalah gabungan slot terbit tersedia dan slot confirmed pelanggan; slot tutup tidak dihitung. Kapasitas belum terbit tidak diestimasi.',
       },
     ])
     c.header(
