@@ -86,10 +86,13 @@ it.each([
 ])(
   'blocks removing a sport from %s to %s when booked',
   async (current, next) => {
+    mocks.existing.role = 'COACH'
     mocks.existing.coachType = current
-    await expect(update(next)).rejects.toThrow('Olahraga tidak dapat diganti')
+    await expect(update(next, 'COACH')).rejects.toThrow(
+      'Olahraga tidak dapat diganti',
+    )
     expect(mocks.tx.staff.update).not.toHaveBeenCalled()
-    expect(mocks.tx.bookingBallboy.count).toHaveBeenCalledWith({
+    expect(mocks.tx.bookingCoach.count).toHaveBeenCalledWith({
       where: {
         slot: { staffId: 'ballboy' },
         status: { not: 'CANCELLED' },
@@ -108,9 +111,22 @@ it('allows ordinary profile edits on booked ballboys', async () => {
   expect(mocks.tx.staff.update).toHaveBeenCalledOnce()
   expect(mocks.tx.bookingBallboy.count).not.toHaveBeenCalled()
 })
-it('still rejects tennis support outside Cemara', async () => {
+it('still rejects tennis coach support outside Cemara', async () => {
+  mocks.existing.role = 'COACH'
   mocks.existing.branchId = 'other'
   mocks.existing.coachType = 'PADEL'
-  await expect(update('PADEL_TENNIS')).rejects.toThrow('Tennis hanya tersedia')
+  await expect(update('PADEL_TENNIS', 'COACH')).rejects.toThrow(
+    'Tennis hanya tersedia',
+  )
   expect(mocks.tx.staff.update).not.toHaveBeenCalled()
+})
+
+it('allows existing ballboys at Padel-only branches without requiring Tennis courts', async () => {
+  mocks.existing.branchId = 's-parman'
+  await update('TENNIS')
+  expect(mocks.tx.staff.update).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ coachType: 'PADEL_TENNIS' }),
+    }),
+  )
 })

@@ -8,7 +8,7 @@ vi.mock('@/services/rolling-court-schedule.service', () => ({
   ensureRollingCourtSchedules: vi.fn(),
 }))
 import { getBallboysHandler } from './ballboy.handler'
-it('lists publicly bookable active tennis ballboys even when they have no available hours', async () => {
+it('lists publicly bookable active ballboys for either sport even when they have no available hours', async () => {
   mocks.staff.mockResolvedValue([
     { id: 'budi', name: 'Budi' },
     { id: 'fully-booked', name: 'Andi' },
@@ -21,10 +21,6 @@ it('lists publicly bookable active tennis ballboys even when they have no availa
       role: 'BALLBOY',
       isActive: true,
       adminServiceOnly: false,
-      OR: [
-        { coachType: { in: ['TENNIS', 'PADEL_TENNIS'] } },
-        { coachType: null },
-      ],
     },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },

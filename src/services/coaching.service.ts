@@ -18,7 +18,6 @@ import { db } from '@/lib/prisma'
 import { formatClubWallClock, toClubWallDate } from '@/lib/club-time'
 import {
   assertCoachingSport,
-  ballboySportWhere,
   buildCoachingSlots,
   coachingScheduleSchema,
 } from '@/lib/coaching-policy'
@@ -253,7 +252,6 @@ export async function coachingAvailability(
             staff: {
               isActive: true,
               role: 'BALLBOY' as const,
-              ...ballboySportWhere(sport),
             },
           },
         ],

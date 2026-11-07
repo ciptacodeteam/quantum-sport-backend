@@ -29,10 +29,9 @@ export async function reconcileRollingServiceSchedule(
             isActive: true,
             bookingWindowMonths: { not: null },
             sport:
-              staff.coachType === 'PADEL_TENNIS'
+              staff.role === 'BALLBOY' || staff.coachType === 'PADEL_TENNIS'
                 ? { in: ['PADEL', 'TENNIS'] }
-                : (staff.coachType ??
-                  (staff.role === 'BALLBOY' ? 'TENNIS' : 'PADEL')),
+                : (staff.coachType ?? 'PADEL'),
           },
         },
       ],

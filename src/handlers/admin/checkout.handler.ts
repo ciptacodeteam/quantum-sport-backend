@@ -169,6 +169,14 @@ function validateBallboysForCourts(
     return
   }
 
+  if (
+    new Set(ballboySelections.map((selection) => selection.slotId)).size !==
+    ballboySelections.length
+  )
+    throw new BadRequestException(
+      'One ballboy slot cannot be assigned to multiple court slots',
+    )
+
   if (courtSlots.length === 0) {
     if (ballboySelections.some((selection) => selection.courtSlotId)) {
       throw new BadRequestException(
@@ -231,7 +239,7 @@ function validateBallboysForCourts(
 
     if (!selection.courtSlotId && matchingCourtSlots.length > 1) {
       throw new BadRequestException(
-        'Ballboy selection must be linked to a specific tennis court booking slot',
+        'Ballboy selection must be linked to a specific court booking slot',
       )
     }
 
@@ -246,7 +254,7 @@ function validateBallboysForCourts(
   for (const ballboyCount of ballboyCountByCourtSlot.values()) {
     if (ballboyCount > 1) {
       throw new BadRequestException(
-        'Only one ballboy can be used per tennis court booking slot',
+        'Only one ballboy can be used per court booking slot',
       )
     }
   }

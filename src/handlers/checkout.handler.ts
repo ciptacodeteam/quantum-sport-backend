@@ -1,4 +1,3 @@
-import { ballboySportWhere } from '@/lib/coaching-policy'
 import { clubNowAsWallDate } from '@/lib/club-time'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
@@ -143,7 +142,7 @@ function timeRangesOverlap(
   )
 }
 
-function validateBallboysForTennisCourts(
+function validateBallboysForCourts(
   ballboySelections: BallboySelectionInput[],
   ballboySlots: Array<{ id: string; startAt: Date; endAt: Date }>,
   courtSlots: Array<{
@@ -157,16 +156,20 @@ function validateBallboysForTennisCourts(
     return
   }
 
+  if (
+    new Set(ballboySelections.map((selection) => selection.slotId)).size !==
+    ballboySelections.length
+  )
+    throw new BadRequestException(
+      'One ballboy slot cannot be assigned to multiple court slots',
+    )
+
   if (courtSlots.length === 0) {
     if (ballboySelections.some((selection) => selection.courtSlotId))
       throw new BadRequestException(
-        'Ballboy selection must match a selected tennis court booking slot',
+        'Ballboy selection must match a selected court booking slot',
       )
     return
-  }
-
-  if (courtSlots.some((slot) => slot.court?.sport !== CourtSport.TENNIS)) {
-    throw new BadRequestException('Ballboy is only available for tennis courts')
   }
 
   const ballboyCountByCourtSlot = new Map<string, number>()
@@ -189,13 +192,13 @@ function validateBallboysForTennisCourts(
 
       if (!selectedCourtSlot) {
         throw new BadRequestException(
-          'Ballboy selection must match a selected tennis court booking slot',
+          'Ballboy selection must match a selected court booking slot',
         )
       }
 
       if (!ballboyCoversCourtSlot(ballboySlot, selectedCourtSlot)) {
         throw new BadRequestException(
-          'Ballboy slots must match selected tennis court booking times',
+          'Ballboy slots must match selected court booking times',
         )
       }
 
@@ -208,13 +211,13 @@ function validateBallboysForTennisCourts(
 
     if (matchingCourtSlots.length === 0) {
       throw new BadRequestException(
-        'Ballboy slots must match selected tennis court booking times',
+        'Ballboy slots must match selected court booking times',
       )
     }
 
     if (!selection.courtSlotId && matchingCourtSlots.length > 1) {
       throw new BadRequestException(
-        'Ballboy selection must be linked to a specific tennis court booking slot',
+        'Ballboy selection must be linked to a specific court booking slot',
       )
     }
 
@@ -229,7 +232,7 @@ function validateBallboysForTennisCourts(
   for (const ballboyCount of ballboyCountByCourtSlot.values()) {
     if (ballboyCount > 1) {
       throw new BadRequestException(
-        'Only one ballboy can be used per tennis court booking slot',
+        'Only one ballboy can be used per court booking slot',
       )
     }
   }
@@ -425,7 +428,6 @@ export const applyPromoCodeHandler = factory.createHandlers(
                 role: 'BALLBOY',
                 isActive: true,
                 adminServiceOnly: false,
-                ...ballboySportWhere('TENNIS'),
               },
             },
             include: {
@@ -447,7 +449,7 @@ export const applyPromoCodeHandler = factory.createHandlers(
             )
           }
 
-          validateBallboysForTennisCourts(
+          validateBallboysForCourts(
             ballboySelections,
             ballboySlotData,
             selectedCourtSlots,
@@ -1028,7 +1030,6 @@ export const checkoutHandler = factory.createHandlers(
                 role: 'BALLBOY',
                 isActive: true,
                 adminServiceOnly: false,
-                ...ballboySportWhere('TENNIS'),
               },
             },
             include: {
@@ -1061,7 +1062,7 @@ export const checkoutHandler = factory.createHandlers(
             )
           }
 
-          validateBallboysForTennisCourts(
+          validateBallboysForCourts(
             ballboySelections,
             ballboySlotData,
             selectedCourtSlots,

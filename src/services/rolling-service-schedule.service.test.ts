@@ -117,7 +117,7 @@ it('preserves booked slots and manual closures while repricing only open matchin
     ),
   ).toBe(false)
 })
-it('closes unbooked slots outside the court window and restricts ballboys to tennis', async () => {
+it('closes unbooked slots outside the court window and allows ballboys to follow either court sport', async () => {
   tx.slot.findMany
     .mockResolvedValueOnce([])
     .mockResolvedValueOnce([slot('outside')])
@@ -126,9 +126,9 @@ it('closes unbooked slots outside the court window and restricts ballboys to ten
     { ...staff, role: 'BALLBOY', coachType: null },
     now,
   )
-  expect(tx.slot.findMany.mock.calls[0][0].where.AND[1].court.sport).toBe(
-    'TENNIS',
-  )
+  expect(tx.slot.findMany.mock.calls[0][0].where.AND[1].court.sport).toEqual({
+    in: ['PADEL', 'TENNIS'],
+  })
   expect(tx.slot.updateMany).toHaveBeenCalledWith({
     where: { id: { in: ['outside'] } },
     data: { scheduleClosed: true },

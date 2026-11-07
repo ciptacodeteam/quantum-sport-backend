@@ -62,7 +62,6 @@ it('fills only the requested hour in one batch and scopes profiles to branch and
       { role: 'COACH', coachType: { in: ['PADEL', 'PADEL_TENNIS'] } },
       {
         role: 'BALLBOY',
-        OR: [{ coachType: { in: ['PADEL', 'PADEL_TENNIS'] } }],
       },
     ],
   })

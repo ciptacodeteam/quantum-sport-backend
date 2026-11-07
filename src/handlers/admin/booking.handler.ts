@@ -1,4 +1,3 @@
-import { ballboySportWhere } from '@/lib/coaching-policy'
 import {
   courtBookingListSchema,
   getCourtBookingList,
@@ -96,7 +95,6 @@ const courtSportBookingWhere = (courtSport: CourtSport) => {
               { courtSlot: { court: { sport: courtSport } } },
               {
                 courtSlotId: null,
-                slot: { staff: ballboySportWhere(courtSport) },
               },
             ],
           },

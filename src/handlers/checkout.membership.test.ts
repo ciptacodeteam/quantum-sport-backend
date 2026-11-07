@@ -634,7 +634,7 @@ it('rejects a court reference on a standalone ballboy order', async () => {
       paymentMethodId: 'qris',
       useMembership: false,
     }),
-  ).rejects.toThrow('must match a selected tennis court')
+  ).rejects.toThrow('must match a selected court')
   expect(mocks.gateway.charge).not.toHaveBeenCalled()
 })
 it('rejects started ballboy hours using Jakarta wall time', async () => {
@@ -669,40 +669,101 @@ it('rejects another overlapping slot for the same ballboy before charging', asyn
   expect(mocks.gateway.charge).not.toHaveBeenCalled()
 })
 
-it('pays tennis courts and linked ballboys together in one checkout', async () => {
+it.each(['PADEL', 'TENNIS'])(
+  'pays %s courts and linked ballboys together in one checkout',
+  async (sport) => {
+    const ballboy = publicBallboySlot()
+    const court = {
+      id: 'court-slot',
+      courtId: 'tennis-court',
+      price: 200000,
+      discountPrice: 0,
+      startAt: ballboy.startAt,
+      endAt: ballboy.endAt,
+      court: { sport },
+      bookingDetails: [],
+    }
+    tx.slot.findMany.mockImplementation(async ({ where }: any) =>
+      where.type === 'BALLBOY' ? [ballboy] : [court],
+    )
+    tx.slot.findFirst = vi.fn().mockResolvedValue(null)
+    tx.$queryRaw = vi.fn().mockResolvedValue([])
+    tx.bookingBallboy = { create: vi.fn() }
+    const response = await checkout({
+      courtSlots: ['court-slot'],
+      ballboySlots: [{ slotId: 'ballboy-slot', courtSlotId: 'court-slot' }],
+      paymentMethodId: 'qris',
+      useMembership: false,
+    })
+    expect(tx.bookingDetail.create).toHaveBeenCalledOnce()
+    expect(tx.bookingBallboy.create).toHaveBeenCalledWith({
+      data: {
+        bookingId: 'booking',
+        slotId: 'ballboy-slot',
+        courtSlotId: 'court-slot',
+        price: 45000,
+      },
+    })
+    expect(tx.invoice.create).toHaveBeenCalledOnce()
+    expect(response.data.total).toBe(246110)
+    expect(mocks.gateway.charge).toHaveBeenCalledOnce()
+  },
+)
+
+it('rejects assigning the same ballboy slot to two Padel courts before payment', async () => {
   const ballboy = publicBallboySlot()
-  const court = {
-    id: 'court-slot',
-    courtId: 'tennis-court',
+  const courts = ['court-a', 'court-b'].map((id) => ({
+    id,
+    courtId: id,
     price: 200000,
     discountPrice: 0,
     startAt: ballboy.startAt,
     endAt: ballboy.endAt,
-    court: { sport: 'TENNIS' },
+    court: { sport: 'PADEL' },
+    bookingDetails: [],
+  }))
+  tx.slot.findMany.mockImplementation(async ({ where }: any) =>
+    where.type === 'BALLBOY' ? [ballboy] : courts,
+  )
+  tx.slot.updateMany.mockImplementation(async ({ where }: any) => ({
+    count: where.id.in.length,
+  }))
+  await expect(
+    checkout({
+      courtSlots: courts.map((court) => court.id),
+      ballboySlots: courts.map((court) => ({
+        slotId: ballboy.id,
+        courtSlotId: court.id,
+      })),
+      paymentMethodId: 'qris',
+      useMembership: false,
+    }),
+  ).rejects.toThrow('multiple court slots')
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
+  expect(tx.invoice.create).not.toHaveBeenCalled()
+})
+it('rejects a linked Padel ballboy whose hour does not match the court', async () => {
+  const ballboy = publicBallboySlot()
+  const court = {
+    id: 'court-slot',
+    courtId: 'court',
+    price: 200000,
+    discountPrice: 0,
+    startAt: new Date(+ballboy.startAt + 3600000),
+    endAt: new Date(+ballboy.endAt + 3600000),
+    court: { sport: 'PADEL' },
     bookingDetails: [],
   }
   tx.slot.findMany.mockImplementation(async ({ where }: any) =>
     where.type === 'BALLBOY' ? [ballboy] : [court],
   )
-  tx.slot.findFirst = vi.fn().mockResolvedValue(null)
-  tx.$queryRaw = vi.fn().mockResolvedValue([])
-  tx.bookingBallboy = { create: vi.fn() }
-  const response = await checkout({
-    courtSlots: ['court-slot'],
-    ballboySlots: [{ slotId: 'ballboy-slot', courtSlotId: 'court-slot' }],
-    paymentMethodId: 'qris',
-    useMembership: false,
-  })
-  expect(tx.bookingDetail.create).toHaveBeenCalledOnce()
-  expect(tx.bookingBallboy.create).toHaveBeenCalledWith({
-    data: {
-      bookingId: 'booking',
-      slotId: 'ballboy-slot',
-      courtSlotId: 'court-slot',
-      price: 45000,
-    },
-  })
-  expect(tx.invoice.create).toHaveBeenCalledOnce()
-  expect(response.data.total).toBe(246110)
-  expect(mocks.gateway.charge).toHaveBeenCalledOnce()
+  await expect(
+    checkout({
+      courtSlots: [court.id],
+      ballboySlots: [{ slotId: ballboy.id, courtSlotId: court.id }],
+      paymentMethodId: 'qris',
+      useMembership: false,
+    }),
+  ).rejects.toThrow('must match selected court booking times')
+  expect(mocks.gateway.charge).not.toHaveBeenCalled()
 })

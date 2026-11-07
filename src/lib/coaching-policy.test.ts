@@ -53,10 +53,8 @@ describe('admin coaching rules', () => {
       buildCoachingSlots({ ...schedule, days: [1] }, new Date('2026-10-01')),
     ).toEqual([])
   })
-  it('matches service sports and keeps legacy ballboys tennis-only', () => {
-    expect(() => assertCoachingSport('BALLBOY', null, 'PADEL')).toThrow(
-      'sesuai',
-    )
+  it('keeps coach sport restrictions while allowing legacy ballboys for Padel and Tennis', () => {
+    expect(() => assertCoachingSport('BALLBOY', null, 'PADEL')).not.toThrow()
     expect(() => assertCoachingSport('COACH', 'PADEL', 'TENNIS')).toThrow(
       'sesuai',
     )
@@ -104,18 +102,14 @@ it('builds repeating services only at matching court times and extends without a
   ).toBe(false)
 })
 
-it('supports padel and dual-sport ballboys while rejecting the other sport', () => {
-  expect(() => assertCoachingSport('BALLBOY', 'PADEL', 'PADEL')).not.toThrow()
-  expect(() => assertCoachingSport('BALLBOY', 'TENNIS', 'PADEL')).toThrow(
-    'sesuai',
-  )
-  expect(() => assertCoachingSport('BALLBOY', 'PADEL', 'TENNIS')).toThrow(
-    'sesuai',
-  )
-  expect(() =>
-    assertCoachingSport('BALLBOY', 'PADEL_TENNIS', 'TENNIS'),
-  ).not.toThrow()
-  expect(() =>
-    assertCoachingSport('BALLBOY', 'PADEL_TENNIS', 'PADEL'),
-  ).not.toThrow()
-})
+it.each([null, 'TENNIS', 'PADEL', 'PADEL_TENNIS'])(
+  'allows ballboys with legacy sport %s on either court type',
+  (legacySport) => {
+    expect(() =>
+      assertCoachingSport('BALLBOY', legacySport, 'PADEL'),
+    ).not.toThrow()
+    expect(() =>
+      assertCoachingSport('BALLBOY', legacySport, 'TENNIS'),
+    ).not.toThrow()
+  },
+)

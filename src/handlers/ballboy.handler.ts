@@ -1,6 +1,5 @@
 import { filterAvailableBallboySlots } from '@/services/ballboy-availability.service'
 import { ensureBallboySchedules } from '@/services/ballboy-schedule.service'
-import { ballboySportWhere } from '@/lib/coaching-policy'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -9,17 +8,16 @@ import { zValidator } from '@hono/zod-validator'
 import status from 'http-status'
 import { availableCoachesQuerySchema } from '@/lib/validation'
 import { toClubWallDate, formatClubWallClock } from '@/lib/club-time'
-import { CourtSport, Role, SlotType } from '@prisma/client'
+import { Role, SlotType } from '@prisma/client'
 
 // GET /ballboys/availability?startAt=YYYY-MM-DDTHH:mm&endAt=YYYY-MM-DDTHH:mm
 export const getAvailableBallboyHandler = factory.createHandlers(
   zValidator('query', availableCoachesQuerySchema, validateHook),
   async (c) => {
     try {
-      const { startAt, endAt, courtSport } = c.req.valid('query') as {
+      const { startAt, endAt } = c.req.valid('query') as {
         startAt: string
         endAt: string
-        courtSport?: CourtSport
       }
 
       const startDateTime = toClubWallDate(startAt)
@@ -35,7 +33,6 @@ export const getAvailableBallboyHandler = factory.createHandlers(
           scheduleClosed: false,
           staff: {
             role: Role.BALLBOY,
-            ...ballboySportWhere(courtSport ?? 'TENNIS'),
             isActive: true,
             ...(!c.req.path?.startsWith('/admin/')
               ? { adminServiceOnly: false }
@@ -110,7 +107,6 @@ export const getBallboysHandler = factory.createHandlers(async (c) => {
       role: Role.BALLBOY,
       isActive: true,
       adminServiceOnly: false,
-      ...ballboySportWhere('TENNIS'),
     },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },

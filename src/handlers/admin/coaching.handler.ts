@@ -84,12 +84,13 @@ export const createCoachingHandler = factory.createHandlers(
       throw new BadRequestException(
         'Pilih satu cabang sebelum menambahkan layanan.',
       )
-    assertCourtSportAtBranch(
-      input.coachType === 'PADEL_TENNIS'
-        ? 'TENNIS'
-        : (input.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : 'PADEL')),
-      branchId,
-    )
+    if (input.kind === 'COACH')
+      assertCourtSportAtBranch(
+        input.coachType === 'PADEL_TENNIS'
+          ? 'TENNIS'
+          : (input.coachType ?? 'PADEL'),
+        branchId,
+      )
     await validateCoachGroups(
       db,
       input.groupIds,
@@ -102,8 +103,7 @@ export const createCoachingHandler = factory.createHandlers(
         branchId,
         name: input.name,
         role: input.kind,
-        coachType:
-          input.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : undefined),
+        coachType: input.kind === 'BALLBOY' ? 'PADEL_TENNIS' : input.coachType,
         coachProfile: input.coachProfile,
         phone: input.phone ? await formatPhone(input.phone) : null,
         isActive: input.isActive,
@@ -132,29 +132,31 @@ export const updateCoachingHandler = factory.createHandlers(
       if (existing.role !== input.kind)
         throw new BadRequestException('Jenis layanan tidak dapat diganti.')
       const nextSport =
-        input.coachType ??
-        existing.coachType ??
-        (input.kind === 'BALLBOY' ? 'TENNIS' : 'PADEL')
-      assertCourtSportAtBranch(
-        nextSport === 'PADEL_TENNIS' ? 'TENNIS' : nextSport,
-        existing.branchId,
-      )
+        input.kind === 'BALLBOY'
+          ? 'PADEL_TENNIS'
+          : (input.coachType ?? existing.coachType ?? 'PADEL')
+      if (input.kind === 'COACH')
+        assertCourtSportAtBranch(
+          nextSport === 'PADEL_TENNIS' ? 'TENNIS' : nextSport,
+          existing.branchId,
+        )
       const currentSport =
         existing.coachType ?? (input.kind === 'BALLBOY' ? 'TENNIS' : null)
       // Adding a sport preserves compatibility with every existing booking.
       const expandsSports =
         nextSport === 'PADEL_TENNIS' &&
         (currentSport === 'PADEL' || currentSport === 'TENNIS')
-      if (currentSport !== nextSport && !expandsSports) {
+      if (
+        input.kind === 'COACH' &&
+        currentSport !== nextSport &&
+        !expandsSports
+      ) {
         const where = {
           slot: { staffId: id },
           status: { not: 'CANCELLED' as const },
           booking: { status: { not: 'CANCELLED' as const } },
         }
-        const booked =
-          input.kind === 'BALLBOY'
-            ? await tx.bookingBallboy.count({ where })
-            : await tx.bookingCoach.count({ where })
+        const booked = await tx.bookingCoach.count({ where })
         if (booked)
           throw new BadRequestException(
             'Olahraga tidak dapat diganti setelah layanan mempunyai booking. Nonaktifkan profil dan buat profil baru.',

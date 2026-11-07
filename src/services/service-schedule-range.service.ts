@@ -2,7 +2,6 @@ import { Prisma, type CourtSport } from '@prisma/client'
 import { branchContext, withBranchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
 import {
-  ballboySportWhere,
   buildRollingCoachingSlots,
   rollingCoachingScheduleSchema,
 } from '@/lib/coaching-policy'
@@ -26,7 +25,7 @@ export async function ensureServiceScheduleRange(
         role: 'COACH' as const,
         coachType: { in: [sport, 'PADEL_TENNIS' as const] },
       },
-      { role: 'BALLBOY' as const, ...ballboySportWhere(sport) },
+      { role: 'BALLBOY' as const },
     ],
   } satisfies Prisma.StaffWhereInput
   const people = await db.staff.findMany({

@@ -232,7 +232,7 @@ it('refuses a group that does not contain the selected coach or match its branch
 })
 
 it.each(['PADEL', 'TENNIS'] as const)(
-  'books a %s ballboy only with matching court sport and saves the court assignment',
+  'books a ballboy on %s courts regardless of legacy sport and saves the court assignment',
   async (sport) => {
     const [court] = await mocks.tx.slot.findMany({ where: { type: 'COURT' } })
     court.court.sport = sport
@@ -267,8 +267,12 @@ it.each(['PADEL', 'TENNIS'] as const)(
     )
     ballboy.staff.coachType = sport === 'PADEL' ? 'TENNIS' : 'PADEL'
     mocks.tx.bookingBallboy.create.mockClear()
-    await expect(checkout()).rejects.toThrow('Olahraga ballboy tidak sesuai')
-    expect(mocks.tx.bookingBallboy.create).not.toHaveBeenCalled()
+    await checkout()
+    expect(mocks.tx.bookingBallboy.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ courtSlotId: 'court-slot' }),
+      }),
+    )
   },
 )
 
