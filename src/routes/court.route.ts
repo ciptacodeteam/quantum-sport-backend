@@ -1,3 +1,8 @@
+import {
+  getMyCourtScheduleHandler,
+  getCourtChangeOptionsHandler,
+  changeCustomerCourtHandler,
+} from '@/handlers/customer-court-change.handler'
 import { createRouter } from '@/lib/create-app'
 import { ok } from '@/lib/response'
 import { defaultTariffPeriod } from '@/lib/tariff-period'
@@ -25,6 +30,9 @@ const courtRoute = createRouter()
       }),
     ),
   )
+  .get('/my-schedule', ...getMyCourtScheduleHandler)
+  .get('/my-schedule/:id/courts', ...getCourtChangeOptionsHandler)
+  .put('/my-schedule/:id/court', ...changeCustomerCourtHandler)
   .get('/slots', ...getAvailableCourtSlotsHandler)
   .get('/:id/slots', ...getCourtSlotsHandler)
   .get('/:id', ...getCourtHandler)
