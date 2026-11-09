@@ -1,3 +1,4 @@
+import { cancelCourtBookingServices } from '@/services/court-service-cancellation.service'
 import {
   courtBookingListSchema,
   getCourtBookingList,
@@ -945,53 +946,12 @@ export const rejectBookingTransactionHandler = factory.createHandlers(
           })
         }
 
-        // Release all coach slots
-        for (const coach of booking.coaches) {
-          await tx.slot.update({
-            where: { id: coach.slotId },
-            data: {
-              isAvailable: true,
-            },
-          })
-        }
-
-        await tx.bookingCoach.updateMany({
-          where: {
-            bookingId: id,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-          },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: 'Rejected by admin',
-          },
-        })
-
-        // Release all ballboy slots
-        for (const ballboy of booking.ballboys) {
-          await tx.slot.update({
-            where: { id: ballboy.slotId },
-            data: {
-              isAvailable: true,
-            },
-          })
-        }
-
-        await tx.bookingBallboy.updateMany({
-          where: {
-            bookingId: id,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-          },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: 'Rejected by admin',
-          },
-        })
+        await cancelCourtBookingServices(
+          tx,
+          id,
+          booking.details.map((detail) => detail.slotId),
+          'Rejected by admin',
+        )
 
         // Restore inventory quantities
         for (const bookingInventory of booking.inventories.filter(

@@ -19,6 +19,7 @@ import {
 
 const read = requireAnyAdminRole(['ADMIN', 'CASHIER', 'ADMIN_VIEWER'])
 const write = requireAnyAdminRole(['ADMIN', 'CASHIER'])
+const cancelService = requireAnyAdminRole(['SUPER_ADMIN', 'CASHIER'])
 const replaceCoach = requireAnyAdminRole(['SUPER_ADMIN'])
 export default createRouter()
   .basePath('/coaching')
@@ -37,12 +38,12 @@ export default createRouter()
   )
   .get(
     '/bookings/:id/cancellation',
-    replaceCoach,
+    cancelService,
     ...previewCoachCancellationHandler,
   )
   .post(
     '/bookings/:id/cancel-coach',
-    replaceCoach,
+    cancelService,
     ...cancelCoachBookingHandler,
   )
   .get('/booking-details/:id/availability', read, ...availableCoachingHandler)

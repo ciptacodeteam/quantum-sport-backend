@@ -258,3 +258,72 @@ it('exports an Excel workbook that matches the selected club and service filters
     'Hak club (100%)': 50000,
   })
 })
+
+it.each(['COACH', 'BALLBOY', 'BOTH'])(
+  'excludes cancelled %s from every report total while preserving active services',
+  (kind) => {
+    const data = invoice()
+    if (kind !== 'BALLBOY') data.booking.coaches[0].status = 'CANCELLED'
+    if (kind !== 'COACH') data.booking.ballboys[0].status = 'CANCELLED'
+    const report = build([data])
+    const expected = kind === 'COACH' ? 50000 : kind === 'BALLBOY' ? 150000 : 0
+    expect(report.summary.totalAmount).toBe(expected)
+    expect(report.rows.reduce((total, row) => total + row.amount, 0)).toBe(
+      expected,
+    )
+    expect(report.staff.reduce((total, row) => total + row.amount, 0)).toBe(
+      expected,
+    )
+    expect(
+      report.clubs.reduce((total, row) => total + row.totalAmount, 0),
+    ).toBe(expected)
+    expect(report.summary.sessions).toBe(kind === 'BOTH' ? 0 : 1)
+  },
+)
+it.each(['COACH', 'BALLBOY'])(
+  'excludes a cancelled %s on a separate paid service invoice',
+  (kind) => {
+    const data = invoice()
+    data.booking.totalPrice = kind === 'COACH' ? 150000 : 50000
+    data.processingFee = 0
+    data.total = data.booking.totalPrice
+    if (kind === 'COACH') {
+      data.booking.ballboys = []
+      data.booking.coaches[0].status = 'CANCELLED'
+    } else {
+      data.booking.coaches = []
+      data.booking.ballboys[0].status = 'CANCELLED'
+    }
+    const report = build([data])
+    expect(data.status).toBe('PAID')
+    expect(data.booking.status).toBe('CONFIRMED')
+    expect(report.summary).toMatchObject({
+      totalAmount: 0,
+      coachAmount: 0,
+      ballboyAmount: 0,
+      invoiceCount: 0,
+      sessions: 0,
+    })
+    expect(report.rows).toEqual([])
+    expect(report.staff).toEqual([])
+    expect(report.clubs).toEqual([])
+  },
+)
+it('omits cancelled services from the exported details and summary even when invoices remain paid', async () => {
+  const data = invoice()
+  data.booking.coaches[0].status = 'CANCELLED'
+  data.booking.ballboys[0].status = 'CANCELLED'
+  mocks.invoices.mockResolvedValue([data])
+  const response = await request(valid, 'ADMIN', true)
+  expect(response.status).toBe(200)
+  const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([])
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Per petugas'])).toEqual([])
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Ringkasan'])).toEqual([
+    expect.objectContaining({
+      'Hak coach': 0,
+      'Hak ballboy': 0,
+      'Total hak club': 0,
+    }),
+  ])
+})

@@ -129,9 +129,15 @@ it.each(['CANCELLED', 'HOLD'])(
     expect(mocks.tx.bookingCoach.updateMany).not.toHaveBeenCalled()
   },
 )
-it('rejects a cancelled parent, unpaid invoice, and elapsed hours', async () => {
+it('allows cleanup when the parent was already cancelled', async () => {
   item.booking.status = 'CANCELLED'
-  await expect(cancel()).rejects.toThrow('terkonfirmasi')
+  item.booking.invoice.status = 'CANCELLED'
+  expect(await cancel()).toMatchObject({
+    status: 'CANCELLED',
+    slotReleased: true,
+  })
+})
+it('rejects an unpaid invoice and elapsed hours', async () => {
   item.booking.status = 'CONFIRMED'
   item.booking.invoice.status = 'PENDING'
   await expect(cancel()).rejects.toThrow('Invoice belum lunas')

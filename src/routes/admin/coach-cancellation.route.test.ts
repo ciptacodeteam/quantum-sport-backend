@@ -23,29 +23,32 @@ beforeEach(() => {
   mocks.preview.mockResolvedValue({ refundRequired: true })
   mocks.cancel.mockResolvedValue({ status: 'CANCELLED' })
 })
-it('allows only the authenticated super admin to preview and cancel on both endpoints', async () => {
-  const a = app('SUPER_ADMIN')
-  expect(
-    (await a.request('/admin/coaching/bookings/item/cancellation')).status,
-  ).toBe(200)
-  for (const [path, method] of [
-    ['/admin/coaching/bookings/item/cancel-coach', 'POST'],
-    ['/admin/booked-coaches/item/cancel', 'PUT'],
-  ]) {
+it.each(['SUPER_ADMIN', 'CASHIER'])(
+  'allows %s to preview and cancel on both endpoints',
+  async (role) => {
+    const a = app(role)
     expect(
-      (
-        await a.request(path, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-      ).status,
+      (await a.request('/admin/coaching/bookings/item/cancellation')).status,
     ).toBe(200)
-  }
-  expect(mocks.cancel).toHaveBeenCalledTimes(2)
-  expect(mocks.cancel).toHaveBeenCalledWith('item', payload, 'actor')
-})
-it.each([undefined, 'ADMIN', 'CASHIER', 'ADMIN_VIEWER', 'COACH', 'BALLBOY'])(
+    for (const [path, method] of [
+      ['/admin/coaching/bookings/item/cancel-coach', 'POST'],
+      ['/admin/booked-coaches/item/cancel', 'PUT'],
+    ]) {
+      expect(
+        (
+          await a.request(path, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        ).status,
+      ).toBe(200)
+    }
+    expect(mocks.cancel).toHaveBeenCalledTimes(2)
+    expect(mocks.cancel).toHaveBeenCalledWith('item', payload, 'actor')
+  },
+)
+it.each([undefined, 'ADMIN', 'ADMIN_VIEWER', 'COACH', 'BALLBOY'])(
   'rejects %s for preview, the new endpoint, and the legacy cancellation endpoint',
   async (role) => {
     const a = app(role)

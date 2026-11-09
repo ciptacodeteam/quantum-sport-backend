@@ -1,3 +1,4 @@
+import { cancelCourtBookingServices } from '@/services/court-service-cancellation.service'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
@@ -812,53 +813,14 @@ export const cancelBookingHandler = factory.createHandlers(
           })
         }
 
-        // 5. Release all coach slots
-        for (const coach of booking.coaches) {
-          await tx.slot.update({
-            where: { id: coach.slotId },
-            data: {
-              isAvailable: true,
-            },
-          })
-        }
-
-        await tx.bookingCoach.updateMany({
-          where: {
-            bookingId,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-          },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: reason || 'Cancelled by admin',
-          },
-        })
-
-        // 6. Release all ballboy slots
-        for (const ballboy of booking.ballboys) {
-          await tx.slot.update({
-            where: { id: ballboy.slotId },
-            data: {
-              isAvailable: true,
-            },
-          })
-        }
-
-        await tx.bookingBallboy.updateMany({
-          where: {
-            bookingId,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-          },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: reason || 'Cancelled by admin',
-          },
-        })
+        const services = await cancelCourtBookingServices(
+          tx,
+          bookingId,
+          booking.details.map((detail) => detail.slotId),
+          reason || 'Cancelled by admin',
+        )
+        releasedCounts.coachSlots = services.coachSlots
+        releasedCounts.ballboySlots = services.ballboySlots
 
         // 7. Restore inventory quantities
         for (const bookingInventory of booking.inventories.filter(

@@ -1,4 +1,7 @@
-import { BadRequestException, NotFoundException } from '@/exceptions'
+import {
+  cancelBookedBallboy,
+  previewBallboyCancellation,
+} from '@/services/ballboy-cancellation.service'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -17,11 +20,12 @@ import status from 'http-status'
 import { z } from 'zod'
 
 // Schema for cancel booking request
-const cancelBookingSchema = z.object({
-  reason: z.string().min(1, 'Cancellation reason is required').optional(),
-})
-
-type CancelBookingSchema = z.infer<typeof cancelBookingSchema>
+const cancelBookingSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500),
+    expectedSlotId: z.string().min(1),
+  })
+  .strict()
 
 // GET /admin/booked-ballboys
 // Get all booked ballboys
@@ -329,128 +333,23 @@ export const getBookedBallboyDetailHandler = factory.createHandlers(
 
 // PUT /admin/booked-ballboys/:id/cancel
 // Cancel a specific ballboy booking
+export const previewBallboyCancellationHandler = factory.createHandlers(
+  zValidator('param', idSchema, validateHook),
+  async (c) =>
+    c.json(ok(await previewBallboyCancellation(c.req.valid('param').id))),
+)
+
 export const cancelBallboyBookingHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
   zValidator('json', cancelBookingSchema, validateHook),
-  async (c) => {
-    try {
-      const { id: ballboyBookingId } = c.req.valid('param') as IdSchema
-      const { reason } = c.req.valid('json') as CancelBookingSchema
-
-      const result = await db.$transaction(async (tx) => {
-        // 1. Fetch the ballboy booking
-        const ballboyBooking = await tx.bookingBallboy.findUnique({
-          where: { id: ballboyBookingId },
-          include: {
-            slot: {
-              include: {
-                staff: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            booking: {
-              include: {
-                invoice: true,
-              },
-            },
-          },
-        })
-
-        if (!ballboyBooking) {
-          throw new NotFoundException('Ballboy booking not found')
-        }
-
-        // 2. Check if the main booking is already cancelled
-        if (ballboyBooking.booking.status === BookingStatus.CANCELLED) {
-          throw new BadRequestException(
-            'Cannot cancel ballboy booking - main booking is already cancelled',
-          )
-        }
-
-        if (ballboyBooking.status === BookingStatus.CANCELLED) {
-          throw new BadRequestException('Ballboy booking is already cancelled')
-        }
-
-        // 3. Release the ballboy slot
-        await tx.slot.update({
-          where: { id: ballboyBooking.slotId },
-          data: {
-            isAvailable: true,
-          },
-        })
-
-        // 4. Keep the row for history, but mark the ballboy add-on as cancelled
-        const cancelledBallboyBooking = await tx.bookingBallboy.update({
-          where: { id: ballboyBookingId },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: reason || 'Cancelled by admin',
-          },
-        })
-
-        // 5. Update the main booking total price (subtract ballboy price)
-        const updatedBooking = await tx.booking.update({
-          where: { id: ballboyBooking.bookingId },
-          data: {
-            totalPrice: {
-              decrement: ballboyBooking.price,
-            },
-          },
-        })
-
-        // 6. Update invoice if exists
-        if (ballboyBooking.booking.invoice) {
-          await tx.invoice.update({
-            where: { id: ballboyBooking.booking.invoice.id },
-            data: {
-              subtotal: {
-                decrement: ballboyBooking.price,
-              },
-              total: {
-                decrement: ballboyBooking.price,
-              },
-            },
-          })
-        }
-
-        return {
-          ballboyBooking: cancelledBallboyBooking,
-          updatedBooking,
-          releasedSlot: ballboyBooking.slot,
-        }
-      })
-
-      return c.json(
-        ok(
-          {
-            cancelledBallboy: {
-              id: result.ballboyBooking.id,
-              staff: result.releasedSlot.staff,
-              price: result.ballboyBooking.price,
-              slot: {
-                startAt: result.releasedSlot.startAt,
-                endAt: result.releasedSlot.endAt,
-                isAvailable: true,
-              },
-            },
-            updatedBooking: {
-              id: result.updatedBooking.id,
-              totalPrice: result.updatedBooking.totalPrice,
-            },
-            reason: reason || 'Cancelled by admin',
-          },
-          'Ballboy booking cancelled successfully. Slot has been released.',
+  async (c) =>
+    c.json(
+      ok(
+        await cancelBookedBallboy(
+          c.req.valid('param').id,
+          c.req.valid('json'),
+          c.get('admin')!.id,
         ),
-        status.OK,
-      )
-    } catch (error) {
-      c.var.logger.fatal(`Error in cancelBallboyBookingHandler: ${error}`)
-      throw error
-    }
-  },
+      ),
+    ),
 )

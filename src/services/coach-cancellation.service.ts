@@ -20,13 +20,14 @@ async function cancellationContext(
     throw new NotFoundException(
       'Pemesanan coach tidak ditemukan di cabang ini.',
     )
-  if (item.status !== 'CONFIRMED' || item.booking.status !== 'CONFIRMED')
+  if (item.status !== 'CONFIRMED' || item.booking.status === 'HOLD')
     throw new BadRequestException(
       'Hanya coach pada booking terkonfirmasi yang dapat dibatalkan.',
     )
   if (item.slot.startAt <= courtBookingCutoff(now))
     throw new BadRequestException('Jadwal melewati batas pembatalan 15 menit.')
   if (
+    item.booking.status !== 'CANCELLED' &&
     item.booking.invoice &&
     item.booking.invoice.total > 0 &&
     item.booking.invoice.status !== 'PAID'

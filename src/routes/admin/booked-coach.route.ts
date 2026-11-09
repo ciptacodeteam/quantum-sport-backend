@@ -13,7 +13,7 @@ const adminBookedCoachRoute = factory
   .get('/:id', ...getBookedCoachDetailHandler)
   .put(
     '/:id/cancel',
-    requireAnyAdminRole(['SUPER_ADMIN']),
+    requireAnyAdminRole(['SUPER_ADMIN', 'CASHIER']),
     ...cancelCoachBookingHandler,
   )
 
