@@ -29,7 +29,7 @@ export default createRouter()
   .get('/bookings', read, ...listCoachingBookingsHandler)
   .patch(
     '/bookings/:id/club-settlement',
-    write,
+    requireAdmin,
     ...setCoachClubSettlementHandler,
   )
   .get(
