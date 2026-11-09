@@ -80,11 +80,6 @@ it.each([
     slotIds: ['coach'],
     manualPayment: { method: 'BANK_TRANSFER_MANUAL', received: false },
   },
-  {
-    slotIds: ['coach'],
-    paymentMethodId: 'va',
-    manualPayment: { method: 'EDC', received: true },
-  },
   { slotId: 'coach', slotIds: ['ballboy'] },
   { slotIds: ['a', 'b', 'c'] },
 ])(
@@ -146,4 +141,13 @@ it('rejects invalid coach/ballboy date ranges before querying bookings', async (
       .status,
   ).toBe(422)
   expect(mocks.coaches).not.toHaveBeenCalled()
+})
+
+it('accepts coach and ballboy without a payment method or receipt confirmation', async () => {
+  const res = await validationApp.request('/detail', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slotIds: ['coach', 'ballboy'] }),
+  })
+  expect(res.status).toBe(200)
 })

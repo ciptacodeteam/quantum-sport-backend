@@ -21,16 +21,6 @@ import {
   buildCoachingSlots,
   coachingScheduleSchema,
 } from '@/lib/coaching-policy'
-import {
-  midtransService,
-  isSupportedChannel,
-  isPaidStatus,
-} from './midtrans.service'
-import { finalizeSuccessfulPayment } from './payment-reconcile.service'
-import {
-  paymentDeadline,
-  PAYMENT_WINDOW_MINUTES,
-} from '@/lib/booking-time-policy'
 import { courtBookingCutoff } from '@/lib/booking-time-policy'
 import { claimSlotsAtomically } from './slot-claim.service'
 import { generateInvoiceNumber } from '@/lib/utils'
@@ -336,9 +326,9 @@ export async function attachCoachingService(
   detailId: string,
   slotId: string | string[],
   cashierId: string,
-  paymentMethodId?: string,
+  _paymentMethodId?: string,
   now = new Date(),
-  manualPayment?: {
+  _manualPayment?: {
     method?: 'EDC' | 'QRIS_STATIC' | 'BANK_TRANSFER_MANUAL'
     received: boolean
   },
@@ -351,14 +341,6 @@ export async function attachCoachingService(
     new Set(slotIds).size !== slotIds.length
   )
     throw new BadRequestException('Pilih maksimal satu coach dan satu ballboy.')
-  if (
-    manualPayment &&
-    (!manualPayment.received ||
-      (manualPayment.method ? !!paymentMethodId : !paymentMethodId))
-  )
-    throw new BadRequestException(
-      'Konfirmasi pembayaran EDC/QRIS Statis/Transfer telah diterima.',
-    )
   const number = await generateInvoiceNumber()
   return db.$transaction(async (tx) => {
     const detail = await coachingCourtDetail(tx, detailId)
@@ -487,53 +469,10 @@ export async function attachCoachingService(
       (sum, s) => sum + (s.type === 'COACH' ? coachPrice : s.price),
       0,
     )
-    const dueDate = paymentDeadline(now)
-    const paid = price === 0 || !!manualPayment
-    const method =
-      manualPayment && price > 0
-        ? await tx.paymentMethod.findFirst({
-            where: {
-              isActive: true,
-              ...(manualPayment.method
-                ? { channel: manualPayment.method }
-                : { id: paymentMethodId, isOffline: true }),
-            },
-            orderBy: { sequence: 'asc' },
-          })
-        : paid
-          ? null
-          : await tx.paymentMethod.findFirst({
-              where: {
-                isActive: true,
-                ...(paymentMethodId ? { id: paymentMethodId } : {}),
-              },
-              orderBy: { sequence: 'asc' },
-            })
-    if (
-      manualPayment &&
-      price > 0 &&
-      (!method || (!manualPayment.method && !method.isOffline))
-    )
-      throw new BadRequestException(
-        'Metode pembayaran manual belum tersedia atau nonaktif. Hubungi Super Admin untuk mengaktifkan EDC, QRIS Statis, atau Transfer.',
-      )
-    if (method && !method.isActive)
-      throw new BadRequestException('Metode pembayaran tidak aktif.')
-    if (
-      !paid &&
-      (method?.isOffline ||
-        !method?.channel ||
-        !isSupportedChannel(method.channel))
-    )
-      throw new BadRequestException(
-        'Pilih metode pembayaran layanan yang aktif.',
-      )
-    const baseFee =
-      method && !manualPayment
-        ? method.fees + Math.round((price * Number(method.percentage)) / 100)
-        : 0
-    const fee = baseFee + Math.round(baseFee * 0.11)
-    const total = price + fee
+    // Admin-added services are confirmed and recorded as paid without a payment method.
+    const dueDate = now
+    const fee = 0
+    const total = price
     if (total > 2147483647)
       throw new BadRequestException('Total pembayaran terlalu besar.')
     const booking = await tx.booking.create({
@@ -542,11 +481,11 @@ export async function attachCoachingService(
         userId: customerId,
         serviceForBookingId: detail.bookingId,
         cashierId,
-        status: paid ? 'CONFIRMED' : 'HOLD',
-        holdExpiresAt: paid ? null : dueDate,
+        status: 'CONFIRMED',
+        holdExpiresAt: null,
         totalPrice: price,
         processingFee: fee,
-        adminNote: `Layanan untuk booking ${detail.bookingId}, lapangan ${detail.slot.court!.name}`,
+        adminNote: `Layanan untuk booking ${detail.bookingId}, lapangan ${detail.slot.court!.name}; dikonfirmasi lunas oleh ${cashierId} pada ${now.toISOString()} tanpa metode pembayaran`,
       },
     })
     for (const slot of selectedSlots) {
@@ -567,7 +506,7 @@ export async function attachCoachingService(
             bookingCoachTypeId: type.id,
             ...group,
             price: coachPrice,
-            status: paid ? 'CONFIRMED' : 'HOLD',
+            status: 'CONFIRMED',
           },
         })
       } else
@@ -577,7 +516,7 @@ export async function attachCoachingService(
             slotId: slot.id,
             courtSlotId: detail.slotId,
             price: slot.price,
-            status: paid ? 'CONFIRMED' : 'HOLD',
+            status: 'CONFIRMED',
           },
         })
     }
@@ -590,88 +529,18 @@ export async function attachCoachingService(
         subtotal: price,
         processingFee: fee,
         total,
-        status: paid ? 'PAID' : 'PENDING',
+        status: 'PAID',
         dueDate,
         issuedAt: now,
-        paidAt: paid ? now : null,
+        paidAt: now,
       },
     })
-    let settled = paid
-    if (method && manualPayment) {
-      const payment = await tx.payment.create({
-        data: {
-          paymentMethodId: method.id,
-          status: 'PAID',
-          amount: total,
-          fees: 0,
-          paidAt: now,
-          meta: {
-            source: 'ADMIN_SERVICE',
-            channel: manualPayment.method ?? method.channel ?? 'OFFLINE',
-            receivedBy: cashierId,
-            receivedAt: now.toISOString(),
-          },
-        },
-      })
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: { paymentId: payment.id },
-      })
-    } else if (method) {
-      const customer = await tx.user.findUniqueOrThrow({
-        where: { id: customerId },
-        select: { name: true, email: true, phone: true },
-      })
-      const init = await midtransService.initiateCheckoutPayment({
-        orderId: invoice.id,
-        amount: total,
-        channelCode: method.channel!,
-        description: selectedSlots
-          .map(
-            (s) =>
-              `${s.type === 'COACH' ? 'Coach' : 'Ballboy'} ${s.staff!.name}`,
-          )
-          .join(' + '),
-        customer: {
-          name: customer.name,
-          email: customer.email ?? undefined,
-          phone: customer.phone ?? undefined,
-        },
-        expiryMinutes: PAYMENT_WINDOW_MINUTES,
-      })
-      const payment = await tx.payment.create({
-        data: {
-          paymentMethodId: method.id,
-          status: 'PENDING',
-          amount: total,
-          fees: fee,
-          externalRef:
-            init.mode === 'snap' ? init.orderId : init.charge.transaction_id,
-          meta: init.meta as Prisma.InputJsonValue,
-          dueDate,
-        },
-      })
-      await tx.invoice.update({
-        where: { id: invoice.id },
-        data: { paymentId: payment.id },
-      })
-      if (
-        init.mode === 'core' &&
-        isPaidStatus(init.charge.transaction_status, init.charge.fraud_status)
-      ) {
-        await finalizeSuccessfulPayment(tx, {
-          invoiceId: invoice.id,
-          paidAt: now,
-        })
-        settled = true
-      }
-    }
     return {
       bookingId: booking.id,
       invoiceId: invoice.id,
       invoiceNumber: invoice.number,
       total,
-      status: settled ? 'PAID' : invoice.status,
+      status: 'PAID',
       dueDate,
     }
   })

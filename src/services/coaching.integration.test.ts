@@ -271,7 +271,7 @@ run('admin coaching transactional integration', () => {
     })
     expect(list.status).toBe(200)
   }, 20000)
-  it('creates an independent unpaid Snap invoice and confirms without changing the court invoice', async () => {
+  it('creates a paid confirmed service invoice without a payment method or changes to the court invoice', async () => {
     const staff = await profile('paid-coach'),
       slot = await staffSlot(staff),
       court = await courtBooking('paid')
@@ -288,12 +288,12 @@ run('admin coaching transactional integration', () => {
       where: { id: result.invoiceId },
       include: { payment: true, booking: { include: { coaches: true } } },
     })
-    expect(invoice.status).toBe('PENDING')
-    expect(invoice.total).toBe(156105)
-    expect(invoice.booking?.status).toBe('HOLD')
+    expect(invoice.status).toBe('PAID')
+    expect(invoice.total).toBe(150000)
+    expect(invoice.booking?.status).toBe('CONFIRMED')
     expect(invoice.booking?.serviceForBookingId).toBe(court.booking.id)
     expect(invoice.booking?.coaches[0].courtSlotId).toBe(court.slot.id)
-    expect(invoice.dueDate?.getTime()).toBe(now.getTime() + 600000)
+    expect(invoice.paidAt?.getTime()).toBe(now.getTime())
     const { generateJwtToken } = await import('@/lib/token')
     const token = await generateJwtToken({
       id: admin,
@@ -317,10 +317,7 @@ run('admin coaching transactional integration', () => {
     expect(scheduled?.serviceForBookingId).toBe(court.booking.id)
     expect(scheduled?.coaches[0].courtSlotId).toBe(court.slot.id)
     expect(scheduled?.coaches[0].slot.startAt).toBe('2026-11-02 13:00:00')
-    expect(invoice.payment?.meta).toMatchObject({
-      checkout_mode: 'snap',
-      snap_token: 'test-token',
-    })
+    expect(invoice.payment).toBeNull()
     expect(
       await raw.invoice.findUnique({ where: { id: court.invoice.id } }),
     ).toMatchObject({ total: 100000, status: 'PAID' })
@@ -378,6 +375,19 @@ run('admin coaching transactional integration', () => {
         now,
       ),
     )
+    // Reproduce a legacy unpaid service created before direct confirmation.
+    await raw.invoice.update({
+      where: { id: first.invoiceId },
+      data: { status: 'PENDING', paidAt: null },
+    })
+    await raw.booking.update({
+      where: { id: first.bookingId },
+      data: { status: 'HOLD', holdExpiresAt: now },
+    })
+    await raw.bookingCoach.updateMany({
+      where: { bookingId: first.bookingId },
+      data: { status: 'HOLD' },
+    })
     await raw.$transaction(async (tx) => {
       await reconciliation.applyPaymentTerminalFailure(tx, {
         invoiceId: first.invoiceId,
@@ -494,26 +504,31 @@ run('admin coaching transactional integration', () => {
       ),
     ).rejects.toThrow('sudah ditambahkan')
   })
-  it('rolls back the claim and all billing records when invoice initialization fails', async () => {
-    const staff = await profile('gateway-failure'),
+  it('confirms paid services even when the payment gateway is unavailable', async () => {
+    const staff = await profile('gateway-unavailable'),
       slot = await staffSlot(staff),
-      court = await courtBooking('gateway-failure')
+      court = await courtBooking('gateway-unavailable')
+    const calls = gateway.mock.calls.length
     gateway.mockRejectedValueOnce(new Error('gateway unavailable'))
-    await expect(
-      context(() =>
-        service.attachCoachingService(
-          court.detail.id,
-          slot.id,
-          admin,
-          `${prefix}-method`,
-          now,
-        ),
+    const result = await context(() =>
+      service.attachCoachingService(
+        court.detail.id,
+        slot.id,
+        admin,
+        undefined,
+        now,
       ),
-    ).rejects.toThrow('gateway unavailable')
-    expect(await raw.slot.findUnique({ where: { id: slot.id } })).toMatchObject(
-      { isAvailable: true },
     )
-    expect(await raw.bookingCoach.count({ where: { slotId: slot.id } })).toBe(0)
+    expect(result.status).toBe('PAID')
+    expect(await raw.slot.findUnique({ where: { id: slot.id } })).toMatchObject(
+      { isAvailable: false },
+    )
+    expect(
+      await raw.bookingCoach.count({
+        where: { slotId: slot.id, status: 'CONFIRMED' },
+      }),
+    ).toBe(1)
+    expect(gateway.mock.calls).toHaveLength(calls)
   })
   it('generates idempotent WIB schedules and does not overwrite a booked slot', async () => {
     const staff = await profile('schedule')
@@ -560,7 +575,7 @@ run('admin coaching transactional integration', () => {
     )
     expect(availability.some((s) => s.staffId === staff)).toBe(false)
   })
-  it('books coach and ballboy atomically in one EDC invoice with a cashier audit trail', async () => {
+  it('books coach and ballboy atomically as paid without a payment method', async () => {
     const coach = await profile('combined-coach', 'COACH', 'TENNIS')
     const ballboy = await profile('combined-ballboy', 'BALLBOY')
     const coachSlot = await staffSlot(coach)
@@ -595,11 +610,10 @@ run('admin coaching transactional integration', () => {
     })
     expect(invoice.booking?.coaches).toHaveLength(1)
     expect(invoice.booking?.ballboys).toHaveLength(1)
-    expect(invoice.payment).toMatchObject({
-      status: 'PAID',
-      amount: 195000,
-      meta: { receivedBy: admin, channel: 'EDC' },
-    })
+    expect(invoice.payment).toBeNull()
+    expect(invoice.booking?.adminNote).toContain(
+      `dikonfirmasi lunas oleh ${admin}`,
+    )
     expect(gateway.mock.calls).toHaveLength(calls)
   })
   it('rolls back the first slot claim if the second service is unavailable', async () => {

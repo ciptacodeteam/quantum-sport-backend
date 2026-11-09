@@ -325,13 +325,7 @@ export const attachCoachingHandler = factory.createHandlers(
         paymentMethodId: z.string().min(1).optional(),
       })
       .strict()
-      .refine((v) => !!v.slotId !== !!v.slotIds, 'Pilih layanan.')
-      .refine(
-        (v) =>
-          !v.manualPayment ||
-          (v.manualPayment.method ? !v.paymentMethodId : !!v.paymentMethodId),
-        'Pilih satu metode pembayaran.',
-      ),
+      .refine((v) => !!v.slotId !== !!v.slotIds, 'Pilih layanan.'),
     validateHook,
   ),
   async (c) => {

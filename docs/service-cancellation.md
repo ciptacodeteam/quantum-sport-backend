@@ -7,3 +7,7 @@ Individual cancellation requires a reason and the displayed slot ID, rechecks th
 Court cancellation (admin or customer) also cancels active coach and ballboy rows linked by the court booking ID, serviceForBookingId, or courtSlotId for older separate service invoices. The operation runs in the same transaction as court cancellation. Paid add-on invoice history is preserved and the booking receives a manual refund review note. The admin rejection path uses the same service cleanup.
 
 No schema migration is required. This change does not retroactively cancel service rows whose courts were cancelled before deployment. Review those entries in the service booking lists and cancel the affected services explicitly.
+
+## Direct confirmation of admin-added services
+
+Adding a coach, ballboy, or both to an existing confirmed court booking immediately creates CONFIRMED service rows and a PAID invoice at the selected service rates. The invoice has paidAt and no processing fee or payment-method record. The booking records the cashier and confirmation time. No gateway request or temporary payment hold is created. Cancellation continues to exclude cancelled service rows from income, while preserving the paid invoice history.

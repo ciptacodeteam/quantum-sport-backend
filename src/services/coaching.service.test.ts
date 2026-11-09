@@ -138,100 +138,53 @@ beforeEach(() => {
     meta: {},
   })
 })
-it.each(
-  (['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'] as const).flatMap((method) =>
-    ['ADMIN', 'CASHIER'].map((role) => ({ method, role })),
-  ),
-)(
-  'records a paid $method invoice for $role without shared catalog writes',
-  async ({ method, role }) => {
-    const result = await withBranchContext(
-      { branchId: 'cemara', isAdmin: true, isSuperAdmin: false, staffId: role },
-      () =>
-        attachCoachingService(
-          'detail',
-          ['coach', 'ballboy'],
-          'admin',
-          undefined,
-          now,
-          { method, received: true },
-        ),
+it.each([
+  { ids: ['coach'], price: 150000 },
+  { ids: ['ballboy'], price: 45000 },
+  { ids: ['coach', 'ballboy'], price: 195000 },
+])(
+  'immediately confirms and pays $ids without a payment method or gateway',
+  async ({ ids, price }) => {
+    const result = await attachCoachingService(
+      'detail',
+      ids,
+      'cashier',
+      undefined,
+      now,
     )
-    expect(mocks.tx.paymentMethod.findFirst).toHaveBeenCalledWith({
-      where: { channel: method, isActive: true },
-      orderBy: { sequence: 'asc' },
-    })
-    expect(mocks.tx.paymentMethod.upsert).not.toHaveBeenCalled()
-    expect(result).toMatchObject({ total: 195000, status: 'PAID' })
-    expect(mocks.tx.booking.create).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({ status: 'PAID', total: price })
     expect(mocks.tx.booking.create.mock.calls[0][0].data).toMatchObject({
       status: 'CONFIRMED',
       holdExpiresAt: null,
-      totalPrice: 195000,
+      totalPrice: price,
       processingFee: 0,
+      cashierId: 'cashier',
+      adminNote: expect.stringContaining('dikonfirmasi lunas oleh cashier'),
     })
-    expect(mocks.tx.bookingCoach.create.mock.calls[0][0].data).toMatchObject({
-      bookingId: 'service',
-      status: 'CONFIRMED',
-      price: 150000,
-    })
-    expect(mocks.tx.bookingBallboy.create.mock.calls[0][0].data).toMatchObject({
-      bookingId: 'service',
-      status: 'CONFIRMED',
-      price: 45000,
-    })
-    expect(mocks.tx.payment.create.mock.calls[0][0].data).toMatchObject({
+    expect(mocks.tx.invoice.create.mock.calls[0][0].data).toMatchObject({
       status: 'PAID',
-      amount: 195000,
-      fees: 0,
+      total: price,
+      processingFee: 0,
       paidAt: now,
-      meta: { receivedBy: 'admin', channel: method },
     })
-    expect(mocks.tx.invoice.update).toHaveBeenCalledWith({
-      where: { id: 'invoice' },
-      data: { paymentId: 'payment' },
-    })
+    for (const model of [mocks.tx.bookingCoach, mocks.tx.bookingBallboy])
+      for (const [args] of model.create.mock.calls)
+        expect(args.data.status).toBe('CONFIRMED')
+    expect(mocks.tx.paymentMethod.findFirst).not.toHaveBeenCalled()
+    expect(mocks.tx.payment.create).not.toHaveBeenCalled()
     expect(mocks.gateway).not.toHaveBeenCalled()
   },
 )
-it('charges gateway fees once for the combined invoice and retains the unpaid hold', async () => {
-  const result = await attachCoachingService(
-    'detail',
-    ['coach', 'ballboy'],
-    'admin',
-    'va',
-    now,
-  )
-  expect(result).toMatchObject({ total: 201605, status: 'PENDING' })
-  expect(mocks.gateway).toHaveBeenCalledOnce()
-  expect(mocks.tx.booking.create.mock.calls[0][0].data.status).toBe('HOLD')
-  expect(mocks.tx.payment.create.mock.calls[0][0].data.status).toBe('PENDING')
-})
-it('rejects an unconfirmed manual payment before claiming slots', async () => {
-  await expect(
-    attachCoachingService('detail', ['coach'], 'admin', undefined, now, {
-      method: 'EDC',
-      received: false,
-    }),
-  ).rejects.toThrow('Konfirmasi')
-  expect(mocks.claim).not.toHaveBeenCalled()
-})
-it('rejects duplicate selections and incompatible methods', async () => {
+it('rejects duplicate selections before claiming slots', async () => {
   await expect(
     attachCoachingService(
       'detail',
       ['coach', 'coach'],
-      'admin',
+      'cashier',
       undefined,
       now,
     ),
   ).rejects.toThrow('maksimal')
-  await expect(
-    attachCoachingService('detail', ['coach'], 'admin', 'va', now, {
-      method: 'EDC',
-      received: true,
-    }),
-  ).rejects.toThrow('Konfirmasi')
   expect(mocks.claim).not.toHaveBeenCalled()
 })
 it('propagates a failed second claim without creating partial billing records', async () => {
@@ -248,7 +201,7 @@ it('propagates a failed second claim without creating partial billing records', 
 it('preserves the legacy single-slot caller', async () => {
   expect(
     await attachCoachingService('detail', 'coach', 'admin', 'va', now),
-  ).toMatchObject({ total: 156105, status: 'PENDING' })
+  ).toMatchObject({ total: 150000, status: 'PAID' })
 })
 
 it('keeps the shared catalog protected for non-super admins', async () => {
@@ -267,68 +220,6 @@ it('keeps the shared catalog protected for non-super admins', async () => {
     },
   )
 })
-it('fails clearly without creating billing records when a manual method is missing or disabled', async () => {
-  mocks.tx.paymentMethod.findFirst.mockResolvedValueOnce(null)
-  await expect(
-    attachCoachingService('detail', ['coach'], 'admin', undefined, now, {
-      method: 'BANK_TRANSFER_MANUAL',
-      received: true,
-    }),
-  ).rejects.toThrow('Hubungi Super Admin')
-  expect(mocks.tx.paymentMethod.upsert).not.toHaveBeenCalled()
-  expect(mocks.tx.booking.create).not.toHaveBeenCalled()
-  expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
-})
-
-it('settles a custom offline catalog method only after receipt confirmation, without gateway fees', async () => {
-  mocks.tx.paymentMethod.findFirst.mockResolvedValue({
-    id: 'cash',
-    isActive: true,
-    isOffline: true,
-    channel: null,
-    fees: 5000,
-    percentage: 2,
-  })
-  const result = await attachCoachingService(
-    'detail',
-    ['coach'],
-    'admin',
-    'cash',
-    now,
-    { received: true },
-  )
-  expect(mocks.tx.paymentMethod.findFirst).toHaveBeenCalledWith({
-    where: { id: 'cash', isOffline: true, isActive: true },
-    orderBy: { sequence: 'asc' },
-  })
-  expect(result).toMatchObject({ total: 150000, status: 'PAID' })
-  expect(mocks.tx.payment.create).toHaveBeenCalledWith(
-    expect.objectContaining({
-      data: expect.objectContaining({
-        paymentMethodId: 'cash',
-        status: 'PAID',
-        fees: 0,
-        meta: expect.objectContaining({ channel: 'OFFLINE' }),
-      }),
-    }),
-  )
-  expect(mocks.gateway).not.toHaveBeenCalled()
-})
-it('does not send an offline catalog method to the online gateway without receipt confirmation', async () => {
-  mocks.tx.paymentMethod.findFirst.mockResolvedValue({
-    id: 'cash',
-    isActive: true,
-    isOffline: true,
-    channel: 'QRIS',
-    fees: 0,
-    percentage: 0,
-  })
-  await expect(
-    attachCoachingService('detail', ['coach'], 'admin', 'cash', now),
-  ).rejects.toThrow('metode pembayaran layanan')
-  expect(mocks.gateway).not.toHaveBeenCalled()
-})
-
 it('charges the additional coach rate when attaching an adjacent hour to the same confirmed court booking', async () => {
   mocks.tx.slot.findFirst.mockResolvedValue({
     ...slots[0],
