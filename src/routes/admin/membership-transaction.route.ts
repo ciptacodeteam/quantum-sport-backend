@@ -1,3 +1,4 @@
+import { requireAdmin } from '@/middlewares/auth'
 import { createRouter } from '@/lib/create-app'
 import {
   approveMembershipTransactionHandler,
@@ -15,8 +16,8 @@ const adminMembershipTransactionRoute = createRouter()
   .get('/export/excel', ...exportMembershipTransactionsToExcelHandler)
   .get('/:id', ...getMembershipTransactionDetailHandler)
   .put('/:id/approve', ...approveMembershipTransactionHandler)
-  .put('/:id/cancel', ...rejectMembershipTransactionHandler)
-  .put('/:id/reject', ...rejectMembershipTransactionHandler)
+  .put('/:id/cancel', requireAdmin, ...rejectMembershipTransactionHandler)
+  .put('/:id/reject', requireAdmin, ...rejectMembershipTransactionHandler)
   .put('/:id/suspend', ...suspendMembershipTransactionHandler)
   .put('/:id/unsuspend', ...unsuspendMembershipTransactionHandler)
 
