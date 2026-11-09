@@ -363,6 +363,7 @@ export const listCoachingBookingsHandler = factory.createHandlers(
       booking: {
         include: {
           user: { select: { name: true, phone: true } },
+          cashier: { select: { id: true, name: true } },
           invoice: {
             select: {
               id: true,
@@ -398,6 +399,8 @@ export const listCoachingBookingsHandler = factory.createHandlers(
         items.map((item) => ({
           id: item.id,
           bookingId: item.bookingId,
+          createdAt: item.createdAt,
+          cashier: item.booking.cashier,
           name: item.slot.staff?.name ?? '-',
           coachingGroupName:
             'coachingGroupName' in item ? item.coachingGroupName : null,

@@ -151,3 +151,41 @@ it('accepts coach and ballboy without a payment method or receipt confirmation',
   })
   expect(res.status).toBe(200)
 })
+
+it.each(['COACH', 'BALLBOY'])(
+  'returns the creating cashier and creation time for %s',
+  async (kind) => {
+    const createdAt = new Date('2026-11-08T11:35:00Z')
+    const cashier = { id: 'cashier-fitri', name: 'Fitri' }
+    const find = kind === 'COACH' ? mocks.coaches : mocks.ballboys
+    find.mockResolvedValue([
+      {
+        id: 'service',
+        bookingId: 'booking',
+        createdAt,
+        slot: {
+          staff: { name: 'Petugas' },
+          startAt: new Date('2026-11-09T19:00:00Z'),
+          endAt: new Date('2026-11-09T20:00:00Z'),
+        },
+        courtSlot: null,
+        price: 45000,
+        status: 'CONFIRMED',
+        booking: {
+          user: { name: 'Budi', phone: '' },
+          cashier,
+          status: 'CONFIRMED',
+          invoice: null,
+        },
+      },
+    ])
+    const response = await (listCoachingBookingsHandler.at(-1) as any)({
+      req: { valid: () => ({ kind }) },
+      json: (value: unknown) => value,
+    })
+    expect(response.data[0]).toMatchObject({ createdAt, cashier })
+    expect(find.mock.calls[0][0].include.booking.include.cashier).toEqual({
+      select: { id: true, name: true },
+    })
+  },
+)
