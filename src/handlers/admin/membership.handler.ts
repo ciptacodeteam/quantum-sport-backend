@@ -222,6 +222,7 @@ const adminMembershipCheckoutSchema = z
     name: z.string().min(1).optional(),
     phone: z.string().min(5).optional(),
     membershipId: z.string(),
+    paymentMethodId: z.string().min(1).optional(),
     startDate: z
       .string()
       .refine((val) => dayjs(val).isValid(), {
@@ -248,6 +249,7 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
         name,
         phone,
         membershipId,
+        paymentMethodId,
         startDate,
       } = c.req.valid('json') as AdminMembershipCheckoutSchema
 
@@ -298,6 +300,52 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
       }
 
       const result = await db.$transaction(async (tx) => {
+        if (membership.price > 0 && !paymentMethodId)
+          throw new BadRequestException(
+            'Pilih metode pembayaran offline terlebih dahulu.',
+          )
+        let recordedPaymentId: string | undefined
+        if (paymentMethodId) {
+          await tx.$queryRaw`SELECT id FROM payment_methods WHERE id = ${paymentMethodId} FOR SHARE`
+          const method = await tx.paymentMethod.findFirst({
+            where: {
+              id: paymentMethodId,
+              isActive: true,
+              OR: [
+                { isOffline: true },
+                {
+                  channel: {
+                    in: ['CASH', 'EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'],
+                  },
+                },
+              ],
+            },
+          })
+          if (!method)
+            throw new BadRequestException(
+              'Metode pembayaran offline tidak tersedia atau nonaktif.',
+            )
+          if (membership.price > 0) {
+            const receivedAt = new Date()
+            const payment = await tx.payment.create({
+              data: {
+                paymentMethodId: method.id,
+                status: PaymentStatus.PAID,
+                amount: membership.price,
+                fees: 0,
+                paidAt: receivedAt,
+                meta: {
+                  source: 'ADMIN_MEMBERSHIP_BOOKING',
+                  channel: method.channel ?? 'OFFLINE',
+                  methodName: method.name,
+                  receivedBy: admin?.id ?? null,
+                  receivedAt: receivedAt.toISOString(),
+                },
+              },
+            })
+            recordedPaymentId = payment.id
+          }
+        }
         const membershipStart = startDate ? dayjs(startDate) : dayjs()
         const membershipEnd = membershipStart.add(membership.duration, 'days')
 
@@ -320,6 +368,7 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
           data: {
             userId: resolvedUserId!,
             membershipUserId: membershipUser.id,
+            paymentId: recordedPaymentId,
             number: invoiceNumber,
             subtotal: membership.price,
             processingFee: 0,

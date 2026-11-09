@@ -15,9 +15,9 @@ const adminMembershipTransactionRoute = createRouter()
   .get('/export/excel', ...exportMembershipTransactionsToExcelHandler)
   .get('/:id', ...getMembershipTransactionDetailHandler)
   .put('/:id/approve', ...approveMembershipTransactionHandler)
+  .put('/:id/cancel', ...rejectMembershipTransactionHandler)
   .put('/:id/reject', ...rejectMembershipTransactionHandler)
   .put('/:id/suspend', ...suspendMembershipTransactionHandler)
   .put('/:id/unsuspend', ...unsuspendMembershipTransactionHandler)
 
 export default adminMembershipTransactionRoute
-

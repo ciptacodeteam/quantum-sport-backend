@@ -1,4 +1,9 @@
 import {
+  cancelUnusedMembership,
+  canCancelMembership,
+  membershipCancellationInclude,
+} from '@/services/membership-cancel.service'
+import {
   bookingDateRangeFields,
   validBookingDateRange,
   bookingDateRangeError,
@@ -95,6 +100,7 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
             ],
           },
           include: {
+            ...membershipCancellationInclude,
             user: {
               select: {
                 id: true,
@@ -141,7 +147,15 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
       const membershipTransactions = await (query.balance === 'negative'
         ? withCustomerWallet(loadTransactions)
         : loadTransactions())
-      return c.json(ok(membershipTransactions), status.OK)
+      return c.json(
+        ok(
+          membershipTransactions.map((pack) => ({
+            ...pack,
+            canCancel: canCancelMembership(pack),
+          })),
+        ),
+        status.OK,
+      )
     } catch (error) {
       c.var.logger.fatal(
         `Error in getAllMembershipTransactionsHandler: ${error}`,
@@ -162,6 +176,7 @@ export const getMembershipTransactionDetailHandler = factory.createHandlers(
       const membershipTransaction = await db.membershipUser.findUnique({
         where: { id },
         include: {
+          ...membershipCancellationInclude,
           user: {
             select: {
               id: true,
@@ -213,7 +228,13 @@ export const getMembershipTransactionDetailHandler = factory.createHandlers(
         throw new NotFoundException('Membership transaction not found')
       }
 
-      return c.json(ok(membershipTransaction), status.OK)
+      return c.json(
+        ok({
+          ...membershipTransaction,
+          canCancel: canCancelMembership(membershipTransaction),
+        }),
+        status.OK,
+      )
     } catch (error) {
       c.var.logger.fatal(
         `Error in getMembershipTransactionDetailHandler: ${error}`,
@@ -247,15 +268,10 @@ export const approveMembershipTransactionHandler = factory.createHandlers(
           throw new NotFoundException('Membership transaction not found')
         }
 
-        // Check if already paid
-        if (
-          membershipTransaction.invoice &&
-          membershipTransaction.invoice.status === PaymentStatus.PAID
-        ) {
+        if (membershipTransaction.invoice?.status !== PaymentStatus.PENDING)
           throw new BadRequestException(
-            'Membership transaction is already paid',
+            'Hanya transaksi menunggu pembayaran yang dapat disetujui.',
           )
-        }
 
         // Update invoice status to PAID
         if (membershipTransaction.invoice) {
@@ -307,61 +323,11 @@ export const rejectMembershipTransactionHandler = factory.createHandlers(
     try {
       const { id } = c.req.valid('param') as IdSchema
 
-      const result = await db.$transaction(async (tx) => {
-        const membershipTransaction = await tx.membershipUser.findUnique({
-          where: { id },
-          include: {
-            invoice: {
-              include: {
-                payment: true,
-              },
-            },
-          },
-        })
-
-        if (!membershipTransaction) {
-          throw new NotFoundException('Membership transaction not found')
-        }
-
-        // Check if already cancelled
-        if (
-          membershipTransaction.invoice &&
-          membershipTransaction.invoice.status === PaymentStatus.CANCELLED
-        ) {
-          throw new BadRequestException(
-            'Membership transaction is already cancelled',
-          )
-        }
-
-        // Update invoice status to CANCELLED
-        if (membershipTransaction.invoice) {
-          await tx.invoice.update({
-            where: { id: membershipTransaction.invoice.id },
-            data: {
-              status: PaymentStatus.CANCELLED,
-              cancelledAt: new Date(),
-            },
-          })
-
-          // Update payment status to CANCELLED
-          if (membershipTransaction.invoice.payment) {
-            await tx.payment.update({
-              where: { id: membershipTransaction.invoice.payment.id },
-              data: {
-                status: PaymentStatus.CANCELLED,
-                cancelledAt: new Date(),
-              },
-            })
-          }
-        }
-
-        return membershipTransaction
-      })
-
-      return c.json(
-        ok(result, 'Membership transaction rejected successfully'),
-        status.OK,
+      const result = await db.$transaction((tx) =>
+        cancelUnusedMembership(tx, id),
       )
+
+      return c.json(ok(result, 'Membership berhasil dibatalkan'), status.OK)
     } catch (error) {
       c.var.logger.fatal(
         `Error in rejectMembershipTransactionHandler: ${error}`,

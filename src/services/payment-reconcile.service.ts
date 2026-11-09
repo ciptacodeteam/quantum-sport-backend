@@ -419,6 +419,14 @@ export async function finalizeSuccessfulPayment(
     }
   }
 
+  if (invoice.membershipUser?.suspensionReason === 'Dibatalkan oleh admin') {
+    return {
+      outcome: 'paid_needs_manual_review',
+      reason:
+        'Membership dibatalkan oleh admin; pembayaran susulan memerlukan pemeriksaan manual.',
+    }
+  }
+
   const previousStatus = invoice.status
 
   const claimedInvoice = await tx.invoice.updateMany({
