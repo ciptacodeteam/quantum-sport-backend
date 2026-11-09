@@ -1,3 +1,4 @@
+import { setCoachClubSettlement } from '@/services/coach-club-settlement.service'
 import { validateCoachGroups } from '@/services/coaching-group.service'
 import {
   bookingDateRangeFields,
@@ -400,6 +401,19 @@ export const listCoachingBookingsHandler = factory.createHandlers(
           id: item.id,
           bookingId: item.bookingId,
           createdAt: item.createdAt,
+          ...('isClubSettled' in item
+            ? {
+                isClubSettled: item.isClubSettled,
+                clubSettlementUpdatedAt:
+                  'clubSettlementUpdatedAt' in item
+                    ? item.clubSettlementUpdatedAt
+                    : null,
+                clubSettlementUpdatedById:
+                  'clubSettlementUpdatedById' in item
+                    ? item.clubSettlementUpdatedById
+                    : null,
+              }
+            : {}),
           cashier: item.booking.cashier,
           name: item.slot.staff?.name ?? '-',
           coachingGroupName:
@@ -454,4 +468,28 @@ export const previewCoachCancellationHandler = factory.createHandlers(
   zValidator('param', params, validateHook),
   async (c) =>
     c.json(ok(await previewCoachCancellation(c.req.valid('param').id))),
+)
+
+export const setCoachClubSettlementHandler = factory.createHandlers(
+  zValidator('param', params, validateHook),
+  zValidator(
+    'json',
+    z
+      .object({
+        isSettled: z.boolean(),
+        expectedIsSettled: z.boolean(),
+      })
+      .strict(),
+    validateHook,
+  ),
+  async (c) =>
+    c.json(
+      ok(
+        await setCoachClubSettlement(
+          c.req.valid('param').id,
+          c.req.valid('json'),
+          c.get('admin')!.id,
+        ),
+      ),
+    ),
 )

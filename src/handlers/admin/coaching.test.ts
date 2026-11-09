@@ -162,6 +162,13 @@ it.each(['COACH', 'BALLBOY'])(
       {
         id: 'service',
         bookingId: 'booking',
+        ...(kind === 'COACH'
+          ? {
+              isClubSettled: true,
+              clubSettlementUpdatedAt: createdAt,
+              clubSettlementUpdatedById: 'cashier-fitri',
+            }
+          : {}),
         createdAt,
         slot: {
           staff: { name: 'Petugas' },
@@ -184,6 +191,13 @@ it.each(['COACH', 'BALLBOY'])(
       json: (value: unknown) => value,
     })
     expect(response.data[0]).toMatchObject({ createdAt, cashier })
+    if (kind === 'COACH')
+      expect(response.data[0]).toMatchObject({
+        isClubSettled: true,
+        clubSettlementUpdatedAt: createdAt,
+        clubSettlementUpdatedById: 'cashier-fitri',
+      })
+    else expect(response.data[0]).not.toHaveProperty('isClubSettled')
     expect(find.mock.calls[0][0].include.booking.include.cashier).toEqual({
       select: { id: true, name: true },
     })

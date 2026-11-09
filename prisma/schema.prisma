@@ -658,6 +658,9 @@ model CoachTypeStaffPrice {
 }
 
 model BookingCoach {
+  isClubSettled             Boolean   @default(false)
+  clubSettlementUpdatedAt   DateTime?
+  clubSettlementUpdatedById String?
   coachingGroupId   String?
   coachingGroupName String?
   coachingGroup     CoachingGroup? @relation(fields: [coachingGroupId], references: [id], onDelete: SetNull)

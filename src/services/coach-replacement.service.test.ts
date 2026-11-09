@@ -198,3 +198,10 @@ it('offers matching slot prices and intervals in the same branch, excluding busy
   expect(result.options.map((s) => s.staffId)).toEqual(['free'])
   expect(result.current.slotId).toBe('old-slot')
 })
+
+it('requires reopening club settlement before changing the coach or club', async () => {
+  current.isClubSettled = true
+  await expect(change()).rejects.toThrow('Batalkan tanda lunas ke club')
+  expect(mocks.claim).not.toHaveBeenCalled()
+  expect(mocks.tx.bookingCoach.updateMany).not.toHaveBeenCalled()
+})

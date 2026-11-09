@@ -116,6 +116,7 @@ for sql in \
   /app/prisma/membership-renewal.sql \
   /app/prisma/coaching-admin.sql \
   /app/prisma/coaching-groups.sql \
+  /app/prisma/coach-club-settlement.sql \
   /app/prisma/rolling-service-schedule.sql \
   /app/prisma/admin-coaching-discounts.sql \
   /app/prisma/tariff-day-rules.sql \

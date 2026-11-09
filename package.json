@@ -55,7 +55,8 @@
     "db:coaching-groups": "prisma db execute --schema prisma/schema.prisma --file prisma/coaching-groups.sql",
     "db:rolling-service-schedule": "prisma db execute --schema prisma/schema.prisma --file prisma/rolling-service-schedule.sql",
     "db:admin-coaching-discounts": "prisma db execute --schema prisma/schema.prisma --file prisma/admin-coaching-discounts.sql",
-    "db:offline-payment-methods": "prisma db execute --schema prisma/schema.prisma --file prisma/offline-payment-methods.sql"
+    "db:offline-payment-methods": "prisma db execute --schema prisma/schema.prisma --file prisma/offline-payment-methods.sql",
+    "db:coach-club-settlement": "prisma db execute --schema prisma/schema.prisma --file prisma/coach-club-settlement.sql"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",

@@ -15,6 +15,7 @@ import {
   availableCoachingHandler,
   attachCoachingHandler,
   listCoachingBookingsHandler,
+  setCoachClubSettlementHandler,
 } from '@/handlers/admin/coaching.handler'
 
 const read = requireAnyAdminRole(['ADMIN', 'CASHIER', 'ADMIN_VIEWER'])
@@ -26,6 +27,11 @@ export default createRouter()
   .get('/', read, ...listCoachingHandler)
   .post('/', requireAdmin, ...createCoachingHandler)
   .get('/bookings', read, ...listCoachingBookingsHandler)
+  .patch(
+    '/bookings/:id/club-settlement',
+    write,
+    ...setCoachClubSettlementHandler,
+  )
   .get(
     '/bookings/:id/replacements',
     replaceCoach,
