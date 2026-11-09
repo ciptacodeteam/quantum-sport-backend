@@ -59,7 +59,23 @@ export async function cancelHoldBookingAndReleaseResources(
 
   if (allSlotIds.length > 0) {
     await tx.slot.updateMany({
-      where: { id: { in: allSlotIds } },
+      where: {
+        id: { in: allSlotIds },
+        scheduleClosed: false,
+        bookingDetails: { none: { booking: { status: { not: 'CANCELLED' } } } },
+        bookingCoaches: {
+          none: {
+            status: { not: 'CANCELLED' },
+            booking: { status: { not: 'CANCELLED' } },
+          },
+        },
+        bookingBallboys: {
+          none: {
+            status: { not: 'CANCELLED' },
+            booking: { status: { not: 'CANCELLED' } },
+          },
+        },
+      },
       data: { isAvailable: true },
     })
     log.info(

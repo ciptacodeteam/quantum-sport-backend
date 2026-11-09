@@ -127,14 +127,11 @@ it('does not release slots if another update has already cancelled the ballboy',
   expect(mocks.tx.slot.updateMany).not.toHaveBeenCalled()
   expect(mocks.tx.booking.update).not.toHaveBeenCalled()
 })
-it.each(['CANCELLED', 'HOLD'])(
-  'rejects a %s ballboy before mutations',
-  async (status) => {
-    item.status = status
-    await expect(cancel()).rejects.toThrow('terkonfirmasi')
-    expect(mocks.tx.bookingBallboy.updateMany).not.toHaveBeenCalled()
-  },
-)
+it('rejects an already cancelled ballboy', async () => {
+  item.status = 'CANCELLED'
+  await expect(cancel()).rejects.toThrow('sudah dibatalkan')
+  expect(mocks.tx.bookingBallboy.updateMany).not.toHaveBeenCalled()
+})
 it('allows cleanup when the parent was already cancelled', async () => {
   item.booking.status = 'CANCELLED'
   item.booking.invoice.status = 'CANCELLED'
@@ -156,3 +153,27 @@ it('rejects a ballboy booking outside the current branch before locking', async 
   await expect(cancel()).rejects.toThrow('cabang')
   expect(mocks.tx.$queryRaw).not.toHaveBeenCalled()
 })
+
+it.each(['HOLD', 'CONFIRMED'])(
+  'cancels a %s service on an unpaid HOLD booking',
+  async (status) => {
+    item.status = status
+    item.booking.status = 'HOLD'
+    item.booking.invoice.status = 'PENDING'
+    expect(
+      await previewBallboyCancellation('ballboy-booking', now),
+    ).toMatchObject({ refundRequired: false })
+    expect(await cancel()).toMatchObject({
+      status: 'CANCELLED',
+      slotReleased: true,
+      refundRequired: false,
+    })
+    expect(mocks.tx.bookingBallboy.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ballboy-booking', slotId: 'ballboy-slot', status },
+      }),
+    )
+    expect(mocks.tx.invoice.update).not.toHaveBeenCalled()
+    expect(mocks.tx.payment.update).not.toHaveBeenCalled()
+  },
+)

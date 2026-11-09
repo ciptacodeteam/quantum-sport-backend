@@ -188,6 +188,7 @@ async function attemptReviveCancelledBooking(
       membershipUserId: true,
       membershipSessionsUsed: true,
       cancellationReason: true,
+      cancelledAt: true,
     },
   })
 
@@ -213,13 +214,39 @@ async function attemptReviveCancelledBooking(
     }),
     tx.bookingCoach.findMany({
       where: { bookingId },
-      select: { slotId: true },
+      select: {
+        slotId: true,
+        status: true,
+        cancelledAt: true,
+        cancellationReason: true,
+      },
     }),
     tx.bookingBallboy.findMany({
       where: { bookingId },
-      select: { slotId: true },
+      select: {
+        slotId: true,
+        status: true,
+        cancelledAt: true,
+        cancellationReason: true,
+      },
     }),
   ])
+
+  if (
+    [...coaches, ...ballboys].some(
+      (item) =>
+        item.status === BookingStatus.CANCELLED &&
+        (!item.cancelledAt ||
+          !booking.cancelledAt ||
+          +item.cancelledAt !== +booking.cancelledAt ||
+          item.cancellationReason !== booking.cancellationReason),
+    )
+  )
+    return {
+      revived: false,
+      reason:
+        'A service was explicitly cancelled; review the late payment manually',
+    }
 
   const courtSlotIds = details.map((d) => d.slotId)
   const coachSlotIds = coaches.map((c) => c.slotId)

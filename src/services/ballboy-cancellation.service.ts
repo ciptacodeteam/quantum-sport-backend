@@ -20,14 +20,12 @@ async function cancellationContext(
     throw new NotFoundException(
       'Pemesanan ballboy tidak ditemukan di cabang ini.',
     )
-  if (item.status !== 'CONFIRMED' || item.booking.status === 'HOLD')
-    throw new BadRequestException(
-      'Hanya ballboy pada booking terkonfirmasi yang dapat dibatalkan.',
-    )
+  if (item.status !== 'CONFIRMED' && item.status !== 'HOLD')
+    throw new BadRequestException('Pemesanan ballboy sudah dibatalkan.')
   if (item.slot.startAt <= courtBookingCutoff(now))
     throw new BadRequestException('Jadwal melewati batas pembatalan 15 menit.')
   if (
-    item.booking.status !== 'CANCELLED' &&
+    item.booking.status === 'CONFIRMED' &&
     item.booking.invoice &&
     item.booking.invoice.total > 0 &&
     item.booking.invoice.status !== 'PAID'
@@ -72,7 +70,7 @@ export async function cancelBookedBallboy(
     if (item.slot.staffId)
       await tx.$queryRaw`SELECT id FROM staff WHERE id = ${item.slot.staffId} FOR UPDATE`
     const changed = await tx.bookingBallboy.updateMany({
-      where: { id, slotId: input.expectedSlotId, status: 'CONFIRMED' },
+      where: { id, slotId: input.expectedSlotId, status: item.status },
       data: {
         status: 'CANCELLED',
         cancelledAt: now,

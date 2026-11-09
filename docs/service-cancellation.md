@@ -11,3 +11,9 @@ No schema migration is required. This change does not retroactively cancel servi
 ## Direct confirmation of admin-added services
 
 Adding a coach, ballboy, or both to an existing confirmed court booking immediately creates CONFIRMED service rows and a PAID invoice at the selected service rates. The invoice has paidAt and no processing fee or payment-method record. The booking records the cashier and confirmation time. No gateway request or temporary payment hold is created. Cancellation continues to exclude cancelled service rows from income, while preserving the paid invoice history.
+
+## Cancelling unpaid services
+
+The cancel action also supports HOLD (Menunggu pembayaran), including older service rows marked CONFIRMED under a HOLD booking. It requires the same role, reason, slot version and 15-minute cutoff as confirmed-service cancellation. Cancelling an unpaid service does not require confirming payment and does not alter invoice/payment amounts or other services.
+
+If an old HOLD booking later expires, only slots without another active booking can be reopened; manually closed slots stay closed. Late payment reconciliation requires manual review if it would revive a service cancelled independently before the booking expiry. Cancelled service rows remain excluded from service income and exports.
