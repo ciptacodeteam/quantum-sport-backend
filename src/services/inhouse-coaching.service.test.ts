@@ -20,7 +20,11 @@ import {
   sellInHousePlan,
   saveInHousePlan,
 } from './inhouse-coaching.service'
-import { inHousePlanSchema, priceInHouseHour } from '@/lib/inhouse-coaching'
+import {
+  inHousePlanSchema,
+  inHouseSelectionSchema,
+  priceInHouseHour,
+} from '@/lib/inhouse-coaching'
 let tx: any
 const range = {
   startAt: new Date('2040-11-03T18:00:00Z'),
@@ -50,42 +54,36 @@ beforeEach(() => {
     $queryRaw: vi.fn(),
     user: { findUnique: vi.fn().mockResolvedValue({ id: 'customer' }) },
     staff: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'andi',
-          branchId: 'cemara',
-          role: 'COACH',
-          isActive: true,
-        }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'andi',
+        branchId: 'cemara',
+        role: 'COACH',
+        isActive: true,
+      }),
     },
     inHousePlan: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'plan',
-          name: 'Andi 5 jam',
-          hours: 5,
-          staffId: 'andi',
-          branchId: 'cemara',
-          staff: { isActive: true, role: 'COACH' },
-          ...terms,
-        }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'plan',
+        name: 'Andi 5 jam',
+        hours: 5,
+        staffId: 'andi',
+        branchId: 'cemara',
+        staff: { isActive: true, role: 'COACH' },
+        ...terms,
+      }),
       create: vi.fn(),
       update: vi.fn(),
     },
     inHouseWallet: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'wallet',
-          staffId: 'andi',
-          branchId: 'cemara',
-          userId: 'customer',
-          staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
-          packageName: 'Andi 5 jam',
-          ...terms,
-        }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'wallet',
+        staffId: 'andi',
+        branchId: 'cemara',
+        userId: 'customer',
+        staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
+        packageName: 'Andi 5 jam',
+        ...terms,
+      }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       update: vi.fn(),
       create: vi
@@ -93,29 +91,25 @@ beforeEach(() => {
         .mockImplementation(({ data }) => ({ ...data, id: 'wallet' })),
     },
     slot: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'coach-slot',
-          staffId: 'andi',
-          branchId: 'cemara',
-          ...range,
-        }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'coach-slot',
+        staffId: 'andi',
+        branchId: 'cemara',
+        ...range,
+      }),
     },
     bookingDetail: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'detail',
-          slotId: 'court-slot',
-          discountPrice: 300000,
-          slot: {
-            id: 'court-slot',
-            branchId: 'cemara',
-            court: { sport: 'PADEL' },
-            ...range,
-          },
-        }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'detail',
+        slotId: 'court-slot',
+        discountPrice: 300000,
+        slot: {
+          id: 'court-slot',
+          branchId: 'cemara',
+          court: { sport: 'PADEL' },
+          ...range,
+        },
+      }),
       update: vi.fn(),
     },
     bookingCoachType: { findFirst: vi.fn().mockResolvedValue({ id: 'type' }) },
@@ -363,4 +357,83 @@ it('does not allow transferring a plan to another coach', async () => {
       isActive: true,
     }),
   ).rejects.toThrow(/Coach paket/)
+})
+
+it.each([1, 3])(
+  'charges a single-hour tariff for %s participants without debiting prepaid quota',
+  async (participants) => {
+    tx.inHousePlan.findFirst.mockResolvedValue({
+      id: 'single',
+      hours: 1,
+      name: 'Andi satuan',
+      staffId: 'andi',
+      branchId: 'cemara',
+      hourlyPrice: 1000000,
+      courtHourlyShare: 250000,
+      extraParticipantHourlyPrice: 100000,
+      staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
+    })
+    const result = await redeemInHouseSelections(tx, {
+      ...input(),
+      selections: [
+        {
+          planId: 'single',
+          courtSlotId: 'court-slot',
+          coachSlotId: 'coach-slot',
+          participants,
+        },
+      ],
+    })
+    expect(result).toEqual({
+      coveredCourtAmount: 300000,
+      courtPriceAdjustment: 50000,
+      extraAmount: 1000000 + (participants - 1) * 100000,
+    })
+    expect(tx.inHousePlan.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'single', hours: 1, isActive: true },
+      }),
+    )
+    expect(tx.inHouseWallet.updateMany).not.toHaveBeenCalled()
+    expect(tx.bookingCoach.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        price: 750000 + (participants - 1) * 100000,
+      }),
+    })
+    expect(tx.bookingCoach.create.mock.calls[0][0].data).not.toHaveProperty(
+      'inHouseUsage',
+    )
+  },
+)
+it('rejects an inactive or non-single-hour plan before recording a direct session', async () => {
+  tx.inHousePlan.findFirst.mockResolvedValue(null)
+  await expect(
+    redeemInHouseSelections(tx, {
+      ...input(),
+      selections: [
+        {
+          planId: 'five-hour',
+          courtSlotId: 'court-slot',
+          coachSlotId: 'coach-slot',
+          participants: 1,
+        },
+      ],
+    }),
+  ).rejects.toThrow()
+  expect(tx.bookingCoach.create).not.toHaveBeenCalled()
+})
+it('does not accept browser prices or combine a wallet with a single tariff', () => {
+  const direct = {
+    planId: 'single',
+    courtSlotId: 'court',
+    coachSlotId: 'coach',
+    participants: 1,
+  }
+  expect(inHouseSelectionSchema.safeParse(direct).success).toBe(true)
+  expect(
+    inHouseSelectionSchema.safeParse({ ...direct, hourlyPrice: 1 }).success,
+  ).toBe(false)
+  expect(
+    inHouseSelectionSchema.safeParse({ ...direct, walletId: 'wallet' }).success,
+  ).toBe(false)
 })

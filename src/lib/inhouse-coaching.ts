@@ -17,14 +17,16 @@ export const inHousePlanSchema = z
     (v) => v.courtHourlyShare <= v.hourlyPrice,
     'Bagian lapangan melebihi harga paket.',
   )
-export const inHouseSelectionSchema = z
-  .object({
-    walletId: z.string().min(1),
-    courtSlotId: z.string().min(1),
-    coachSlotId: z.string().min(1),
-    participants: z.number().int().min(1).max(100),
-  })
-  .strict()
+const sessionFields = {
+  courtSlotId: z.string().min(1),
+  coachSlotId: z.string().min(1),
+  participants: z.number().int().min(1).max(100),
+}
+export const INHOUSE_COACH_TYPE = 'Coaching In-house'
+export const inHouseSelectionSchema = z.union([
+  z.object({ walletId: z.string().min(1), ...sessionFields }).strict(),
+  z.object({ planId: z.string().min(1), ...sessionFields }).strict(),
+])
 export type InHouseSelection = z.infer<typeof inHouseSelectionSchema>
 
 export function priceInHouseHour(
@@ -43,4 +45,13 @@ export function priceInHouseHour(
     coachAmount: terms.hourlyPrice - terms.courtHourlyShare,
     extraAmount,
   }
+}
+
+export function isInHouseService(item: {
+  inHouseUsage?: unknown
+  bookingCoachType?: { name: string } | null
+}) {
+  return (
+    !!item.inHouseUsage || item.bookingCoachType?.name === INHOUSE_COACH_TYPE
+  )
 }

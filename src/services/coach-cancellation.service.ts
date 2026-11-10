@@ -1,3 +1,4 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { db } from '@/lib/prisma'
 import { courtBookingCutoff } from '@/lib/booking-time-policy'
@@ -12,6 +13,7 @@ async function cancellationContext(
   const item = await client.bookingCoach.findFirst({
     where: { id },
     include: {
+      bookingCoachType: true,
       inHouseUsage: true,
       slot: { include: { staff: { select: { id: true, name: true } } } },
       booking: { include: { invoice: true } },
@@ -21,7 +23,7 @@ async function cancellationContext(
     throw new NotFoundException(
       'Pemesanan coach tidak ditemukan di cabang ini.',
     )
-  if (item.inHouseUsage)
+  if (isInHouseService(item))
     throw new BadRequestException(
       'Sesi paket in-house sudah mencakup lapangan. Batalkan booking lapangan agar jadwal dan kuota dikembalikan bersama.',
     )

@@ -1,3 +1,4 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
 import { setCoachClubSettlement } from '@/services/coach-club-settlement.service'
 import { validateCoachGroups } from '@/services/coaching-group.service'
 import {
@@ -384,7 +385,11 @@ export const listCoachingBookingsHandler = factory.createHandlers(
     const items =
       kind === 'COACH'
         ? await db.bookingCoach.findMany({
-            include: { ...include, inHouseUsage: { select: { id: true } } },
+            include: {
+              ...include,
+              bookingCoachType: true,
+              inHouseUsage: { select: { id: true } },
+            },
             where,
             orderBy: { createdAt: 'desc' },
             take: 500,
@@ -400,7 +405,7 @@ export const listCoachingBookingsHandler = factory.createHandlers(
         items.map((item) => ({
           id: item.id,
           bookingId: item.bookingId,
-          isInHouse: 'inHouseUsage' in item && !!item.inHouseUsage,
+          isInHouse: 'inHouseUsage' in item && isInHouseService(item),
           createdAt: item.createdAt,
           ...('isClubSettled' in item
             ? {

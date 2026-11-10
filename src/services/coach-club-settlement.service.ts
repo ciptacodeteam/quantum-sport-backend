@@ -1,3 +1,4 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { db } from '@/lib/prisma'
 
@@ -18,13 +19,17 @@ export async function setCoachClubSettlement(
     await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${initial.bookingId} FOR UPDATE`
     const current = await tx.bookingCoach.findFirst({
       where: { id },
-      include: { inHouseUsage: true, booking: { include: { invoice: true } } },
+      include: {
+        bookingCoachType: true,
+        inHouseUsage: true,
+        booking: { include: { invoice: true } },
+      },
     })
     if (!current)
       throw new NotFoundException(
         'Pemesanan coach tidak ditemukan di cabang ini.',
       )
-    if (current.inHouseUsage)
+    if (isInHouseService(current))
       throw new BadRequestException(
         'Paket in-house dicatat pada laporan in-house, bukan settlement club.',
       )

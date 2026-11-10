@@ -1,3 +1,4 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
 import { ensureServiceScheduleRange } from './service-schedule-range.service'
 import {
   linkedCoachSessionPrice,
@@ -187,6 +188,7 @@ export async function coachingCourtDetail(
             where: { status: { not: 'CANCELLED' } },
             select: {
               courtSlotId: true,
+              bookingCoachType: { select: { name: true } },
               inHouseUsage: { select: { id: true, restoredAt: true } },
             },
           },
@@ -204,8 +206,8 @@ export async function coachingCourtDetail(
     detail.booking.coaches?.some(
       (item) =>
         item.courtSlotId === detail.slotId &&
-        item.inHouseUsage &&
-        !item.inHouseUsage.restoredAt,
+        isInHouseService(item) &&
+        !item.inHouseUsage?.restoredAt,
     )
   )
     throw new BadRequestException(

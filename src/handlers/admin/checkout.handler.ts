@@ -44,6 +44,7 @@ const adminCheckoutSchema = z
     name: z.string().min(1).optional(),
     phone: z.string().min(5).optional(),
     totalHours: z.number().positive(),
+    expectedTotal: z.number().int().nonnegative().optional(),
     courtSlots: z.array(z.string()).optional(),
     coachSlots: z.array(z.string()).optional(),
     inHouseSelections: z
@@ -290,7 +291,9 @@ export const adminCheckoutHandler = factory.createHandlers(
     const inHouseSelections = c.req.valid('json').inHouseSelections
     if (
       inHouseSelections?.length &&
-      (!inputUserId || useMembership || recurringBooking)
+      ((inHouseSelections.some((s) => 'walletId' in s) && !inputUserId) ||
+        useMembership ||
+        recurringBooking)
     )
       throw new BadRequestException(
         'Pilih customer dan nonaktifkan membership lapangan/booking rutin untuk memakai paket in-house.',
@@ -1077,6 +1080,14 @@ export const adminCheckoutHandler = factory.createHandlers(
             `User ${resolvedUserId} has no active membership with available sessions for ${totalHours} hours`,
           )
         }
+
+        // Reject stale browser quotes before recording any payment; the transaction
+        // rolls back slot claims and quota debits as well.
+        const expectedTotal = c.req.valid('json').expectedTotal
+        if (expectedTotal !== undefined && expectedTotal !== totalPrice)
+          throw new BadRequestException(
+            'Total pembayaran berubah. Muat ulang harga dan periksa kembali ringkasan sebelum mengonfirmasi.',
+          )
 
         // Update totals on booking
         // (totalPrice already excludes court costs if covered by membership)

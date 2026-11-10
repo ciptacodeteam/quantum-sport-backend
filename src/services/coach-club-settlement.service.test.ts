@@ -105,8 +105,11 @@ it('rejects a booking absent from the selected branch', async () => {
   expect(mocks.update).not.toHaveBeenCalled()
 })
 
-it('does not settle in-house quota sessions as club payables', async () => {
-  mocks.find.mockResolvedValue(pack({ inHouseUsage: { id: 'usage' } }))
+it.each([
+  { inHouseUsage: { id: 'usage' } },
+  { inHouseUsage: null, bookingCoachType: { name: 'Coaching In-house' } },
+])('does not settle in-house sessions as club payables: %j', async (source) => {
+  mocks.find.mockResolvedValue(pack(source))
   await expect(
     setCoachClubSettlement(
       'coach-line',

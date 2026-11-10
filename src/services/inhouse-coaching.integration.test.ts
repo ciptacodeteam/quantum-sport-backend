@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { withBranchContext } from '@/lib/branch-context'
 const url = process.env.TEST_INHOUSE_DATABASE_URL
@@ -35,6 +35,16 @@ run('in-house coaching transactions', () => {
         role: 'COACH',
         coachType: 'PADEL',
         adminServiceOnly: true,
+      },
+    })
+    await raw.staff.create({
+      data: {
+        id: `${prefix}-cashier`,
+        branchId: branch,
+        name: 'Cashier',
+        email: `${prefix}-cashier@test.invalid`,
+        password: 'unused',
+        role: 'CASHIER',
       },
     })
     const plan = await context(() =>
@@ -280,4 +290,127 @@ run('in-house coaching transactions', () => {
       ),
     ).toBeNull()
   })
+  it.each([
+    { hours: 1, participants: 1, hourlyPrice: 1000000, courtShare: 250000 },
+    { hours: 2, participants: 1, hourlyPrice: 1000000, courtShare: 250000 },
+    { hours: 2, participants: 3, hourlyPrice: 800000, courtShare: 200000 },
+  ])(
+    'checks out $hours direct hours with $participants participants using real database accounting',
+    async ({ hours, participants, hourlyPrice, courtShare }) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2040-11-01T00:00:00Z'))
+      try {
+        await context(() =>
+          service.saveInHousePlan(planId, {
+            staffId,
+            name: 'Tarif satuan',
+            hours: 1,
+            hourlyPrice,
+            courtHourlyShare: courtShare,
+            extraParticipantHourlyPrice: 100000,
+            isActive: true,
+          }),
+        )
+        const firstHour = hours === 1 ? 10 : participants === 1 ? 11 : 13
+        const slots = await Promise.all(
+          Array.from({ length: hours }, (_, index) =>
+            prepareHour(firstHour + index),
+          ),
+        )
+        await raw.slot.updateMany({
+          where: { id: { in: slots.map((s) => s.court.id) } },
+          data: { isAvailable: true },
+        })
+        const walletBefore = await raw.inHouseWallet.findMany({
+          where: { branchId: branch },
+          orderBy: { id: 'asc' },
+        })
+        const { adminCheckoutHandler } =
+          await import('@/handlers/admin/checkout.handler')
+        const total = hours * (hourlyPrice + (participants - 1) * 100000)
+        const payload = {
+          expectedTotal: total + 1,
+          userId,
+          totalHours: hours,
+          courtSlots: slots.map((s) => s.court.id),
+          useMembership: false,
+          paymentMethodId,
+          inHouseSelections: slots.map((s) => ({
+            planId,
+            courtSlotId: s.court.id,
+            coachSlotId: s.coach.id,
+            participants,
+          })),
+        }
+        const checkout = () =>
+          context(() =>
+            (adminCheckoutHandler.at(-1) as any)({
+              req: { valid: () => payload },
+              get: () => ({ id: `${prefix}-cashier`, role: 'CASHIER' }),
+              var: {
+                logger: {
+                  info: vi.fn(),
+                  warn: vi.fn(),
+                  fatal: vi.fn(),
+                  error: vi.fn(),
+                },
+              },
+              json: (body: any) => body,
+            }),
+          )
+        const previousBookings = await raw.booking.count({
+          where: { branchId: branch },
+        })
+        await expect(checkout()).rejects.toThrow(/Total pembayaran berubah/)
+        expect(await raw.booking.count({ where: { branchId: branch } })).toBe(
+          previousBookings,
+        )
+        expect(
+          await raw.slot.count({
+            where: {
+              id: { in: slots.flatMap((s) => [s.court.id, s.coach.id]) },
+              isAvailable: true,
+            },
+          }),
+        ).toBe(hours * 2)
+        payload.expectedTotal = total
+        const result = await checkout()
+        expect(result.success).toBe(true)
+        const invoice = await raw.invoice.findUniqueOrThrow({
+          where: { id: result.data.invoiceId },
+          include: {
+            payment: true,
+            booking: { include: { coaches: true, details: true } },
+          },
+        })
+        expect(invoice.total).toBe(total)
+        expect(invoice.payment).toMatchObject({
+          amount: total,
+          paymentMethodId,
+          status: 'PAID',
+        })
+        expect(invoice.booking).toMatchObject({
+          totalPrice: total,
+          courtDiscountPrice: courtShare * hours,
+        })
+        expect(
+          invoice.booking!.coaches.reduce((sum, coach) => sum + coach.price, 0),
+        ).toBe((hourlyPrice - courtShare + (participants - 1) * 100000) * hours)
+        expect(
+          invoice.booking!.details.reduce(
+            (sum, court) => sum + court.discountPrice,
+            0,
+          ),
+        ).toBe(courtShare * hours)
+        expect(
+          await raw.inHouseWallet.findMany({
+            where: { branchId: branch },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual(walletBefore)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
 })

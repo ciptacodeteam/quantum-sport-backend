@@ -699,6 +699,8 @@ const ballboySelectionSchema = z.union([
 
 // Checkout schema
 export const checkoutSchema = z.object({
+  // In-house coaching is an admin-only sale, never a customer checkout option.
+  inHouseSelections: z.never().optional(),
   bookingId: z.string().optional(), // Optional: for updating existing DRAFT booking
   paymentMethodId: z.string(),
   useMembership: z.boolean().optional().default(true),
@@ -940,6 +942,8 @@ export type CreditCardPaymentSchema = z.infer<typeof creditCardPaymentSchema>
 
 // Update checkout schema to support credit card
 export const extendedCheckoutSchema = z.object({
+  // In-house coaching is an admin-only sale, never a customer checkout option.
+  inHouseSelections: z.never().optional(),
   bookingId: z.string().optional(),
   paymentMethodId: z.string().optional(),
   useMembership: z.boolean().optional().default(true),
@@ -971,6 +975,8 @@ export const extendedCheckoutSchema = z.object({
 export type ExtendedCheckoutSchema = z.infer<typeof extendedCheckoutSchema>
 
 export const applyPromoCodeSchema = z.object({
+  // In-house coaching is an admin-only sale, never a customer checkout option.
+  inHouseSelections: z.never().optional(),
   promoCode: z.string().min(3).max(50).regex(promoCodeRegex, {
     message: 'Promo code must be alphanumeric without spaces',
   }),

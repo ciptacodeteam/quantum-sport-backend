@@ -1,3 +1,4 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
 import { db } from '@/lib/prisma'
 import { formatClubWallClock } from '@/lib/club-time'
 import type { Prisma } from '@prisma/client'
@@ -9,6 +10,7 @@ export const serviceIncomeInclude = {
     include: {
       coaches: {
         include: {
+          bookingCoachType: true,
           inHouseUsage: true,
           slot: { include: { staff: { select: { id: true, name: true } } } },
         },
@@ -123,7 +125,7 @@ export function buildServiceIncome(
       if (
         item.service === 'COACH' &&
         'inHouseUsage' in item &&
-        item.inHouseUsage
+        isInHouseService(item)
       )
         return
       // Keep settled prices in allocation so their share never moves to another club.

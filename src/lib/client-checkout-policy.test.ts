@@ -24,3 +24,21 @@ it('allows customers to purchase ballboy slots independently', () => {
     assertClientCheckoutAddOnsAllowed({ ballboySlots: ['ballboy-slot'] }),
   ).not.toThrow()
 })
+
+it('rejects in-house selections at customer checkout and promo endpoints', async () => {
+  const { checkoutSchema, extendedCheckoutSchema, applyPromoCodeSchema } =
+    await import('./validation')
+  for (const schema of [
+    checkoutSchema,
+    extendedCheckoutSchema,
+    applyPromoCodeSchema,
+  ]) {
+    expect(
+      schema.safeParse({
+        paymentMethodId: 'cash',
+        promoCode: 'PROMO',
+        inHouseSelections: [{ planId: 'single' }],
+      }).success,
+    ).toBe(false)
+  }
+})

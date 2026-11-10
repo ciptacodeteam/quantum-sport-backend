@@ -3,6 +3,7 @@ import { db } from '@/lib/prisma'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import {
   inHousePlanSchema,
+  INHOUSE_COACH_TYPE,
   priceInHouseHour,
   type InHouseSelection,
 } from '@/lib/inhouse-coaching'
@@ -165,7 +166,11 @@ export async function redeemInHouseSelections(
   let coveredCourtAmount = 0,
     courtPriceAdjustment = 0,
     extraAmount = 0
-  for (const id of [...new Set(selections.map((s) => s.walletId))].sort())
+  for (const id of [
+    ...new Set(
+      selections.flatMap((s) => ('walletId' in s ? [s.walletId] : [])),
+    ),
+  ].sort())
     await tx.$queryRaw`SELECT id FROM inhouse_wallets WHERE id = ${id} FOR UPDATE`
   // Reserve every coach slot together to enforce overlap checks across all selected coaches.
   await claimSlotsAtomically(tx, {
@@ -173,20 +178,34 @@ export async function redeemInHouseSelections(
     type: 'COACH',
   })
   const coachType = await tx.bookingCoachType.findFirst({
-    where: { name: 'Coaching In-house' },
+    where: { name: INHOUSE_COACH_TYPE },
   })
   if (!coachType)
     throw new BadRequestException(
       'Jenis layanan in-house belum tersedia. Terapkan migrasi coaching in-house terlebih dahulu.',
     )
   for (const selection of selections) {
-    const wallet = await tx.inHouseWallet.findFirst({
-      where: { id: selection.walletId, userId, invoice: { status: 'PAID' } },
-      include: { staff: true },
-    })
-    if (!wallet || !wallet.staff.isActive || wallet.staff.role !== 'COACH')
+    const prepaid = 'walletId' in selection
+    if (!prepaid)
+      await tx.$queryRaw`SELECT id FROM inhouse_plans WHERE id = ${selection.planId} FOR SHARE`
+    const terms = prepaid
+      ? await tx.inHouseWallet.findFirst({
+          where: {
+            id: selection.walletId,
+            userId,
+            invoice: { status: 'PAID' },
+          },
+          include: { staff: true },
+        })
+      : await tx.inHousePlan.findFirst({
+          where: { id: selection.planId, hours: 1, isActive: true },
+          include: { staff: true },
+        })
+    if (!terms || !terms.staff.isActive || terms.staff.role !== 'COACH')
       throw new BadRequestException(
-        'Kuota in-house tidak tersedia untuk customer ini.',
+        prepaid
+          ? 'Kuota in-house tidak tersedia untuk customer ini.'
+          : 'Tarif satuan 1 jam atau coach tidak tersedia.',
       )
     const court = await tx.bookingDetail.findFirst({
       where: { bookingId, slotId: selection.courtSlotId },
@@ -195,7 +214,7 @@ export async function redeemInHouseSelections(
     const coach = await tx.slot.findFirst({
       where: {
         id: selection.coachSlotId,
-        staffId: wallet.staffId,
+        staffId: terms.staffId,
         type: 'COACH',
         scheduleClosed: false,
       },
@@ -204,8 +223,8 @@ export async function redeemInHouseSelections(
       !input.courtSlotIds.includes(selection.courtSlotId) ||
       !court ||
       !coach ||
-      court.slot.branchId !== wallet.branchId ||
-      coach.branchId !== wallet.branchId ||
+      court.slot.branchId !== terms.branchId ||
+      coach.branchId !== terms.branchId ||
       +coach.startAt !== +court.slot.startAt ||
       +coach.endAt !== +court.slot.endAt ||
       +coach.endAt - +coach.startAt !== 3600000
@@ -215,7 +234,7 @@ export async function redeemInHouseSelections(
       )
     assertCoachingSport(
       'COACH',
-      wallet.staff.coachType,
+      terms.staff.coachType,
       court.slot.court?.sport ?? 'PADEL',
     )
     if (
@@ -226,32 +245,38 @@ export async function redeemInHouseSelections(
       throw new BadRequestException(
         'Paket in-house dan coach club tidak dapat dipakai pada jam yang sama.',
       )
-    const debit = await tx.inHouseWallet.updateMany({
-      where: { id: wallet.id, userId, remainingMinutes: { gte: 60 } },
-      data: { remainingMinutes: { decrement: 60 } },
-    })
-    if (debit.count !== 1)
-      throw new BadRequestException(
-        'Sisa kuota coaching tidak cukup. Muat ulang pilihan paket.',
-      )
-    const price = priceInHouseHour(wallet, selection.participants)
+    if (prepaid) {
+      const debit = await tx.inHouseWallet.updateMany({
+        where: { id: terms.id, userId, remainingMinutes: { gte: 60 } },
+        data: { remainingMinutes: { decrement: 60 } },
+      })
+      if (debit.count !== 1)
+        throw new BadRequestException(
+          'Sisa kuota coaching tidak cukup. Muat ulang pilihan paket.',
+        )
+    }
+    const price = priceInHouseHour(terms, selection.participants)
     await tx.bookingCoach.create({
       data: {
         bookingId,
         slotId: coach.id,
         courtSlotId: court.slotId,
         bookingCoachTypeId: coachType.id,
-        price: price.extraAmount,
-        description: `In-house ${wallet.packageName}; ${selection.participants} peserta`,
-        inHouseUsage: {
-          create: {
-            branchId: wallet.branchId,
-            walletId: wallet.id,
-            minutes: 60,
-            participants: selection.participants,
-            ...price,
-          },
-        },
+        price: price.extraAmount + (prepaid ? 0 : price.coachAmount),
+        description: `In-house ${prepaid ? ('packageName' in terms ? terms.packageName : '') : `satuan ${'name' in terms ? terms.name : '1 jam'}`}; ${selection.participants} peserta`,
+        ...(prepaid
+          ? {
+              inHouseUsage: {
+                create: {
+                  branchId: terms.branchId,
+                  walletId: terms.id,
+                  minutes: 60,
+                  participants: selection.participants,
+                  ...price,
+                },
+              },
+            }
+          : {}),
       },
     })
     await tx.bookingDetail.update({
@@ -260,7 +285,7 @@ export async function redeemInHouseSelections(
     })
     coveredCourtAmount += court.discountPrice
     courtPriceAdjustment += court.discountPrice - price.courtAmount
-    extraAmount += price.extraAmount
+    extraAmount += price.extraAmount + (prepaid ? 0 : terms.hourlyPrice)
   }
   return { coveredCourtAmount, courtPriceAdjustment, extraAmount }
 }

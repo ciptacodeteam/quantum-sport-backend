@@ -1,3 +1,4 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
 import {
   coachingGroupMembershipSelect,
   eligibleCoachingGroups,
@@ -16,6 +17,7 @@ async function getReplacementContext(client: Client, id: string, now: Date) {
   const current = await client.bookingCoach.findFirst({
     where: { id },
     include: {
+      bookingCoachType: true,
       inHouseUsage: true,
       slot: { include: { staff: true } },
       courtSlot: { include: { court: true } },
@@ -40,7 +42,7 @@ async function getReplacementContext(client: Client, id: string, now: Date) {
     throw new BadRequestException(
       'Coach hanya dapat diganti pada booking terkonfirmasi.',
     )
-  if (current.inHouseUsage)
+  if (isInHouseService(current))
     throw new BadRequestException(
       'Kuota paket terikat pada coach. Batalkan sesi untuk mengembalikan kuota, lalu booking ulang dengan coach paket yang sama.',
     )

@@ -10,6 +10,16 @@ Admin menu: **Master Data → Coaching In-house** (`/admin/coaching-inhouse`).
 4. In **Booking Lapangan → Tambah Layanan**, eligible paid packages appear only for their owner, branch and sport. Nothing is selected automatically. Each explicit package choice reserves one hour with its own coach and participant count. Court membership and recurring court bookings cannot cover the same checkout. Selecting club coaching clears any package choice on that playing hour; selecting a package clears club choices on that hour.
 5. Packages can be consumed on different dates, are bound to the original coach, and currently have no expiry date. Rates are copied to the wallet on purchase. Catalog edits only affect subsequent purchases.
 
+## Coaching satuan (admin only)
+
+Configure an active **1-hour** product for each coach in **Master Data → Coaching In-house → Paket & Tarif**. In **Booking Lapangan → Tambah Layanan**, select **Coaching satuan** for each court hour to coach, then choose the offline payment method. Two selected hours use the 1-hour tariff twice; there is no need to create or sell a 2-hour product or prepaid wallet. Direct coaching also supports walk-in customers.
+
+The direct amount due per hour is the coach-specific 1-hour tariff plus Rp100,000 for each additional participant. The ordinary court charge is replaced in full. For a Rp1,000,000 tariff with Rp250,000 court allocation, a two-hour booking costs Rp2,000,000: Rp500,000 court and Rp1,500,000 coach. Two additional participants add Rp400,000 for those two hours, all allocated to the coach. No club bundle discount is added to those hours. Other selected court hours and ballboy services retain their existing prices.
+
+Direct sessions save the court allocation and coach amount on the booking lines and appear on its paid invoice. They do not issue, consume or restore prepaid quota; **Riwayat & Pembagian** remains the prepaid redemption ledger. Both direct and prepaid in-house sessions are excluded from club settlement. Cancel or reschedule through their linked court booking so the bundled court and coaching stay together.
+
+The server re-reads active 1-hour terms, checks branch/sport/coach availability and calculates every amount inside checkout's transaction. Customer checkout and promo endpoints reject `inHouseSelections`; the customer-facing UI has no in-house selection controls.
+
 The prepaid package covers the selected court hour in full. For a normal court price of Rp300,000 and package court share of Rp250,000, the court allocation is Rp250,000 and the customer is not charged for that court hour again. The entire Rp100,000 per additional participant per hour is allocated to the coach. Other court hours and other services remain payable normally.
 
 **Riwayat & Pembagian** lists the saved base coach share, court share and extra participant amount per redemption. Cancelled rows are marked and retain their history. Package purchases appear in invoices and Income as **Paket Coach In-house**. Redemption does not count the original package sale again. In-house allocations are excluded from club payables and club settlement controls.
