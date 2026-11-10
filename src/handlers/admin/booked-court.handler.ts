@@ -1,3 +1,4 @@
+import { rescheduleCourtServices } from '@/services/reschedule-court-services.service'
 import { cancelCourtBookingServices } from '@/services/court-service-cancellation.service'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
@@ -984,7 +985,13 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
               'Pembayaran harus lunas sebelum reschedule.',
             )
           }
-          if (!canRescheduleAt(bookingDetail.slot.startAt)) {
+          if (
+            !canRescheduleAt(
+              bookingDetail.slot.startAt,
+              new Date(),
+              c.get('admin')?.role,
+            )
+          ) {
             throw new BadRequestException(
               'Reschedule maksimal H-2 (minimal 48 jam sebelum jadwal asal).',
             )
@@ -1101,63 +1108,14 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             )
           }
 
-          // Before actually moving the court slot, check if there are coach slots
-          // at the same time that also need to be moved. If any corresponding
-          // coach slot is not available at the new time, block the reschedule.
-          const relatedCoaches = bookingDetail.booking.coaches.filter(
-            (coach) => {
-              return (
-                dayjs(coach.slot.startAt).isSame(bookingDetail.slot.startAt) &&
-                dayjs(coach.slot.endAt).isSame(bookingDetail.slot.endAt)
-              )
-            },
+          await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${bookingDetail.booking.id} FOR UPDATE`
+          await rescheduleCourtServices(
+            tx,
+            bookingDetail.booking.id,
+            bookingDetail.slot,
+            newSlot,
+            bookingDetail.booking.branchId,
           )
-
-          const coachSlotReplacements: {
-            bookingCoachId: string
-            oldSlotId: string
-            newSlotId: string
-          }[] = []
-
-          for (const coach of relatedCoaches) {
-            const coachSlot = await tx.slot.findFirst({
-              where: {
-                type: SlotType.COACH,
-                staffId: coach.slot.staffId,
-                startAt: newSlot.startAt,
-                endAt: newSlot.endAt,
-                isAvailable: true,
-              },
-              include: {
-                bookingCoaches: {
-                  where: {
-                    status: {
-                      not: BookingStatus.CANCELLED,
-                    },
-                    booking: {
-                      status: {
-                        not: BookingStatus.CANCELLED,
-                      },
-                    },
-                  },
-                  select: { id: true },
-                  take: 1,
-                },
-              },
-            })
-
-            if (!coachSlot || coachSlot.bookingCoaches.length > 0) {
-              throw new BadRequestException(
-                'Selected slot is not available for the assigned coach at the new time',
-              )
-            }
-
-            coachSlotReplacements.push({
-              bookingCoachId: coach.id,
-              oldSlotId: coach.slotId,
-              newSlotId: coachSlot.id,
-            })
-          }
 
           // Claim before releasing the original slot. Concurrent attempts cannot both win.
           const claimed = await tx.slot.updateMany({
@@ -1194,33 +1152,6 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
               court: true,
             },
           })
-
-          // Apply coach slot moves (if any)
-          for (const item of coachSlotReplacements) {
-            // release old coach slot
-            await tx.slot.update({
-              where: { id: item.oldSlotId },
-              data: {
-                isAvailable: true,
-              },
-            })
-
-            // lock new coach slot
-            await tx.slot.update({
-              where: { id: item.newSlotId },
-              data: {
-                isAvailable: false,
-              },
-            })
-
-            // move booking coach to new slot
-            await tx.bookingCoach.update({
-              where: { id: item.bookingCoachId },
-              data: {
-                slotId: item.newSlotId,
-              },
-            })
-          }
 
           const priceDifference = 0
           const updatedBooking = bookingDetail.booking

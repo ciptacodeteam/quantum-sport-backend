@@ -18,6 +18,9 @@ vi.mock('@/lib/prisma', () => ({
     $transaction: (fn: (tx: unknown) => unknown, options?: unknown) => {
       mocks.transaction(options)
       return fn({
+        $queryRaw: vi.fn(),
+        bookingCoach: { findMany: vi.fn().mockResolvedValue([]) },
+        bookingBallboy: { findMany: vi.fn().mockResolvedValue([]) },
         bookingDetail: { findUnique: mocks.detail, update: mocks.updateDetail },
         slot: {
           findUnique: mocks.slot,
@@ -73,11 +76,17 @@ function setup(source: 'PADEL' | 'TENNIS', target: 'PADEL' | 'TENNIS') {
   })
 }
 beforeEach(() => vi.clearAllMocks())
-const execute = () =>
+const execute = (role = 'CASHIER', requestedRole?: string) =>
   (rescheduleCourtBookingHandler[2] as any)({
+    get: () => ({ id: 'actor', role }),
     req: {
       valid: (key: string) =>
-        key === 'param' ? { id: 'detail' } : { newSlotId: 'new' },
+        key === 'param'
+          ? { id: 'detail' }
+          : {
+              newSlotId: 'new',
+              ...(requestedRole ? { role: requestedRole } : {}),
+            },
     },
     var: { logger: { fatal: vi.fn() } },
     json: (body: unknown, status: number) => ({ body, status }),
@@ -299,4 +308,56 @@ it('allows an eligible membership move without changing a paid invoice total', a
   const result = await execute()
   expect(result.body.data.priceDifference).toBe(0)
   expect(result.body.data.updatedBooking.totalPrice).toBe(0)
+})
+
+it.each([
+  '2040-01-04T02:00:00Z',
+  '2040-01-05T02:30:00Z',
+  '2040-01-05T04:00:00Z',
+])(
+  'allows only super admin to bypass the original booking deadline at %s',
+  async (now) => {
+    setup('PADEL', 'PADEL')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(now))
+    try {
+      await expect(execute('CASHIER')).rejects.toThrow('minimal 48 jam')
+      await expect(execute('ADMIN')).rejects.toThrow('minimal 48 jam')
+      expect(mocks.claimSlot).not.toHaveBeenCalled()
+      expect((await execute('SUPER_ADMIN')).status).toBe(200)
+    } finally {
+      vi.useRealTimers()
+    }
+  },
+)
+it('still rejects an unavailable target for super admin despite the deadline exemption', async () => {
+  setup('PADEL', 'PADEL')
+  mocks.slot.mockResolvedValue({ ...(await mocks.slot()), isAvailable: false })
+  await expect(execute('SUPER_ADMIN')).rejects.toThrow('no longer available')
+  expect(mocks.claimSlot).not.toHaveBeenCalled()
+})
+
+it('does not accept a forged super-admin role from the request body', async () => {
+  setup('PADEL', 'PADEL')
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2040-01-05T02:30:00Z'))
+  try {
+    await expect(execute('CASHIER', 'SUPER_ADMIN')).rejects.toThrow(
+      'minimal 48 jam',
+    )
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(mocks.claimSlot).not.toHaveBeenCalled()
+})
+it('still forbids a past replacement slot for super admin', async () => {
+  setup('PADEL', 'PADEL')
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2040-01-07T00:00:00Z'))
+  try {
+    await expect(execute('SUPER_ADMIN')).rejects.toThrow('already passed')
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(mocks.claimSlot).not.toHaveBeenCalled()
 })

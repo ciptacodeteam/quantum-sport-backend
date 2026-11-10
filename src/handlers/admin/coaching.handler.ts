@@ -323,7 +323,7 @@ export const attachCoachingHandler = factory.createHandlers(
           .strict()
           .optional(),
         coachingGroupId: z.string().min(1).optional(),
-        paymentMethodId: z.string().min(1).optional(),
+        paymentMethodId: z.string().min(1),
       })
       .strict()
       .refine((v) => !!v.slotId !== !!v.slotIds, 'Pilih layanan.'),

@@ -94,31 +94,12 @@ beforeEach(() => {
         .mockRejectedValue(
           new Error('Hanya super admin yang dapat mengubah katalog bersama.'),
         ),
-      findFirst: vi.fn().mockImplementation(async (args) => {
-        const context = branchContext.getStore()
-        if (context)
-          await scopeBranchOperation(
-            {},
-            'PaymentMethod',
-            'findFirst',
-            args,
-            context,
-          )
-        return args.where.channel
-          ? {
-              id: 'manual',
-              isActive: true,
-              channel: args.where.channel,
-              fees: 0,
-              percentage: 0,
-            }
-          : {
-              id: 'va',
-              isActive: true,
-              channel: 'BCA_VIRTUAL_ACCOUNT',
-              fees: 4000,
-              percentage: 1,
-            }
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'cash',
+        name: 'Tunai Kasir',
+        isActive: true,
+        isOffline: true,
+        channel: null,
       }),
     },
     invoice: {
@@ -143,13 +124,13 @@ it.each([
   { ids: ['ballboy'], price: 45000 },
   { ids: ['coach', 'ballboy'], price: 195000 },
 ])(
-  'immediately confirms and pays $ids without a payment method or gateway',
+  'immediately confirms and pays $ids with a recorded offline method and no gateway',
   async ({ ids, price }) => {
     const result = await attachCoachingService(
       'detail',
       ids,
       'cashier',
-      undefined,
+      'cash',
       now,
     )
     expect(result).toMatchObject({ status: 'PAID', total: price })
@@ -170,20 +151,27 @@ it.each([
     for (const model of [mocks.tx.bookingCoach, mocks.tx.bookingBallboy])
       for (const [args] of model.create.mock.calls)
         expect(args.data.status).toBe('CONFIRMED')
-    expect(mocks.tx.paymentMethod.findFirst).not.toHaveBeenCalled()
-    expect(mocks.tx.payment.create).not.toHaveBeenCalled()
+    expect(mocks.tx.paymentMethod.findFirst).toHaveBeenCalled()
+    expect(mocks.tx.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethodId: 'cash',
+          status: 'PAID',
+          amount: price,
+          fees: 0,
+          paidAt: now,
+        }),
+      }),
+    )
+    expect(mocks.tx.invoice.create.mock.calls[0][0].data.paymentId).toBe(
+      'payment',
+    )
     expect(mocks.gateway).not.toHaveBeenCalled()
   },
 )
 it('rejects duplicate selections before claiming slots', async () => {
   await expect(
-    attachCoachingService(
-      'detail',
-      ['coach', 'coach'],
-      'cashier',
-      undefined,
-      now,
-    ),
+    attachCoachingService('detail', ['coach', 'coach'], 'cashier', 'cash', now),
   ).rejects.toThrow('maksimal')
   expect(mocks.claim).not.toHaveBeenCalled()
 })
@@ -192,7 +180,7 @@ it('propagates a failed second claim without creating partial billing records', 
     .mockResolvedValueOnce(undefined)
     .mockRejectedValueOnce(new Error('Slot sudah dibooking'))
   await expect(
-    attachCoachingService('detail', ['coach', 'ballboy'], 'admin', 'va', now),
+    attachCoachingService('detail', ['coach', 'ballboy'], 'admin', 'cash', now),
   ).rejects.toThrow('sudah dibooking')
   expect(mocks.tx.booking.create).not.toHaveBeenCalled()
   expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
@@ -200,7 +188,7 @@ it('propagates a failed second claim without creating partial billing records', 
 })
 it('preserves the legacy single-slot caller', async () => {
   expect(
-    await attachCoachingService('detail', 'coach', 'admin', 'va', now),
+    await attachCoachingService('detail', 'coach', 'admin', 'cash', now),
   ).toMatchObject({ total: 150000, status: 'PAID' })
 })
 
@@ -233,7 +221,7 @@ it('charges the additional coach rate when attaching an adjacent hour to the sam
     'detail',
     ['coach'],
     'admin',
-    undefined,
+    'cash',
     now,
     { method: 'EDC', received: true },
   )
@@ -246,6 +234,44 @@ it('charges the additional coach rate when attaching an adjacent hour to the sam
   expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
     expect.objectContaining({
       data: expect.objectContaining({ total: 100000, subtotal: 100000 }),
+    }),
+  )
+})
+
+it.each([
+  null,
+  { id: 'va', isActive: true, channel: 'BCA_VIRTUAL_ACCOUNT' },
+  { id: 'cash', isActive: false, isOffline: true },
+])(
+  'rejects unavailable, online or inactive methods before claiming any service: %j',
+  async (method) => {
+    mocks.tx.paymentMethod.findFirst.mockResolvedValue(method)
+    await expect(
+      attachCoachingService('detail', 'coach', 'admin', 'invalid', now),
+    ).rejects.toThrow(/offline/)
+    expect(mocks.claim).not.toHaveBeenCalled()
+    expect(mocks.tx.payment.create).not.toHaveBeenCalled()
+  },
+)
+it('rejects a missing method even if manual receipt confirmation is supplied', async () => {
+  await expect(
+    attachCoachingService('detail', 'coach', 'admin', undefined, now, {
+      method: 'EDC',
+      received: true,
+    }),
+  ).rejects.toThrow(/offline/)
+  expect(mocks.claim).not.toHaveBeenCalled()
+})
+it('records the selected offline method even for a zero-price service', async () => {
+  mocks.tx.slot.findFirst.mockResolvedValue({ ...slots[1], price: 0 })
+  await attachCoachingService('detail', 'ballboy', 'cashier', 'cash', now)
+  expect(mocks.tx.payment.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        paymentMethodId: 'cash',
+        amount: 0,
+        status: 'PAID',
+      }),
     }),
   )
 })

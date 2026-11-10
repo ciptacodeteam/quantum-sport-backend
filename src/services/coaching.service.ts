@@ -349,7 +349,7 @@ export async function attachCoachingService(
   detailId: string,
   slotId: string | string[],
   cashierId: string,
-  _paymentMethodId?: string,
+  paymentMethodId?: string,
   now = new Date(),
   _manualPayment?: {
     method?: 'EDC' | 'QRIS_STATIC' | 'BANK_TRANSFER_MANUAL'
@@ -364,6 +364,10 @@ export async function attachCoachingService(
     new Set(slotIds).size !== slotIds.length
   )
     throw new BadRequestException('Pilih maksimal satu coach dan satu ballboy.')
+  if (!paymentMethodId)
+    throw new BadRequestException(
+      'Pilih metode pembayaran offline terlebih dahulu.',
+    )
   const number = await generateInvoiceNumber()
   return db.$transaction(async (tx) => {
     const detail = await coachingCourtDetail(tx, detailId)
@@ -375,6 +379,34 @@ export async function attachCoachingService(
     // Serialize additions/cancellation to this court booking as well as staff claims.
     await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${detail.bookingId} FOR UPDATE`
     await coachingCourtDetail(tx, detailId)
+    await tx.$queryRaw`SELECT id FROM payment_methods WHERE id = ${paymentMethodId} FOR SHARE`
+    const method = await tx.paymentMethod.findFirst({
+      where: {
+        id: paymentMethodId,
+        isActive: true,
+        OR: [
+          { isOffline: true },
+          {
+            channel: {
+              in: ['CASH', 'EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'],
+            },
+          },
+        ],
+      },
+    })
+    if (
+      !method ||
+      !method.isActive ||
+      !(
+        method.isOffline ||
+        ['CASH', 'EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'].includes(
+          method.channel ?? '',
+        )
+      )
+    )
+      throw new BadRequestException(
+        'Metode pembayaran offline tidak tersedia atau nonaktif. Pilih ulang metode pembayaran.',
+      )
     const candidates = await tx.slot.findMany({
       where: {
         id: { in: slotIds },
@@ -492,7 +524,7 @@ export async function attachCoachingService(
       (sum, s) => sum + (s.type === 'COACH' ? coachPrice : s.price),
       0,
     )
-    // Admin-added services are confirmed and recorded as paid without a payment method.
+    // Record the offline receipt in the same transaction as the services and invoice.
     const dueDate = now
     const fee = 0
     const total = price
@@ -508,7 +540,7 @@ export async function attachCoachingService(
         holdExpiresAt: null,
         totalPrice: price,
         processingFee: fee,
-        adminNote: `Layanan untuk booking ${detail.bookingId}, lapangan ${detail.slot.court!.name}; dikonfirmasi lunas oleh ${cashierId} pada ${now.toISOString()} tanpa metode pembayaran`,
+        adminNote: `Layanan untuk booking ${detail.bookingId}, lapangan ${detail.slot.court!.name}; dikonfirmasi lunas oleh ${cashierId} pada ${now.toISOString()} melalui ${method.name}`,
       },
     })
     for (const slot of selectedSlots) {
@@ -543,12 +575,29 @@ export async function attachCoachingService(
           },
         })
     }
+    const payment = await tx.payment.create({
+      data: {
+        paymentMethodId: method.id,
+        status: 'PAID',
+        amount: total,
+        fees: 0,
+        paidAt: now,
+        meta: {
+          source: 'ADMIN_BOOKING_SERVICE',
+          receivedBy: cashierId,
+          receivedAt: now.toISOString(),
+          methodName: method.name,
+          courtBookingId: detail.bookingId,
+        },
+      },
+    })
     const invoice = await tx.invoice.create({
       data: {
         branchId: detail.booking.branchId,
         bookingId: booking.id,
         userId: customerId,
         number,
+        paymentId: payment.id,
         subtotal: price,
         processingFee: fee,
         total,

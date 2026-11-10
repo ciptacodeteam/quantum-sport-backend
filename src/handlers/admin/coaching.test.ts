@@ -101,6 +101,7 @@ it.each(['EDC', 'QRIS_STATIC', 'BANK_TRANSFER_MANUAL'])(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         slotIds: ['coach', 'ballboy'],
+        paymentMethodId: 'offline-method',
         manualPayment: { method, received: true },
       }),
     })
@@ -143,13 +144,13 @@ it('rejects invalid coach/ballboy date ranges before querying bookings', async (
   expect(mocks.coaches).not.toHaveBeenCalled()
 })
 
-it('accepts coach and ballboy without a payment method or receipt confirmation', async () => {
+it('rejects coach and ballboy without a selected offline payment method', async () => {
   const res = await validationApp.request('/detail', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slotIds: ['coach', 'ballboy'] }),
   })
-  expect(res.status).toBe(200)
+  expect(res.status).toBe(422)
 })
 
 it.each(['COACH', 'BALLBOY'])(

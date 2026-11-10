@@ -271,7 +271,7 @@ run('admin coaching transactional integration', () => {
     })
     expect(list.status).toBe(200)
   }, 20000)
-  it('creates a paid confirmed service invoice without a payment method or changes to the court invoice', async () => {
+  it('creates a paid service invoice with an offline method without changing the court invoice', async () => {
     const staff = await profile('paid-coach'),
       slot = await staffSlot(staff),
       court = await courtBooking('paid')
@@ -280,7 +280,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         slot.id,
         admin,
-        `${prefix}-method`,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -317,7 +317,11 @@ run('admin coaching transactional integration', () => {
     expect(scheduled?.serviceForBookingId).toBe(court.booking.id)
     expect(scheduled?.coaches[0].courtSlotId).toBe(court.slot.id)
     expect(scheduled?.coaches[0].slot.startAt).toBe('2026-11-02 13:00:00')
-    expect(invoice.payment).toBeNull()
+    expect(invoice.payment).toMatchObject({
+      paymentMethodId: `${prefix}-EDC`,
+      status: 'PAID',
+      amount: invoice.total,
+    })
     expect(
       await raw.invoice.findUnique({ where: { id: court.invoice.id } }),
     ).toMatchObject({ total: 100000, status: 'PAID' })
@@ -349,7 +353,7 @@ run('admin coaching transactional integration', () => {
             [a, b][i].detail.id,
             s.id,
             admin,
-            `${prefix}-method`,
+            `${prefix}-EDC`,
             now,
           ),
         ),
@@ -371,7 +375,7 @@ run('admin coaching transactional integration', () => {
         a.detail.id,
         s1.id,
         admin,
-        `${prefix}-method`,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -409,7 +413,7 @@ run('admin coaching transactional integration', () => {
         b.detail.id,
         s2.id,
         admin,
-        `${prefix}-method`,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -434,7 +438,7 @@ run('admin coaching transactional integration', () => {
           court.detail.id,
           slot.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
         ),
       ),
@@ -455,37 +459,38 @@ run('admin coaching transactional integration', () => {
           court.detail.id,
           slot.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
         ),
       ),
     ).rejects.toThrow('terkonfirmasi')
   })
-  it('only permits one ballboy on a tennis court and makes a zero-price invoice without gateway calls', async () => {
+  it('supports ballboys on padel and tennis, requires an offline method even at zero price, and prevents duplicates', async () => {
     const staff = await profile('ballboy', 'BALLBOY'),
       slot = await staffSlot(staff, 13, '00', 0, 'BALLBOY')
     const other = await profile('ballboy2', 'BALLBOY'),
       second = await staffSlot(other, 13, '00', 0, 'BALLBOY')
     const court = await courtBooking('ballboy', 'TENNIS'),
       padel = await courtBooking('ballboy-padel')
-    await expect(
-      context(() =>
-        service.attachCoachingService(
-          padel.detail.id,
-          slot.id,
-          admin,
-          undefined,
-          now,
-        ),
+    const padelStaff = await profile('ballboy-padel-staff', 'BALLBOY')
+    const padelSlot = await staffSlot(padelStaff, 13, '00', 0, 'BALLBOY')
+    const padelResult = await context(() =>
+      service.attachCoachingService(
+        padel.detail.id,
+        padelSlot.id,
+        admin,
+        `${prefix}-EDC`,
+        now,
       ),
-    ).rejects.toThrow('tennis')
+    )
+    expect(padelResult.total).toBe(0)
     const count = gateway.mock.calls.length
     const result = await context(() =>
       service.attachCoachingService(
         court.detail.id,
         slot.id,
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -498,7 +503,7 @@ run('admin coaching transactional integration', () => {
           court.detail.id,
           second.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
         ),
       ),
@@ -515,7 +520,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         slot.id,
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -553,7 +558,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         slots[0].id,
         admin,
-        `${prefix}-method`,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -575,7 +580,7 @@ run('admin coaching transactional integration', () => {
     )
     expect(availability.some((s) => s.staffId === staff)).toBe(false)
   })
-  it('books coach and ballboy atomically as paid without a payment method', async () => {
+  it('books coach and ballboy atomically with an offline receipt', async () => {
     const coach = await profile('combined-coach', 'COACH', 'TENNIS')
     const ballboy = await profile('combined-ballboy', 'BALLBOY')
     const coachSlot = await staffSlot(coach)
@@ -587,7 +592,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         [coachSlot.id, ballboySlot.id],
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
         { method: 'EDC', received: true },
       ),
@@ -610,7 +615,11 @@ run('admin coaching transactional integration', () => {
     })
     expect(invoice.booking?.coaches).toHaveLength(1)
     expect(invoice.booking?.ballboys).toHaveLength(1)
-    expect(invoice.payment).toBeNull()
+    expect(invoice.payment).toMatchObject({
+      paymentMethodId: `${prefix}-EDC`,
+      status: 'PAID',
+      amount: invoice.total,
+    })
     expect(invoice.booking?.adminNote).toContain(
       `dikonfirmasi lunas oleh ${admin}`,
     )
@@ -632,7 +641,7 @@ run('admin coaching transactional integration', () => {
           court.detail.id,
           [coachSlot.id, ballboySlot.id],
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
           { method: 'EDC', received: true },
         ),
@@ -658,7 +667,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         oldSlot.id,
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
         { method: 'EDC', received: true },
       ),
@@ -735,7 +744,7 @@ run('admin coaching transactional integration', () => {
           courts[i].detail.id,
           slot.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
         ),
       )
@@ -784,7 +793,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         [coachSlot.id, ballboySlot.id],
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
         { method: 'EDC', received: true },
       ),
@@ -842,7 +851,7 @@ run('admin coaching transactional integration', () => {
           now,
         ),
       ),
-    ).rejects.toThrow('terkonfirmasi')
+    ).rejects.toThrow('sudah dibatalkan')
   })
   it('serializes coach cancellation against replacement without leaving either slot stranded', async () => {
     const original = await profile('cancel-race-old', 'COACH', 'TENNIS')
@@ -855,7 +864,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         oldSlot.id,
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
       ),
     )
@@ -985,7 +994,7 @@ run('admin coaching transactional integration', () => {
           court.detail.id,
           slot.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
         ),
       ),
@@ -995,7 +1004,7 @@ run('admin coaching transactional integration', () => {
         court.detail.id,
         slot.id,
         admin,
-        undefined,
+        `${prefix}-EDC`,
         now,
         undefined,
         first.id,
@@ -1027,7 +1036,7 @@ run('admin coaching transactional integration', () => {
           otherCourt.detail.id,
           slot.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
           undefined,
           second.id,
@@ -1097,7 +1106,7 @@ run('admin coaching transactional integration', () => {
             court.detail.id,
             slot.id,
             admin,
-            undefined,
+            `${prefix}-EDC`,
             now,
             undefined,
             groupId,
@@ -1117,7 +1126,7 @@ run('admin coaching transactional integration', () => {
           court.detail.id,
           slot.id,
           admin,
-          undefined,
+          `${prefix}-EDC`,
           now,
           undefined,
           group.id,
