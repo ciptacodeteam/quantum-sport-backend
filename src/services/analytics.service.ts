@@ -192,6 +192,8 @@ export async function getIncomeBySourceAnalytics(
     transactions: invoices.map((invoice: any) => ({
       id: invoice.id,
       invoiceNumber: invoice.number,
+      bookingId: invoice.booking?.serviceForBookingId ?? invoice.booking?.id ?? null,
+      branchId: invoice.branchId,
       customerName: invoice.user?.name ?? 'Customer tidak tersedia',
       branchName: invoice.branch?.name ?? invoice.branchId,
       source: invoice.booking

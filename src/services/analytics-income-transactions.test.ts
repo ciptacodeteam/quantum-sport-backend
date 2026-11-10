@@ -115,3 +115,38 @@ it('returns an empty transaction list and zero totals when no paid invoices matc
     totalProcessingFees: 0,
   })
 })
+
+it('identifies service invoices by their parent court booking without changing invoice totals', async () => {
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('court', 300000),
+      booking: { id: 'court-1', cashierId: 'staff-1' },
+    },
+    {
+      ...invoice('coach', 50000),
+      booking: {
+        id: 'service-1',
+        serviceForBookingId: 'court-1',
+        cashierId: 'staff-1',
+      },
+    },
+    {
+      ...invoice('ballboy', 0),
+      booking: {
+        id: 'service-2',
+        serviceForBookingId: 'court-1',
+        cashierId: 'staff-1',
+      },
+    },
+    invoice('other', 10000),
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions.map((row) => row.bookingId)).toEqual([
+    'court-1',
+    'court-1',
+    'court-1',
+    null,
+  ])
+  expect(data.transactions).toHaveLength(4)
+  expect(data.summary.totalGrossAmount).toBe(360000)
+})
