@@ -150,3 +150,71 @@ it('identifies service invoices by their parent court booking without changing i
   expect(data.transactions).toHaveLength(4)
   expect(data.summary.totalGrossAmount).toBe(360000)
 })
+
+it('returns playing times in WIB, merges consecutive court hours and preserves gaps and services', async () => {
+  const slot = (startAt: string, endAt: string) => ({
+    startAt: new Date(startAt),
+    endAt: new Date(endAt),
+  })
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('court', 300000),
+      booking: {
+        id: 'court-1',
+        cashierId: 'staff-1',
+        details: [
+          {
+            slot: {
+              ...slot('2026-11-03T09:00:00Z', '2026-11-03T10:00:00Z'),
+              court: { name: 'Court A' },
+            },
+          },
+          {
+            slot: {
+              ...slot('2026-11-03T10:00:00Z', '2026-11-03T11:00:00Z'),
+              court: { name: 'Court A' },
+            },
+          },
+          {
+            slot: {
+              ...slot('2026-11-03T13:00:00Z', '2026-11-03T14:00:00Z'),
+              court: { name: 'Court A' },
+            },
+          },
+        ],
+        coaches: [
+          { slot: slot('2026-11-03T09:00:00Z', '2026-11-03T10:00:00Z') },
+        ],
+        ballboys: [
+          { slot: slot('2026-11-03T23:00:00Z', '2026-11-04T00:00:00Z') },
+        ],
+      },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions[0].playingSchedules).toEqual(
+    expect.arrayContaining([
+      {
+        label: 'Lapangan · Court A',
+        startAt: '2026-11-03T09:00:00+07:00',
+        endAt: '2026-11-03T11:00:00+07:00',
+      },
+      {
+        label: 'Lapangan · Court A',
+        startAt: '2026-11-03T13:00:00+07:00',
+        endAt: '2026-11-03T14:00:00+07:00',
+      },
+      {
+        label: 'Coach',
+        startAt: '2026-11-03T09:00:00+07:00',
+        endAt: '2026-11-03T10:00:00+07:00',
+      },
+      {
+        label: 'Ballboy',
+        startAt: '2026-11-03T23:00:00+07:00',
+        endAt: '2026-11-04T00:00:00+07:00',
+      },
+    ]),
+  )
+  expect(data.transactions[0].playingSchedules).toHaveLength(4)
+})

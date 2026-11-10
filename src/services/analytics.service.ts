@@ -11,11 +11,52 @@ import {
   bookingCheckoutWhere,
   type BookingCheckoutType,
 } from '@/lib/booking-checkout'
+import { clubWallTime } from '@/lib/club-time'
 import { db } from '@/lib/prisma'
 import { BookingStatus, CourtSport, PaymentStatus } from '@prisma/client'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
 import { getFileUrl } from './upload.service'
+
+/** Preserve slot wall-clock times while exposing actual WIB instants to clients. */
+function incomePlayingSchedules(booking: any) {
+  const slots: { label: string; startAt: Date; endAt: Date }[] = [
+    ...(booking?.details ?? []).map((item: any) => ({
+      label: item.slot.court?.name
+        ? `Lapangan · ${item.slot.court.name}`
+        : 'Lapangan',
+      startAt: item.slot.startAt,
+      endAt: item.slot.endAt,
+    })),
+    ...(booking?.coaches ?? []).map((item: any) => ({
+      label: 'Coach',
+      ...item.slot,
+    })),
+    ...(booking?.ballboys ?? []).map((item: any) => ({
+      label: 'Ballboy',
+      ...item.slot,
+    })),
+  ]
+  slots.sort(
+    (a, b) => a.label.localeCompare(b.label) || +a.startAt - +b.startAt,
+  )
+  const merged: typeof slots = []
+  for (const slot of slots) {
+    const previous = merged.at(-1)
+    if (
+      previous &&
+      previous.label === slot.label &&
+      +slot.startAt <= +previous.endAt
+    ) {
+      if (+slot.endAt > +previous.endAt) previous.endAt = slot.endAt
+    } else merged.push({ ...slot })
+  }
+  return merged.map((slot) => ({
+    label: slot.label,
+    startAt: clubWallTime(slot.startAt).format(),
+    endAt: clubWallTime(slot.endAt).format(),
+  }))
+}
 
 /**
  * Get income analytics separated by source
@@ -37,7 +78,26 @@ export async function getIncomeBySourceAnalytics(
     branch: { select: { name: true } },
     payment: { select: { method: { select: { name: true } } } },
     booking: {
-      include: { cashier: { select: { id: true, name: true, email: true } } },
+      include: {
+        cashier: { select: { id: true, name: true, email: true } },
+        details: {
+          select: {
+            slot: {
+              select: {
+                startAt: true,
+                endAt: true,
+                court: { select: { name: true } },
+              },
+            },
+          },
+        },
+        coaches: {
+          select: { slot: { select: { startAt: true, endAt: true } } },
+        },
+        ballboys: {
+          select: { slot: { select: { startAt: true, endAt: true } } },
+        },
+      },
     },
     classBooking: true,
     membershipUser: true,
@@ -192,8 +252,10 @@ export async function getIncomeBySourceAnalytics(
     transactions: invoices.map((invoice: any) => ({
       id: invoice.id,
       invoiceNumber: invoice.number,
-      bookingId: invoice.booking?.serviceForBookingId ?? invoice.booking?.id ?? null,
+      bookingId:
+        invoice.booking?.serviceForBookingId ?? invoice.booking?.id ?? null,
       branchId: invoice.branchId,
+      playingSchedules: incomePlayingSchedules(invoice.booking),
       customerName: invoice.user?.name ?? 'Customer tidak tersedia',
       branchName: invoice.branch?.name ?? invoice.branchId,
       source: invoice.booking
