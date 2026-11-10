@@ -1,6 +1,6 @@
 # Coaching in-house
 
-Admin menu: **Booking System → Coaching In-house** (`/admin/coaching-inhouse`).
+Admin menu: **Master Data → Coaching In-house** (`/admin/coaching-inhouse`).
 
 ## Operation
 
