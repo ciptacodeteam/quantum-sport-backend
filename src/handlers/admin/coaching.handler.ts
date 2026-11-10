@@ -384,7 +384,7 @@ export const listCoachingBookingsHandler = factory.createHandlers(
     const items =
       kind === 'COACH'
         ? await db.bookingCoach.findMany({
-            include,
+            include: { ...include, inHouseUsage: { select: { id: true } } },
             where,
             orderBy: { createdAt: 'desc' },
             take: 500,
@@ -400,6 +400,7 @@ export const listCoachingBookingsHandler = factory.createHandlers(
         items.map((item) => ({
           id: item.id,
           bookingId: item.bookingId,
+          isInHouse: 'inHouseUsage' in item && !!item.inHouseUsage,
           createdAt: item.createdAt,
           ...('isClubSettled' in item
             ? {

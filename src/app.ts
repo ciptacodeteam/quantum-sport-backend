@@ -1,3 +1,4 @@
+import adminInHouseCoachingRoute from './routes/admin/inhouse-coaching.route'
 import adminCoachingGroupRoute from './routes/admin/coaching-group.route'
 import adminCoachingRoute from './routes/admin/coaching.route'
 import branchRoute from './routes/branch.route'
@@ -108,6 +109,7 @@ const routes = [
 
 // ADD NEW ADMIN ROUTES HERE
 const adminRoutes = [
+  adminInHouseCoachingRoute,
   adminCoachingRoute,
   adminCoachingGroupRoute,
   adminTariffPeriodRoute,

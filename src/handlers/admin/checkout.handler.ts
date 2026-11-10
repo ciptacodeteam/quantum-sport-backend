@@ -1,3 +1,5 @@
+import { inHouseSelectionSchema } from '@/lib/inhouse-coaching'
+import { redeemInHouseSelections } from '@/services/inhouse-coaching.service'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { assertCoachingSport } from '@/lib/coaching-policy'
 import {
@@ -44,6 +46,11 @@ const adminCheckoutSchema = z
     totalHours: z.number().positive(),
     courtSlots: z.array(z.string()).optional(),
     coachSlots: z.array(z.string()).optional(),
+    inHouseSelections: z
+      .array(inHouseSelectionSchema)
+      .min(1)
+      .max(100)
+      .optional(),
     coachGroups: z
       .array(
         z
@@ -280,6 +287,14 @@ export const adminCheckoutHandler = factory.createHandlers(
       inventories,
     } = c.req.valid('json') as AdminCheckoutSchema
     const courtSlots = uniqueSlotIds(rawCourtSlots)
+    const inHouseSelections = c.req.valid('json').inHouseSelections
+    if (
+      inHouseSelections?.length &&
+      (!inputUserId || useMembership || recurringBooking)
+    )
+      throw new BadRequestException(
+        'Pilih customer dan nonaktifkan membership lapangan/booking rutin untuk memakai paket in-house.',
+      )
     const coachSlots = uniqueSlotIds(rawCoachSlots)
     if (
       coachGroups &&
@@ -592,6 +607,10 @@ export const adminCheckoutHandler = factory.createHandlers(
                 select: {
                   id: true,
                   coachingGroups: { select: coachingGroupMembershipSelect },
+                  inHousePlans: {
+                    where: { isActive: true },
+                    select: { id: true },
+                  },
                   coachType: true,
                 },
               },
@@ -621,6 +640,10 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
             )
           }
+          if (slotData.some((slot) => slot.staff?.inHousePlans?.length))
+            throw new BadRequestException(
+              'Coach in-house harus menggunakan paket customer. Pilih paket in-house atau beli paket satu jam terlebih dahulu.',
+            )
           selectedCoachSlots = slotData
           if (courtSportForMembership) {
             const allowedCoachTypes: CoachType[] =
@@ -649,7 +672,9 @@ export const adminCheckoutHandler = factory.createHandlers(
             )
           }
           // Use a generic coach type; if none exists, create a default one.
-          let defaultCoachType = await tx.bookingCoachType.findFirst()
+          let defaultCoachType = await tx.bookingCoachType.findFirst({
+            where: { name: { not: 'Coaching In-house' } },
+          })
           if (!defaultCoachType) {
             defaultCoachType = await tx.bookingCoachType.create({
               data: {
@@ -707,6 +732,21 @@ export const adminCheckoutHandler = factory.createHandlers(
           }
           c.var.logger.info(
             `Total coach slots booked: ${bookedItems.coachSlots.length}. Total coach price: ${[...coachPrices.values()].reduce((sum, price) => sum + price, 0)}`,
+          )
+        }
+
+        if (inHouseSelections?.length) {
+          const redemption = await redeemInHouseSelections(tx, {
+            selections: inHouseSelections,
+            userId: resolvedUserId!,
+            bookingId: booking.id,
+            courtSlotIds: courtSlots ?? [],
+            clubCoachSlots: selectedCoachSlots,
+          })
+          totalPrice += redemption.extraAmount - redemption.coveredCourtAmount
+          courtDiscountPrice -= redemption.courtPriceAdjustment
+          bookedItems.coachSlots.push(
+            ...inHouseSelections.map((item) => item.coachSlotId),
           )
         }
 

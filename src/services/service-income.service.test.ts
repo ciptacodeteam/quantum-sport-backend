@@ -374,3 +374,19 @@ it('exports only unsettled coach payables', async () => {
   const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
   expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([])
 })
+
+it('keeps in-house participant fees out of club payables without changing the club share', () => {
+  const data = invoice()
+  data.booking.coaches.push({
+    ...item('inhouse', 100000),
+    inHouseUsage: { id: 'usage' },
+  } as any)
+  data.booking.totalPrice += 100000
+  data.total += 100000
+  const report = build([data])
+  expect(report.summary.coachAmount).toBe(150000)
+  expect(report.summary.ballboyAmount).toBe(50000)
+  expect(report.rows.some((row) => row.staffName === 'Petugas inhouse')).toBe(
+    false,
+  )
+})

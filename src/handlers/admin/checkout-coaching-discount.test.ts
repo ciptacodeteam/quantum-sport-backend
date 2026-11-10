@@ -411,3 +411,87 @@ it.each([
     )
   },
 )
+
+it.each([1, 3])(
+  'checks out a prepaid in-house hour for %s participants without stacking the club discount',
+  async (participants) => {
+    mocks.payload.coachSlots = []
+    mocks.payload.inHouseSelections = [
+      {
+        walletId: 'wallet',
+        courtSlotId: 'court-slot',
+        coachSlotId: 'coach-slot',
+        participants,
+      },
+    ]
+    mocks.tx.inHouseWallet = {
+      findFirst: vi
+        .fn()
+        .mockResolvedValue({
+          id: 'wallet',
+          staffId: 'andi',
+          branchId: 'cemara',
+          userId: 'customer',
+          packageName: 'Andi 5 jam',
+          hourlyPrice: 900000,
+          courtHourlyShare: 250000,
+          extraParticipantHourlyPrice: 100000,
+          staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
+        }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    }
+    mocks.tx.slot.findFirst = vi
+      .fn()
+      .mockResolvedValue({
+        id: 'coach-slot',
+        staffId: 'andi',
+        branchId: 'cemara',
+        ...range,
+      })
+    mocks.tx.bookingDetail.findFirst.mockResolvedValue({
+      id: 'detail',
+      slotId: 'court-slot',
+      discountPrice: 150000,
+      slot: {
+        id: 'court-slot',
+        branchId: 'cemara',
+        court: { sport: 'PADEL' },
+        ...range,
+      },
+    })
+    await checkout()
+    expect(mocks.tx.bookingDetail.update).toHaveBeenCalledExactlyOnceWith({
+      where: { id: 'detail' },
+      data: { discountPrice: 250000 },
+    })
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: (participants - 1) * 100000 }),
+      }),
+    )
+    expect(mocks.tx.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalPrice: (participants - 1) * 100000,
+          courtDiscountPrice: 250000,
+        }),
+      }),
+    )
+    expect(mocks.tx.payment.create).toHaveBeenCalledTimes(
+      participants === 1 ? 0 : 1,
+    )
+  },
+)
+it('rejects applying court membership to the same prepaid coaching checkout', async () => {
+  mocks.payload.useMembership = true
+  mocks.payload.inHouseSelections = [
+    {
+      walletId: 'wallet',
+      courtSlotId: 'court-slot',
+      coachSlotId: 'coach-slot',
+      participants: 1,
+    },
+  ]
+  await expect(checkout()).rejects.toThrow(/membership/)
+  expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
+})

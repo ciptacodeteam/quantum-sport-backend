@@ -146,6 +146,7 @@ model User {
   updatedAt DateTime @default(now()) @updatedAt
 
   authTokens          AuthToken[]
+  inHouseWallets      InHouseWallet[]
   recurringBookings   RecurringBooking[]
   bookings            Booking[]
   membershipUser      MembershipUser[]
@@ -217,6 +218,8 @@ model Staff {
   coachTypeStaffPrice CoachTypeStaffPrice[]
   bookingCashier      Booking[]
   coachingGroups      CoachingGroupCoach[]
+  inHousePlans        InHousePlan[]
+  inHouseWallets      InHouseWallet[]
 
   @@index([branchId])
   @@index([isActive, role])
@@ -469,6 +472,7 @@ model Invoice {
   bookingId        String? @unique
   classBookingId   String? @unique
   membershipUserId String? @unique
+  inHouseWalletId   String? @unique
 
   promoCodeId         String?
   promoCodeText       String?
@@ -493,6 +497,7 @@ model Invoice {
   classBooking   ClassBooking?   @relation(fields: [classBookingId], references: [id])
   membershipUser MembershipUser? @relation(fields: [membershipUserId], references: [id])
   promoCode      PromoCode?      @relation(fields: [promoCodeId], references: [id])
+  inHouseWallet  InHouseWallet? @relation(fields: [inHouseWalletId], references: [id])
 
   @@index([branchId])
   @@index([status, dueDate])
@@ -658,6 +663,7 @@ model CoachTypeStaffPrice {
 }
 
 model BookingCoach {
+  inHouseUsage InHouseUsage?
   isClubSettled             Boolean   @default(false)
   clubSettlementUpdatedAt   DateTime?
   clubSettlementUpdatedById String?
@@ -1145,4 +1151,69 @@ model CoachingGroupCoach {
   @@id([groupId, staffId])
   @@index([staffId])
   @@map("coaching_group_coaches")
+}
+
+// Coach-specific prepaid hours. Sale terms are copied to the wallet so edits
+// to a catalog plan never reprice an already purchased customer package.
+model InHousePlan {
+  id                          String          @id @default(cuid())
+  branchId                    String
+  staffId                     String
+  name                        String
+  hours                       Int
+  hourlyPrice                 Int
+  courtHourlyShare            Int
+  extraParticipantHourlyPrice Int             @default(100000)
+  isActive                    Boolean         @default(true)
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+  staff                       Staff           @relation(fields: [staffId], references: [id])
+  wallets                     InHouseWallet[]
+
+  @@index([branchId, staffId])
+  @@map("inhouse_plans")
+}
+
+model InHouseWallet {
+  id                          String         @id @default(cuid())
+  branchId                    String
+  packageId                   String
+  staffId                     String
+  userId                      String
+  saleRequestId               String         @unique
+  packageName                 String
+  totalMinutes                Int
+  remainingMinutes            Int
+  hourlyPrice                 Int
+  courtHourlyShare            Int
+  extraParticipantHourlyPrice Int
+  createdById                 String
+  createdAt                   DateTime       @default(now())
+  package                     InHousePlan    @relation(fields: [packageId], references: [id])
+  staff                       Staff          @relation(fields: [staffId], references: [id])
+  user                        User           @relation(fields: [userId], references: [id])
+  invoice                     Invoice?
+  usages                      InHouseUsage[]
+
+  @@index([branchId, userId, remainingMinutes])
+  @@map("inhouse_wallets")
+}
+
+model InHouseUsage {
+  id             String        @id @default(cuid())
+  branchId       String
+  walletId       String
+  bookingCoachId String        @unique
+  minutes        Int
+  participants   Int
+  courtAmount    Int
+  coachAmount    Int
+  extraAmount    Int
+  restoredAt     DateTime?
+  createdAt      DateTime      @default(now())
+  wallet         InHouseWallet @relation(fields: [walletId], references: [id])
+  bookingCoach   BookingCoach  @relation(fields: [bookingCoachId], references: [id])
+
+  @@index([branchId, walletId])
+  @@map("inhouse_usages")
 }

@@ -101,6 +101,7 @@ export async function getIncomeBySourceAnalytics(
     },
     classBooking: true,
     membershipUser: true,
+    inHouseWallet: { select: { id: true } },
   }
 
   if (source === 'cashier') {
@@ -122,6 +123,7 @@ export async function getIncomeBySourceAnalytics(
   let cashierBookingIncome = 0
   let classBookingIncome = 0
   let membershipIncome = 0
+  let inHouseIncome = 0
   let totalProcessingFees = 0
   let totalGrossAmount = 0
   let totalNetAmount = 0
@@ -129,6 +131,7 @@ export async function getIncomeBySourceAnalytics(
   const bookingIncome: Record<string, any> = {}
   const classIncome: Record<string, any> = {}
   const membershipIncome_: Record<string, any> = {}
+  const inHouseTransactions: any[] = []
 
   for (const invoice of invoices as any[]) {
     const gross = invoice.total || 0
@@ -165,6 +168,17 @@ export async function getIncomeBySourceAnalytics(
         id: invoice.id,
         bookingId: invoice.booking.id,
         amount: invoice.total,
+        processingFee,
+        netAmount,
+        date: invoice.paidAt,
+      })
+    }
+
+    if (invoice.inHouseWallet) {
+      inHouseIncome += netAmount
+      inHouseTransactions.push({
+        id: invoice.id,
+        amount: gross,
         processingFee,
         netAmount,
         date: invoice.paidAt,
@@ -228,7 +242,8 @@ export async function getIncomeBySourceAnalytics(
     onlineBookingIncome +
     cashierBookingIncome +
     classBookingIncome +
-    membershipIncome
+    membershipIncome +
+    inHouseIncome
 
   return {
     summary: {
@@ -240,13 +255,27 @@ export async function getIncomeBySourceAnalytics(
       cashierBookingIncome,
       classBookingIncome,
       membershipIncome,
+      inHouseIncome,
       totalTransactions: invoices.length,
     },
     bySource: {
       ...bookingIncome,
       ...classIncome,
       ...membershipIncome_,
-    },
+      ...(inHouseTransactions.length
+        ? {
+            InHouse: {
+              count: inHouseTransactions.length,
+              total: inHouseIncome,
+              processingFee: inHouseTransactions.reduce(
+                (sum, row) => sum + row.processingFee,
+                0,
+              ),
+              transactions: inHouseTransactions,
+            },
+          }
+        : {}),
+    } as Record<string, any>,
     // One row per paid invoice, including invoices whose original product was
     // removed. Use the exact same invoice set as the financial summary.
     transactions: invoices.map((invoice: any) => ({
@@ -266,7 +295,9 @@ export async function getIncomeBySourceAnalytics(
           ? 'Class Bookings'
           : invoice.membershipUser
             ? 'Membership'
-            : 'Other',
+            : invoice.inHouseWallet
+              ? 'InHouse'
+              : 'Other',
       paymentMethod: invoice.payment?.method?.name ?? null,
       paidAt: invoice.paidAt,
       amount: invoice.total || 0,
@@ -311,6 +342,7 @@ export async function getPaymentMethodAnalytics(
           booking: { select: { cashierId: true } },
           classBookingId: true,
           membershipUserId: true,
+          inHouseWalletId: true,
         },
       },
     },
@@ -367,7 +399,9 @@ export async function getPaymentMethodAnalytics(
           ? 'Class Bookings'
           : invoice.membershipUserId
             ? 'Membership'
-            : 'Other',
+            : invoice.inHouseWalletId
+              ? 'InHouse'
+              : 'Other',
       paymentMethod: payment.method?.name ?? null,
       paidAt: invoice.paidAt,
       amount: amt,

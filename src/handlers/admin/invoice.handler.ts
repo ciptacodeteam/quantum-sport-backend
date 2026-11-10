@@ -70,7 +70,9 @@ export const getAllInvoicesAdminHandler = factory.createHandlers(
           ? 'CLASS_BOOKING'
           : inv.membershipUserId
             ? 'MEMBERSHIP'
-            : 'UNKNOWN'
+            : inv.inHouseWalletId
+              ? 'INHOUSE_PACKAGE'
+              : 'UNKNOWN'
       return {
         id: inv.id,
         number: inv.number,
@@ -107,6 +109,7 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
     const invoice = await db.invoice.findUnique({
       where: { id },
       include: {
+        inHouseWallet: { include: { staff: { select: { name: true } } } },
         user: {
           select: {
             id: true,
@@ -139,6 +142,7 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
             },
             coaches: {
               include: {
+                inHouseUsage: true,
                 slot: {
                   include: {
                     staff: { select: { id: true, name: true, phone: true } },
@@ -193,7 +197,9 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
         ? 'CLASS_BOOKING'
         : invoice.membershipUserId
           ? 'MEMBERSHIP'
-          : 'UNKNOWN'
+          : invoice.inHouseWalletId
+            ? 'INHOUSE_PACKAGE'
+            : 'UNKNOWN'
 
     const response = {
       id: invoice.id,
@@ -211,6 +217,7 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
       paidAt: invoice.paidAt,
       cancelledAt: invoice.cancelledAt,
       payment: invoice.payment,
+      inHousePackage: invoice.inHouseWallet,
       booking: invoice.booking && {
         ...invoice.booking,
         courts: invoice.booking.details.map((d) => ({
@@ -218,12 +225,19 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
           slot: invoiceScheduleSlot(d.slot),
           price: d.price,
           discountPrice: d.discountPrice,
+          inHouseCovered: invoice.booking!.coaches.some(
+            (c) =>
+              c.courtSlotId === d.slotId &&
+              c.inHouseUsage &&
+              !c.inHouseUsage.restoredAt,
+          ),
         })),
         coaches: invoice.booking.coaches.map((c) => ({
           staff: c.slot.staff,
           coachType: c.bookingCoachType,
           slot: invoiceScheduleSlot(c.slot),
           price: c.price,
+          inHouseUsage: c.inHouseUsage,
         })),
         ballboys: invoice.booking.ballboys.map((b) => ({
           staff: b.slot.staff,

@@ -9,6 +9,7 @@ export const serviceIncomeInclude = {
     include: {
       coaches: {
         include: {
+          inHouseUsage: true,
           slot: { include: { staff: { select: { id: true, name: true } } } },
         },
       },
@@ -119,6 +120,12 @@ export function buildServiceIncome(
     )
     services.forEach((item, index) => {
       if (item.status !== 'CONFIRMED' || amounts[index] <= 0) return
+      if (
+        item.service === 'COACH' &&
+        'inHouseUsage' in item &&
+        item.inHouseUsage
+      )
+        return
       // Keep settled prices in allocation so their share never moves to another club.
       if (item.service === 'COACH' && item.isClubSettled) return
       allRows.push({

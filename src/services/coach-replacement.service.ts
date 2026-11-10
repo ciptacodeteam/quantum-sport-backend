@@ -16,6 +16,7 @@ async function getReplacementContext(client: Client, id: string, now: Date) {
   const current = await client.bookingCoach.findFirst({
     where: { id },
     include: {
+      inHouseUsage: true,
       slot: { include: { staff: true } },
       courtSlot: { include: { court: true } },
       booking: {
@@ -38,6 +39,10 @@ async function getReplacementContext(client: Client, id: string, now: Date) {
   )
     throw new BadRequestException(
       'Coach hanya dapat diganti pada booking terkonfirmasi.',
+    )
+  if (current.inHouseUsage)
+    throw new BadRequestException(
+      'Kuota paket terikat pada coach. Batalkan sesi untuk mengembalikan kuota, lalu booking ulang dengan coach paket yang sama.',
     )
   if (current.isClubSettled)
     throw new BadRequestException(

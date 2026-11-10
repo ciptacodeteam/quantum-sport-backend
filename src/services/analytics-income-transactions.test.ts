@@ -218,3 +218,18 @@ it('returns playing times in WIB, merges consecutive court hours and preserves g
   )
   expect(data.transactions[0].playingSchedules).toHaveLength(4)
 })
+
+it('records in-house package sales once in their own revenue source', async () => {
+  mocks.invoices.mockResolvedValue([
+    { ...invoice('inhouse', 4500000), inHouseWallet: { id: 'wallet' } },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.summary).toMatchObject({
+    totalIncome: 4500000,
+    totalNetAmount: 4500000,
+    inHouseIncome: 4500000,
+    totalTransactions: 1,
+  })
+  expect(data.bySource.InHouse).toMatchObject({ count: 1, total: 4500000 })
+  expect(data.transactions[0].source).toBe('InHouse')
+})

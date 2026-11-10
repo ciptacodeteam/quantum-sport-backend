@@ -18,11 +18,15 @@ export async function setCoachClubSettlement(
     await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${initial.bookingId} FOR UPDATE`
     const current = await tx.bookingCoach.findFirst({
       where: { id },
-      include: { booking: { include: { invoice: true } } },
+      include: { inHouseUsage: true, booking: { include: { invoice: true } } },
     })
     if (!current)
       throw new NotFoundException(
         'Pemesanan coach tidak ditemukan di cabang ini.',
+      )
+    if (current.inHouseUsage)
+      throw new BadRequestException(
+        'Paket in-house dicatat pada laporan in-house, bukan settlement club.',
       )
     if (current.isClubSettled !== input.expectedIsSettled)
       throw new BadRequestException(

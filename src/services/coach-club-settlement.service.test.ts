@@ -104,3 +104,15 @@ it('rejects a booking absent from the selected branch', async () => {
   ).rejects.toThrow('cabang ini')
   expect(mocks.update).not.toHaveBeenCalled()
 })
+
+it('does not settle in-house quota sessions as club payables', async () => {
+  mocks.find.mockResolvedValue(pack({ inHouseUsage: { id: 'usage' } }))
+  await expect(
+    setCoachClubSettlement(
+      'coach-line',
+      { isSettled: true, expectedIsSettled: false },
+      'admin',
+    ),
+  ).rejects.toThrow(/in-house/)
+  expect(mocks.update).not.toHaveBeenCalled()
+})

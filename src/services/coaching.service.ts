@@ -36,6 +36,7 @@ export const coachingSelect = {
   coachType: true,
   coachProfile: true,
   coachingGroups: { select: coachingGroupMembershipSelect },
+  inHousePlans: { where: { isActive: true }, select: { id: true } },
   isActive: true,
   rollingServiceSchedule: true,
 } satisfies Prisma.StaffSelect
@@ -179,7 +180,18 @@ export async function coachingCourtDetail(
     where: { id: detailId },
     include: {
       slot: { include: { court: true } },
-      booking: { include: { invoice: true } },
+      booking: {
+        include: {
+          invoice: true,
+          coaches: {
+            where: { status: { not: 'CANCELLED' } },
+            select: {
+              courtSlotId: true,
+              inHouseUsage: { select: { id: true, restoredAt: true } },
+            },
+          },
+        },
+      },
     },
   })
   if (!detail?.slot.court)
@@ -187,6 +199,17 @@ export async function coachingCourtDetail(
   if (detail.booking.status !== 'CONFIRMED')
     throw new BadRequestException(
       'Layanan hanya dapat ditambahkan ke booking lapangan terkonfirmasi.',
+    )
+  if (
+    detail.booking.coaches?.some(
+      (item) =>
+        item.courtSlotId === detail.slotId &&
+        item.inHouseUsage &&
+        !item.inHouseUsage.restoredAt,
+    )
+  )
+    throw new BadRequestException(
+      'Jam ini menggunakan paket in-house. Coach club tidak dapat ditambahkan pada jam yang sama.',
     )
   return detail
 }

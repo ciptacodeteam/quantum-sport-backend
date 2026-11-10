@@ -1,3 +1,4 @@
+import { restoreInHouseUsage } from './inhouse-coaching.service'
 import type { Prisma } from '@prisma/client'
 
 /** Caller holds the court booking lock. Include legacy add-ons linked only by courtSlotId. */
@@ -21,6 +22,7 @@ export async function cancelCourtBookingServices(
       tx.bookingCoach.findMany({
         where,
         select: {
+          inHouseUsage: { select: { id: true, walletId: true } },
           id: true,
           slotId: true,
           bookingId: true,
@@ -46,6 +48,14 @@ export async function cancelCourtBookingServices(
     // A replacement can finish while we wait on a legacy service booking lock.
   ;[coaches, ballboys] = await readServices()
   const services = [...coaches, ...ballboys]
+  for (const walletId of [
+    ...new Set(
+      coaches.flatMap((coach) =>
+        coach.inHouseUsage ? [coach.inHouseUsage.walletId] : [],
+      ),
+    ),
+  ].sort())
+    await tx.$queryRaw`SELECT id FROM inhouse_wallets WHERE id = ${walletId} FOR UPDATE`
   for (const id of [
     ...new Set(
       services.map((s) => s.slot.staffId).filter((id): id is string => !!id),
@@ -58,6 +68,9 @@ export async function cancelCourtBookingServices(
     cancellationReason: reason,
   }
   await tx.bookingCoach.updateMany({ where, data })
+  for (const coach of coaches)
+    if (coach.inHouseUsage)
+      await restoreInHouseUsage(tx, coach.inHouseUsage.id, now)
   await tx.bookingBallboy.updateMany({ where, data })
   const slotIds = [...new Set(services.map((s) => s.slotId))]
   if (slotIds.length)

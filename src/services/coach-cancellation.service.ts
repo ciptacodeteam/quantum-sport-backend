@@ -12,6 +12,7 @@ async function cancellationContext(
   const item = await client.bookingCoach.findFirst({
     where: { id },
     include: {
+      inHouseUsage: true,
       slot: { include: { staff: { select: { id: true, name: true } } } },
       booking: { include: { invoice: true } },
     },
@@ -19,6 +20,10 @@ async function cancellationContext(
   if (!item)
     throw new NotFoundException(
       'Pemesanan coach tidak ditemukan di cabang ini.',
+    )
+  if (item.inHouseUsage)
+    throw new BadRequestException(
+      'Sesi paket in-house sudah mencakup lapangan. Batalkan booking lapangan agar jadwal dan kuota dikembalikan bersama.',
     )
   if (item.status !== 'CONFIRMED' && item.status !== 'HOLD')
     throw new BadRequestException('Pemesanan coach sudah dibatalkan.')
