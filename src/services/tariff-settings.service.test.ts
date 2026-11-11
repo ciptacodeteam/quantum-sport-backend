@@ -41,6 +41,8 @@ it('saves and refreshes the same branch and sport atomically from the effective 
   expect(mocks.lock).toHaveBeenCalled()
   expect(mocks.upsert.mock.calls[0][0].create).toEqual({
     ...input,
+    happyInHouseCoachDiscount: null,
+    peakInHouseCoachDiscount: null,
     happyAllDayDays: [],
     branchId: 'cemara',
     effectiveFrom: new Date('2026-11-01T00:00:00Z'),
@@ -170,4 +172,34 @@ it('preserves day rules when an older client saves a new date without that field
   )
   expect(mocks.upsert.mock.calls[0][0].create.happyAllDayDays).toEqual([6, 7])
   expect(mocks.refresh).not.toHaveBeenCalled()
+})
+
+it('saves in-house discounts independently and preserves them when older callers omit them', async () => {
+  const discounts = {
+    happyInHouseCoachDiscount: 100000,
+    peakInHouseCoachDiscount: 150000,
+  }
+  await saveTariffPeriod(
+    'cemara',
+    { ...input, ...discounts, happyCoachDiscount: 20000 },
+    now,
+  )
+  expect(mocks.upsert.mock.calls[0][0].create).toMatchObject(discounts)
+  expect(mocks.upsert.mock.calls[0][0].update).toMatchObject(discounts)
+  mocks.list.mockResolvedValue([{ ...input, ...discounts, branchId: 'cemara' }])
+  await saveTariffPeriod('cemara', input, now)
+  expect(mocks.upsert.mock.calls[1][0].create).toMatchObject(discounts)
+  await saveTariffPeriod(
+    'cemara',
+    {
+      ...input,
+      happyInHouseCoachDiscount: null,
+      peakInHouseCoachDiscount: null,
+    },
+    now,
+  )
+  expect(mocks.upsert.mock.calls[2][0].update).toMatchObject({
+    happyInHouseCoachDiscount: null,
+    peakInHouseCoachDiscount: null,
+  })
 })

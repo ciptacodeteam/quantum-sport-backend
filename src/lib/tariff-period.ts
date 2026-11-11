@@ -9,6 +9,8 @@ export const defaultTariffPeriod = {
 }
 export type TariffBands = typeof defaultTariffPeriod
 export type CoachingDiscounts = {
+  happyInHouseCoachDiscount?: number | null
+  peakInHouseCoachDiscount?: number | null
   happyCoachDiscount?: number
   peakCoachDiscount?: number
 }
@@ -43,10 +45,33 @@ export const tariffPeriodSchema = z
     happyEnd: z.number().int().min(1).max(24),
     peakStart: z.number().int().min(0).max(23),
     peakEnd: z.number().int().min(1).max(24),
+    happyInHouseCoachDiscount: z
+      .number()
+      .int()
+      .min(0)
+      .max(2147483647)
+      .nullable()
+      .optional(),
+    peakInHouseCoachDiscount: z
+      .number()
+      .int()
+      .min(0)
+      .max(2147483647)
+      .nullable()
+      .optional(),
     happyCoachDiscount: z.number().int().min(0).max(2147483647).optional(),
     peakCoachDiscount: z.number().int().min(0).max(2147483647).optional(),
   })
   .superRefine((value, ctx) => {
+    if (
+      (value.happyInHouseCoachDiscount != null) !==
+      (value.peakInHouseCoachDiscount != null)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['happyInHouseCoachDiscount'],
+        message: 'Isi kedua potongan in-house atau nonaktifkan keduanya.',
+      })
     if (value.happyEnd <= value.happyStart)
       ctx.addIssue({
         code: 'custom',

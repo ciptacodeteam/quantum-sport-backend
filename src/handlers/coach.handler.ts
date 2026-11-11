@@ -1,4 +1,4 @@
-import { ensureRollingCourtSchedules } from '@/services/rolling-court-schedule.service'
+import { ensureServiceSchedules } from '@/services/service-schedule-maintenance.service'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -54,7 +54,7 @@ export const getAvailableCoachesHandler = factory.createHandlers(
   zValidator('query', availableCoachesQuerySchema, validateHook),
   async (c) => {
     try {
-      await ensureRollingCourtSchedules()
+      await ensureServiceSchedules('COACH')
       const { startAt, endAt, courtSport } = c.req.valid('query') as {
         startAt: string
         endAt: string

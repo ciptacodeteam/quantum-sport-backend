@@ -116,10 +116,13 @@ for sql in \
   /app/prisma/membership-renewal.sql \
   /app/prisma/coaching-admin.sql \
   /app/prisma/inhouse-coaching.sql \
+  /app/prisma/inhouse-coach-profiles.sql \
+  /app/prisma/inhouse-wallet-deletion.sql \
   /app/prisma/coaching-groups.sql \
   /app/prisma/coach-club-settlement.sql \
   /app/prisma/rolling-service-schedule.sql \
   /app/prisma/admin-coaching-discounts.sql \
+  /app/prisma/inhouse-coaching-discounts.sql \
   /app/prisma/tariff-day-rules.sql \
   /app/prisma/coach-session-pricing.sql \
   /app/prisma/customer-activation.sql \

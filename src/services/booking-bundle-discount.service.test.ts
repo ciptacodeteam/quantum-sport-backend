@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import {
   getCourtCoachBundleDiscount,
+  getInHouseCourtDiscount,
   getCourtCoachBundleDiscountByCourtSlot,
 } from './booking-bundle-discount.service'
 import { tariffPeriodSchema, type TariffRule } from '@/lib/tariff-period'
@@ -93,4 +94,49 @@ it('uses Happy Hour coaching discount on weekend evenings and Peak Hour on weekd
   expect(getCourtCoachBundleDiscount(court(20, '2026-11-07'), [rule])).toBe(
     25000,
   )
+})
+
+it('keeps in-house and club independent across bands, days and effective dates', () => {
+  const separate = {
+    ...rule,
+    happyAllDayDays: [6, 7],
+    happyInHouseCoachDiscount: 90000,
+    peakInHouseCoachDiscount: 120000,
+  }
+  expect(getInHouseCourtDiscount(court(10), [separate])).toBe(90000)
+  expect(getInHouseCourtDiscount(court(17), [separate])).toBe(120000)
+  expect(getCourtCoachBundleDiscount(court(17), [separate])).toBe(25000)
+  expect(getInHouseCourtDiscount(court(20, '2026-11-07'), [separate])).toBe(
+    90000,
+  )
+  expect(
+    getInHouseCourtDiscount(court(10, '2026-11-04'), [separate]),
+  ).toBeNull()
+  expect(
+    getInHouseCourtDiscount({ ...court(10), branchId: 'other' }, [separate]),
+  ).toBeNull()
+  expect(
+    getInHouseCourtDiscount(court(10), [
+      { ...separate, happyInHouseCoachDiscount: 0 },
+    ]),
+  ).toBe(0)
+  expect(getInHouseCourtDiscount(court(10), [rule])).toBeNull()
+})
+it.each([-1, 0.5, 2147483648])(
+  'rejects invalid in-house discount %s',
+  (amount) => {
+    expect(
+      tariffPeriodSchema.safeParse({
+        ...rule,
+        happyInHouseCoachDiscount: amount,
+        peakInHouseCoachDiscount: 0,
+      }).success,
+    ).toBe(false)
+  },
+)
+it('requires both in-house amounts to prevent partially configured pricing', () => {
+  expect(
+    tariffPeriodSchema.safeParse({ ...rule, happyInHouseCoachDiscount: 20000 })
+      .success,
+  ).toBe(false)
 })

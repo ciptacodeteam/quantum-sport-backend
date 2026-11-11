@@ -533,3 +533,68 @@ it('only accepts active in-house coaches when configuring a tariff', async () =>
   })
   expect(tx.inHousePlan.create).not.toHaveBeenCalled()
 })
+
+const separateRule = {
+  branchId: 'cemara',
+  sport: 'PADEL',
+  effectiveFrom: '2030-01-01',
+  happyStart: 0,
+  happyEnd: 15,
+  peakStart: 15,
+  peakEnd: 24,
+  happyInHouseCoachDiscount: 20000,
+  peakInHouseCoachDiscount: 20000,
+  happyCoachDiscount: 999999,
+  peakCoachDiscount: 999999,
+}
+it.each([0, 20000, 500000])(
+  'credits prepaid court allocation after the in-house discount %s',
+  async (discount) => {
+    const result = await redeemInHouseSelections(tx, {
+      ...input(),
+      tariffRules: [
+        {
+          ...separateRule,
+          happyInHouseCoachDiscount: discount,
+          peakInHouseCoachDiscount: discount,
+        },
+      ],
+    })
+    const courtDue = Math.max(0, 300000 - discount - 250000)
+    expect(result.coveredCourtAmount).toBe(300000 - courtDue)
+    expect(result.extraAmount).toBe(200000)
+    expect(tx.bookingDetail.update).toHaveBeenCalledWith({
+      where: { id: 'detail' },
+      data: { discountPrice: Math.max(0, 300000 - discount) },
+    })
+    expect(
+      tx.bookingCoach.create.mock.calls[0][0].data.inHouseUsage.create,
+    ).toMatchObject({ courtAmount: 250000, coachAmount: 650000 })
+  },
+)
+it('charges the coach share plus discounted court for direct coaching', async () => {
+  tx.inHousePlan.findFirst.mockResolvedValue({
+    id: 'plan',
+    staffId: 'andi',
+    branchId: 'cemara',
+    hours: 1,
+    ...terms,
+    staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
+  })
+  const result = await redeemInHouseSelections(tx, {
+    ...input(),
+    tariffRules: [separateRule],
+    selections: [
+      {
+        planId: 'plan',
+        courtSlotId: 'court-slot',
+        coachSlotId: 'coach-slot',
+        participants: 1,
+      },
+    ],
+  })
+  expect(result.coveredCourtAmount).toBe(20000)
+  expect(result.extraAmount).toBe(650000)
+  expect(300000 - result.coveredCourtAmount + result.extraAmount).toBe(930000)
+  expect(tx.bookingCoach.create.mock.calls[0][0].data.price).toBe(650000)
+})

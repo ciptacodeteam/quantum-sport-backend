@@ -38,6 +38,28 @@ export function getCourtCoachBundleDiscount(
   return 0
 }
 
+/** Null keeps the legacy all-inclusive package behavior until explicitly configured. */
+export function getInHouseCourtDiscount(
+  courtSlot: CourtBundleSlot,
+  rules: TariffRule[] = [],
+) {
+  const bands = resolveTariffPeriod(
+    rules,
+    courtSlot.startAt,
+    courtSlot.branchId ?? branchContext.getStore()?.branchId ?? '',
+    courtSlot.court?.sport ?? CourtSport.PADEL,
+  )
+  if (
+    bands.happyInHouseCoachDiscount == null &&
+    bands.peakInHouseCoachDiscount == null
+  )
+    return null
+  const band = tariffBand(courtSlot.startAt, bands, courtSlot.endAt)
+  if (band === 'happyHour') return bands.happyInHouseCoachDiscount ?? null
+  if (band === 'peakHour') return bands.peakInHouseCoachDiscount ?? null
+  return 0
+}
+
 export function getCourtCoachBundleDiscountByCourtSlot(
   courtSlots: CourtBundleSlot[],
   coachSlots: CoachBundleSlot[],

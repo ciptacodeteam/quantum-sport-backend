@@ -1020,6 +1020,8 @@ model TariffPeriod {
   happyAllDayDays Int[] @default([])
   happyCoachDiscount Int @default(0)
   peakCoachDiscount Int @default(0)
+  happyInHouseCoachDiscount Int?
+  peakInHouseCoachDiscount Int?
   id             String    @id @default(cuid())
   branchId       String
   sport          CourtSport

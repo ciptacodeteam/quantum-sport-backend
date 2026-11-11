@@ -35,6 +35,7 @@ run('in-house coaching transactions', () => {
         role: 'COACH',
         coachType: 'PADEL',
         adminServiceOnly: true,
+        isInHouseCoach: true,
       },
     })
     await raw.staff.create({

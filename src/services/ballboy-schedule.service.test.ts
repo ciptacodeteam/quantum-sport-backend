@@ -45,3 +45,23 @@ it('isolates branches and retries failed maintenance immediately', async () => {
   await ensureBallboySchedules(now)
   expect(mocks.courts).toHaveBeenCalledTimes(3)
 })
+
+it('coalesces concurrent coach maintenance and keeps role and branch caches separate', async () => {
+  const { ensureServiceSchedules } =
+    await import('./service-schedule-maintenance.service')
+  const now = new Date('2030-01-01T00:00:00Z')
+  await Promise.all([
+    ensureServiceSchedules('COACH', now),
+    ensureServiceSchedules('COACH', now),
+  ])
+  await ensureServiceSchedules('COACH', new Date(+now + 15000))
+  expect(mocks.services).toHaveBeenCalledTimes(1)
+  expect(mocks.services).toHaveBeenCalledWith(now, 'COACH')
+  await ensureServiceSchedules('BALLBOY', now)
+  expect(mocks.services).toHaveBeenCalledWith(now, 'BALLBOY')
+  mocks.context.branchId = 'other'
+  await ensureServiceSchedules('COACH', now)
+  expect(mocks.services).toHaveBeenCalledTimes(3)
+  await ensureServiceSchedules('COACH', new Date(+now + 60000))
+  expect(mocks.services).toHaveBeenCalledTimes(4)
+})

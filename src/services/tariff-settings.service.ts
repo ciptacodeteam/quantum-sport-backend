@@ -43,6 +43,16 @@ export async function saveTariffPeriod(
       data.sport,
       false,
     )
+    const inHouseDiscounts = {
+      happyInHouseCoachDiscount:
+        data.happyInHouseCoachDiscount === undefined
+          ? (previous.happyInHouseCoachDiscount ?? null)
+          : data.happyInHouseCoachDiscount,
+      peakInHouseCoachDiscount:
+        data.peakInHouseCoachDiscount === undefined
+          ? (previous.peakInHouseCoachDiscount ?? null)
+          : data.peakInHouseCoachDiscount,
+    }
     const happyAllDayDays =
       data.happyAllDayDays ?? previous.happyAllDayDays ?? []
     const daysChanged =
@@ -59,13 +69,20 @@ export async function saveTariffPeriod(
           effectiveFrom,
         },
       },
-      create: { ...data, happyAllDayDays, effectiveFrom, branchId },
+      create: {
+        ...data,
+        ...inHouseDiscounts,
+        happyAllDayDays,
+        effectiveFrom,
+        branchId,
+      },
       update: {
         happyAllDayDays,
         happyStart: data.happyStart,
         happyEnd: data.happyEnd,
         peakStart: data.peakStart,
         peakEnd: data.peakEnd,
+        ...inHouseDiscounts,
         happyCoachDiscount: data.happyCoachDiscount,
         peakCoachDiscount: data.peakCoachDiscount,
       },

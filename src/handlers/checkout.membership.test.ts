@@ -485,6 +485,8 @@ it('uses the effective branch tariff instead of the old 15:00 boundary at custom
       happyAllDayDays: [],
       happyCoachDiscount: 0,
       peakCoachDiscount: 0,
+      happyInHouseCoachDiscount: null,
+      peakInHouseCoachDiscount: null,
       id: 'rule',
       branchId: 'cemara',
       sport: 'PADEL',

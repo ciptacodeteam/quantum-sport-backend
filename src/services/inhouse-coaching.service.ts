@@ -13,6 +13,8 @@ import { claimSlotsAtomically } from './slot-claim.service'
 import { assertCoachingSport } from '@/lib/coaching-policy'
 import { formatClubWallClock } from '@/lib/club-time'
 import type { z } from 'zod'
+import { getInHouseCourtDiscount } from './booking-bundle-discount.service'
+import type { TariffRule } from '@/lib/tariff-period'
 
 type Tx = Prisma.TransactionClient
 export async function saveInHousePlan(
@@ -186,6 +188,7 @@ export async function redeemInHouseSelections(
     userId: string
     bookingId: string
     courtSlotIds: string[]
+    tariffRules?: TariffRule[]
     clubCoachSlots: { startAt: Date; endAt: Date }[]
   },
 ) {
@@ -291,6 +294,24 @@ export async function redeemInHouseSelections(
         )
     }
     const price = priceInHouseHour(terms, selection.participants)
+    const discount = getInHouseCourtDiscount(court.slot, input.tariffRules)
+    // Prepaid packages have already paid their court allocation; charge only a top-up.
+    const courtDue =
+      discount === null
+        ? 0
+        : Math.max(
+            0,
+            court.discountPrice - discount - (prepaid ? price.courtAmount : 0),
+          )
+    const courtLinePrice =
+      discount === null
+        ? price.courtAmount
+        : Math.max(0, court.discountPrice - discount)
+    const coachDue = prepaid
+      ? 0
+      : discount === null
+        ? terms.hourlyPrice
+        : price.coachAmount
     await tx.bookingCoach.create({
       data: {
         bookingId,
@@ -316,11 +337,11 @@ export async function redeemInHouseSelections(
     })
     await tx.bookingDetail.update({
       where: { id: court.id },
-      data: { discountPrice: price.courtAmount },
+      data: { discountPrice: courtLinePrice },
     })
-    coveredCourtAmount += court.discountPrice
-    courtPriceAdjustment += court.discountPrice - price.courtAmount
-    extraAmount += price.extraAmount + (prepaid ? 0 : terms.hourlyPrice)
+    coveredCourtAmount += court.discountPrice - courtDue
+    courtPriceAdjustment += court.discountPrice - courtLinePrice
+    extraAmount += price.extraAmount + coachDue
   }
   return { coveredCourtAmount, courtPriceAdjustment, extraAmount }
 }
