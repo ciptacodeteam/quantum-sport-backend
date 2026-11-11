@@ -14,7 +14,7 @@ import {
   bookingCheckoutTypes,
   bookingCheckoutWhere,
 } from '@/lib/booking-checkout'
-import { formatClubWallClock, toClubWallDate } from '@/lib/club-time'
+import { clubNowAsWallDate, formatClubWallClock, toClubWallDate } from '@/lib/club-time'
 import { getOngoingSchedule } from '@/lib/ongoing-schedule'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -1305,7 +1305,8 @@ export const exportBookingsHandler = factory.createHandlers(
 export const getOngoingBookingScheduleHandler = factory.createHandlers(
   async (c) => {
     try {
-      const now = dayjs().toDate()
+      const now = new Date()
+      const wallNow = clubNowAsWallDate(now)
 
       // Get confirmed bookings with slots that are happening now or in the near future
       const bookings = await db.booking.findMany({
@@ -1316,7 +1317,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
               details: {
                 some: {
                   slot: {
-                    endAt: { gt: now },
+                    endAt: { gt: wallNow },
                   },
                 },
               },
@@ -1329,7 +1330,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
                   },
                   slot: {
                     isAvailable: false,
-                    endAt: { gt: now },
+                    endAt: { gt: wallNow },
                   },
                 },
               },
@@ -1342,7 +1343,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
                   },
                   slot: {
                     isAvailable: false,
-                    endAt: { gt: now },
+                    endAt: { gt: wallNow },
                   },
                 },
               },
@@ -1505,7 +1506,7 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
           const slotStart = dayjs(schedule.startAt)
 
           // Calculate time difference
-          const minutesFromNow = slotStart.diff(dayjs(), 'minutes')
+          const minutesFromNow = slotStart.diff(dayjs(wallNow), 'minutes')
           const timeDisplay =
             minutesFromNow > 0
               ? `In ${minutesFromNow} minutes`
@@ -1527,8 +1528,8 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
             user: booking.user,
             cashier: booking.cashier,
             schedule: {
-              startAt: schedule.startAt,
-              endAt: schedule.endAt,
+              startAt: formatClubWallClock(schedule.startAt),
+              endAt: formatClubWallClock(schedule.endAt),
               status: schedule.status,
               minutesFromNow,
               timeDisplay,
@@ -1537,8 +1538,8 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
               courtId: detail.court?.id,
               courtName: detail.court?.name,
               courtImage: detail.court?.image,
-              slotStart: detail.slot.startAt,
-              slotEnd: detail.slot.endAt,
+              slotStart: formatClubWallClock(detail.slot.startAt),
+              slotEnd: formatClubWallClock(detail.slot.endAt),
               price: detail.price,
             })),
             coaches: booking.coaches.map((coach) => ({
@@ -1546,16 +1547,16 @@ export const getOngoingBookingScheduleHandler = factory.createHandlers(
               coachName: coach.slot.staff?.name ?? 'Coach',
               coachImage: coach.slot.staff?.image,
               coachType: coach.bookingCoachType.name,
-              slotStart: coach.slot.startAt,
-              slotEnd: coach.slot.endAt,
+              slotStart: formatClubWallClock(coach.slot.startAt),
+              slotEnd: formatClubWallClock(coach.slot.endAt),
               price: coach.price,
             })),
             ballboys: booking.ballboys.map((ballboy) => ({
               ballboyId: ballboy.slot.staff?.id,
               ballboyName: ballboy.slot.staff?.name ?? 'Ballboy',
               ballboyImage: ballboy.slot.staff?.image,
-              slotStart: ballboy.slot.startAt,
-              slotEnd: ballboy.slot.endAt,
+              slotStart: formatClubWallClock(ballboy.slot.startAt),
+              slotEnd: formatClubWallClock(ballboy.slot.endAt),
               price: ballboy.price,
             })),
             inventories: booking.inventories.map((inv) => ({
