@@ -752,7 +752,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             courtSlotIds: courtSlots ?? [],
             clubCoachSlots: selectedCoachSlots,
             tariffRules: inHouseSelections.some(
-              (selection) => 'planId' in selection,
+              (selection) => 'planId' in selection || 'staffId' in selection,
             )
               ? await getTariffPeriods(tx)
               : [],

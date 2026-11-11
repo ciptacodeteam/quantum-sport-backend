@@ -495,3 +495,93 @@ it('rejects applying court membership to the same prepaid coaching checkout', as
   await expect(checkout()).rejects.toThrow(/membership/)
   expect(mocks.tx.invoice.create).not.toHaveBeenCalled()
 })
+
+it.each([
+  [10, 150000, 1],
+  [18, 350000, 1],
+  [10, 150000, 2],
+  [18, 350000, 2],
+])(
+  'saves fixed in-house court prices in the actual invoice for two %s:00 hours at regular %s with %s participants',
+  async (hour, regularPrice, participants) => {
+    mocks.rules[0].inHouseCourtHourlyPrice = 250000
+    const courts = [0, 1].map((index) => ({
+      id: `court-${index}`,
+      courtId: 'court',
+      branchId: 'cemara',
+      court: { sport: 'PADEL' },
+      price: regularPrice,
+      discountPrice: 0,
+      bookingDetails: [],
+      startAt: new Date(`2040-01-02T${hour + index}:00:00Z`),
+      endAt: new Date(`2040-01-02T${hour + index + 1}:00:00Z`),
+    }))
+    const coaches = courts.map((court, index) => ({
+      id: `coach-${index}`,
+      staffId: 'andi',
+      branchId: 'cemara',
+      price: 750000,
+      additionalHourPrice: 100000,
+      staff: {
+        id: 'andi',
+        isActive: true,
+        role: 'COACH',
+        coachType: 'PADEL',
+        isInHouseCoach: true,
+      },
+      startAt: court.startAt,
+      endAt: court.endAt,
+    }))
+    const expectedTotal = 2000000 + (participants - 1) * 200000
+    mocks.payload = {
+      ...mocks.payload,
+      totalHours: 2,
+      courtSlots: courts.map((slot) => slot.id),
+      coachSlots: [],
+      expectedTotal,
+      inHouseSelections: coaches.map((coach, index) => ({
+        staffId: 'andi',
+        courtSlotId: courts[index].id,
+        coachSlotId: coach.id,
+        participants,
+      })),
+    }
+    mocks.tx.slot.findMany.mockImplementation(({ where }: any) =>
+      where.type === 'COACH' ? coaches : courts,
+    )
+    mocks.tx.slot.findFirst = vi
+      .fn()
+      .mockImplementation(({ where }: any) =>
+        coaches.find((coach) => coach.id === where.id),
+      )
+    mocks.tx.bookingDetail.findFirst.mockImplementation(({ where }: any) => {
+      const court = courts.find((court) => court.id === where.slotId)!
+      return {
+        id: `detail-${court.id}`,
+        slotId: court.id,
+        discountPrice: court.price,
+        slot: court,
+      }
+    })
+    await checkout()
+    expect(mocks.tx.bookingDetail.update).toHaveBeenCalledTimes(2)
+    for (const [args] of mocks.tx.bookingDetail.update.mock.calls)
+      expect(args.data).toEqual({ discountPrice: 250000 })
+    expect(mocks.tx.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          courtNormalPrice: regularPrice * 2,
+          courtDiscountPrice: 500000,
+          totalPrice: expectedTotal,
+        }),
+      }),
+    )
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: expectedTotal }),
+      }),
+    )
+    for (const [args] of mocks.tx.bookingCoach.create.mock.calls)
+      expect(args.data.price).toBe(750000 + (participants - 1) * 100000)
+  },
+)

@@ -1,0 +1,172 @@
+import { beforeEach, expect, it, vi } from 'vitest'
+import { Hono } from 'hono'
+import * as XLSX from 'xlsx'
+const mocks = vi.hoisted(() => ({ invoices: vi.fn(), tariffs: vi.fn() }))
+vi.mock('@/lib/prisma', () => ({
+  db: {
+    invoice: { findMany: mocks.invoices },
+    tariffPeriod: { findMany: mocks.tariffs },
+  },
+}))
+vi.mock('@/services/upload.service', () => ({ getFileUrl: vi.fn() }))
+import { getIncomeBySourceAnalytics } from './analytics.service'
+import { buildServiceIncome } from './service-income.service'
+import { createIncomeSourceWorkbook } from './income-source-export'
+import { serviceIncomeExportHandler } from '@/handlers/admin/service-income.handler'
+const start = new Date('2026-11-11T17:00:00Z')
+const end = new Date('2026-11-12T16:59:59.999Z')
+const range = {
+  startAt: new Date('2026-11-12T12:00:00Z'),
+  endAt: new Date('2026-11-12T13:00:00Z'),
+}
+const service = (id: string, price: number) => ({
+  id,
+  price,
+  status: 'CONFIRMED',
+  coachingGroupId: 'club-a',
+  coachingGroupName: 'Club A',
+  slot: { ...range, staff: { id, name: id } },
+})
+const invoice = (courtPrice: number, coachPrice: number, promo = 0) => ({
+  id: 'invoice-1',
+  number: 'INV-001',
+  status: 'PAID',
+  paidAt: start,
+  branchId: 'cemara',
+  branch: { name: 'Cemara' },
+  user: { id: 'customer', name: 'Budi' },
+  payment: { method: { name: 'Tunai' } },
+  processingFee: 5000,
+  total: courtPrice + coachPrice + 50000 - promo + 5000,
+  booking: {
+    id: 'booking-1',
+    cashierId: 'cashier',
+    purpose: 'REGULAR',
+    status: 'CONFIRMED',
+    totalPrice: courtPrice + coachPrice + 50000 - promo,
+    promoDiscountAmount: promo,
+    courtDiscountPrice: courtPrice,
+    details: [
+      {
+        price: 350000,
+        discountPrice: courtPrice,
+        slot: { ...range, court: { name: 'Court 2' } },
+      },
+    ],
+    coaches: [service('coach', coachPrice)],
+    ballboys: [service('ballboy', 50000)],
+  },
+})
+const serviceReport = (data: unknown) =>
+  buildServiceIncome([data] as Parameters<typeof buildServiceIncome>[0])
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.tariffs.mockRejectedValue(
+    new Error('Historical reports must not recalculate today’s tariffs'),
+  )
+})
+it.each([
+  ['happy hour', 105000, 0],
+  ['peak hour', 325000, 0],
+  ['happy hour plus promo', 105000, 35500],
+  ['fully discounted court', 0, 0],
+] as const)(
+  'keeps the recorded %s court price out of club payouts in both income reports',
+  async (_, courtPrice, promo) => {
+    const data = invoice(courtPrice, 200000, promo)
+    mocks.invoices.mockResolvedValue([data])
+    const sources = await getIncomeBySourceAnalytics(start, end)
+    const services = serviceReport(data)
+    const factor = promo ? 0.9 : 1
+    expect(sources.summary.totalNetAmount).toBe(data.total - data.processingFee)
+    expect(services.summary.coachAmount).toBe(200000 * factor)
+    expect(services.summary.ballboyAmount).toBe(50000 * factor)
+    expect(sources.summary.totalNetAmount - services.summary.totalAmount).toBe(
+      courtPrice * factor,
+    )
+    expect(mocks.tariffs).not.toHaveBeenCalled()
+  },
+)
+it.each([1, 2, 3])(
+  'keeps two fixed in-house court hours, full coach fees and %s participants reconciled without adding them to club payables',
+  async (participants) => {
+    const data = invoice(500000, 1500000 + (participants - 1) * 200000)
+    data.booking.coaches[0] = {
+      ...data.booking.coaches[0],
+      bookingCoachType: { name: 'Coaching In-house' },
+      inHouseUsage: null,
+    } as (typeof data.booking.coaches)[0]
+    data.booking.details = [0, 1].map((index) => ({
+      price: 150000,
+      discountPrice: 250000,
+      slot: {
+        ...range,
+        court: { name: 'Court 2' },
+        startAt: new Date(+range.startAt + index * 3600000),
+        endAt: new Date(+range.endAt + index * 3600000),
+      },
+    }))
+    mocks.invoices.mockResolvedValue([data])
+    const sources = await getIncomeBySourceAnalytics(start, end)
+    const services = serviceReport(data)
+    expect(sources.summary.totalNetAmount).toBe(
+      2050000 + (participants - 1) * 200000,
+    )
+    expect(services.summary).toMatchObject({
+      coachAmount: 0,
+      ballboyAmount: 50000,
+      totalAmount: 50000,
+    })
+    expect(
+      sources.summary.totalNetAmount -
+        data.booking.coaches[0].price -
+        services.summary.totalAmount,
+    ).toBe(500000)
+    expect(mocks.tariffs).not.toHaveBeenCalled()
+  },
+)
+it('keeps the historical court discount after a coach cancellation and applies promo shares consistently', async () => {
+  const data = invoice(105000, 200000, 35500)
+  data.booking.coaches[0].status = 'CANCELLED'
+  mocks.invoices.mockResolvedValue([data])
+  const sources = await getIncomeBySourceAnalytics(start, end)
+  const services = serviceReport(data)
+  expect(sources.summary.totalExcludedAmount).toBe(180000)
+  expect(sources.summary.totalNetAmount).toBe(139500)
+  expect(services.summary.totalAmount).toBe(45000)
+  expect(sources.summary.totalNetAmount - services.summary.totalAmount).toBe(
+    94500,
+  )
+})
+it('exports the same discounted-court allocation in Income by Source and Income Layanan Excel', async () => {
+  const data = invoice(105000, 200000, 35500)
+  mocks.invoices.mockResolvedValue([data])
+  const sources = await getIncomeBySourceAnalytics(start, end)
+  const sourceBook = createIncomeSourceWorkbook(sources)
+  const sourceDetails = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+    sourceBook.Sheets['Detail transaksi'],
+  )
+  expect(sourceDetails[0].Revenue).toBe(319500)
+  const app = new Hono<any>()
+  app.use('*', async (c, next) => {
+    c.set('admin', { id: 'admin', role: 'ADMIN' })
+    await next()
+  })
+  app.get('/services/export', ...serviceIncomeExportHandler)
+  const query = new URLSearchParams({
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+  })
+  const response = await app.request(`/services/export?${query}`)
+  expect(response.status).toBe(200)
+  const serviceBook = XLSX.read(await response.arrayBuffer(), { type: 'array' })
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+    serviceBook.Sheets['Detail transaksi'],
+  )
+  expect(rows.find((row) => row.Jenis === 'COACH')?.['Hak club (100%)']).toBe(
+    180000,
+  )
+  expect(rows.find((row) => row.Jenis === 'BALLBOY')?.['Hak club (100%)']).toBe(
+    45000,
+  )
+})
