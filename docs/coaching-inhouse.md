@@ -5,14 +5,14 @@ Operations menu: **Booking System → Coaching In-house** (`/admin/coaching-inho
 ## Operation
 
 1. Create the coach profile under **Master Data → Coach In-house** (`/admin/coach-inhouse`) and configure available hours from its schedule action. Only admins manage profiles. Cashiers access package sales and balances under **Booking System → Coaching In-house**.
-2. Under **Paket & Tarif**, configure each coach's 1, 5 and/or 10-hour products. Price and court allocation are in rupiah per hour. The coach's base share is price minus the court allocation. Creating an active in-house product identifies that coach as an in-house coach for future booking choices; existing club bookings are not repriced.
+2. Open **Master Data → Coach In-house → Jadwal & Harga → Paket & Tarif** for the selected coach. ADMIN and SUPER_ADMIN configure that coach's 1, 5 and/or 10-hour products. Price and court allocation are in rupiah per hour. The coach's base share is price minus the court allocation. Creating an active in-house product identifies that coach as an in-house coach for future booking choices; existing club bookings are not repriced.
 3. Under **Kuota Customer**, search/select an existing customer, select a product and the offline method through which payment has been received. Confirming records a paid invoice and creates the prepaid hours. Sale retries use an idempotency key.
 4. In **Booking Lapangan → Tambah Layanan**, eligible paid packages appear only for their owner, branch and sport. Nothing is selected automatically. Each explicit package choice reserves one hour with its own coach and participant count. Court membership and recurring court bookings cannot cover the same checkout. Selecting club coaching clears any package choice on that playing hour; selecting a package clears club choices on that hour.
 5. Packages can be consumed on different dates, are bound to the original coach, and currently have no expiry date. Rates are copied to the wallet on purchase. Catalog edits only affect subsequent purchases.
 
 ## Coaching satuan (admin only)
 
-Configure an active **1-hour** product for each coach in **Booking System → Coaching In-house → Paket & Tarif**. In **Booking Lapangan → Tambah Layanan**, select **Coaching satuan** for each court hour to coach, then choose the offline payment method. Two selected hours use the 1-hour tariff twice; there is no need to create or sell a 2-hour product or prepaid wallet. Direct coaching also supports walk-in customers.
+Configure an active **1-hour** product for each coach in **Master Data → Coach In-house → Jadwal & Harga → Paket & Tarif**. In **Booking Lapangan → Tambah Layanan**, select **Coaching satuan** for each court hour to coach, then choose the offline payment method. Two selected hours use the 1-hour tariff twice; there is no need to create or sell a 2-hour product or prepaid wallet. Direct coaching also supports walk-in customers.
 
 The direct amount due per hour is the coach-specific 1-hour tariff plus Rp100,000 for each additional participant. The ordinary court charge is replaced in full. For a Rp1,000,000 tariff with Rp250,000 court allocation, a two-hour booking costs Rp2,000,000: Rp500,000 court and Rp1,500,000 coach. Two additional participants add Rp400,000 for those two hours, all allocated to the coach. No club bundle discount is added to those hours. Other selected court hours and ballboy services retain their existing prices.
 
@@ -85,3 +85,9 @@ With explicit in-house discounts:
 - Example: court Rp350,000, discount Rp50,000, package court allocation Rp250,000 → prepaid customer pays a Rp50,000 court top-up. Package coach/court allocation remains unchanged.
 
 The frontend preview and server checkout use the playing-date tariff. Saved booking prices are retained when tariff settings change. Apply `npm run db:inhouse-coaching-discounts` before deploying the new Prisma Client. Production Docker startup also applies this additive SQL script automatically before starting the app.
+
+## Package management location
+
+**Booking System → Coaching In-house** contains customer package sales, quota balances, and usage history. Its package-management tab has been removed for all roles. Cashiers can still select existing active packages when recording sales.
+
+**Master Data → Coach In-house → Jadwal & Harga → Paket & Tarif** contains package cards, details and create/edit controls for the opened coach only. The coach is fixed by the profile; the form cannot switch staff. Only ADMIN and SUPER_ADMIN can access this editor, and backend plan writes continue to enforce `requireAdmin`.
