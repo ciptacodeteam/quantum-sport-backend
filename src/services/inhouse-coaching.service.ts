@@ -294,15 +294,12 @@ export async function redeemInHouseSelections(
         )
     }
     const price = priceInHouseHour(terms, selection.participants)
-    const discount = getInHouseCourtDiscount(court.slot, input.tariffRules)
-    // Prepaid packages have already paid their court allocation; charge only a top-up.
+    // Tariff discounts apply only to direct hourly coaching; prepaid terms stay frozen.
+    const discount = prepaid
+      ? null
+      : getInHouseCourtDiscount(court.slot, input.tariffRules)
     const courtDue =
-      discount === null
-        ? 0
-        : Math.max(
-            0,
-            court.discountPrice - discount - (prepaid ? price.courtAmount : 0),
-          )
+      discount === null ? 0 : Math.max(0, court.discountPrice - discount)
     const courtLinePrice =
       discount === null
         ? price.courtAmount

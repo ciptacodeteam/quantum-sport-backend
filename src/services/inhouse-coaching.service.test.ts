@@ -548,7 +548,7 @@ const separateRule = {
   peakCoachDiscount: 999999,
 }
 it.each([0, 20000, 500000])(
-  'credits prepaid court allocation after the in-house discount %s',
+  'preserves prepaid package pricing regardless of hourly discount %s',
   async (discount) => {
     const result = await redeemInHouseSelections(tx, {
       ...input(),
@@ -560,12 +560,11 @@ it.each([0, 20000, 500000])(
         },
       ],
     })
-    const courtDue = Math.max(0, 300000 - discount - 250000)
-    expect(result.coveredCourtAmount).toBe(300000 - courtDue)
+    expect(result.coveredCourtAmount).toBe(300000)
     expect(result.extraAmount).toBe(200000)
     expect(tx.bookingDetail.update).toHaveBeenCalledWith({
       where: { id: 'detail' },
-      data: { discountPrice: Math.max(0, 300000 - discount) },
+      data: { discountPrice: 250000 },
     })
     expect(
       tx.bookingCoach.create.mock.calls[0][0].data.inHouseUsage.create,

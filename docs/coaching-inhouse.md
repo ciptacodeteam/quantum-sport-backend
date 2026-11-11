@@ -73,16 +73,16 @@ Deletion stores `deletedAt` and `deletedById`, hides the package from wallet lis
 Before deployment, run `npm run db:inhouse-coach-profiles` and `npm run db:generate`.
 This adds `Staff.isInHouseCoach` and marks existing coaches with in-house plans (including inactive plans) as in-house, preserving existing package configuration. New profiles created through **Master Data → Coach In-house** carry this marker immediately, independently of tariff creation. The tariff dropdown only lists active marked coaches; the backend enforces the same restriction on tariff writes. Ordinary profile edits preserve the marker when it is omitted.
 
-## Separate court discounts for Club and In-house coaching
+## Separate court discounts for Club and hourly In-house coaching
 
-Configure **Master Data → Pengaturan Jam Tarif → Potongan lapangan coaching** for the selected branch and sport. Club and In-house have separate Happy Hour/Peak Hour amounts and share the selected tariff bands, full Happy Hour days, and effective playing date. Existing Club values remain unchanged.
+Configure **Master Data → Pengaturan Jam Tarif → Potongan lapangan coaching** for the selected branch and sport. Club and hourly In-house coaching have separate Happy Hour/Peak Hour amounts and share the selected tariff bands, full Happy Hour days, and effective playing date. Existing Club values remain unchanged.
 
-In-house defaults to the previous inclusive package behavior (`NULL` amounts). Enable **Gunakan potongan in-house terpisah** and save both amounts to switch to explicit discounts. Zero disables the discount for that band; disabling the option restores inclusive package behavior. Discounts cannot exceed the court price and Club/In-house cannot stack on one court hour.
+Hourly In-house coaching defaults to the inclusive single-hour tariff (`NULL` amounts). Enable **Gunakan potongan coaching satuan** and save both amounts to apply court discounts to direct hourly coaching (`planId`) only. Zero disables the discount for that band; disabling the option restores the inclusive single-hour tariff. Prepaid wallet redemptions (`walletId`) never use this setting. Discounts cannot exceed the court price and Club/In-house cannot stack on one court hour.
 
 With explicit in-house discounts:
 - Direct coaching: discounted court price + coach share + participant extras.
-- Prepaid wallet: only the remaining court top-up after the discount and already-paid court allocation + participant extras.
-- Example: court Rp350,000, discount Rp50,000, package court allocation Rp250,000 → prepaid customer pays a Rp50,000 court top-up. Package coach/court allocation remains unchanged.
+- Prepaid wallet: the court remains covered by the purchased package; only participant extras are charged at redemption. Frozen package coach/court allocations are preserved.
+- Example: with a Rp350,000 court and Rp50,000 hourly discount, direct hourly coaching pays Rp300,000 for the court plus the coach share. Redeeming a prepaid package does not use that discount and does not add a court top-up.
 
 The frontend preview and server checkout use the playing-date tariff. Saved booking prices are retained when tariff settings change. Apply `npm run db:inhouse-coaching-discounts` before deploying the new Prisma Client. Production Docker startup also applies this additive SQL script automatically before starting the app.
 

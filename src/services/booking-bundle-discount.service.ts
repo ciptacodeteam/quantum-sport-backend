@@ -38,7 +38,7 @@ export function getCourtCoachBundleDiscount(
   return 0
 }
 
-/** Null keeps the legacy all-inclusive package behavior until explicitly configured. */
+/** For direct hourly coaching only; null keeps the inclusive single-hour tariff. */
 export function getInHouseCourtDiscount(
   courtSlot: CourtBundleSlot,
   rules: TariffRule[] = [],

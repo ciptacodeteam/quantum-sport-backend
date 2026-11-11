@@ -58,6 +58,61 @@ function incomePlayingSchedules(booking: any) {
   }))
 }
 
+type IncomeServiceCancellation = {
+  status?: string
+  price?: number
+  cancelledAt?: Date | null
+  cancellationReason?: string | null
+  slot?: { staff?: { name: string } | null }
+}
+
+/** Paid invoices remain payment history even when individual services are cancelled. */
+function incomeCancellation(invoice: {
+  booking?: {
+    status?: string
+    details?: unknown[]
+    coaches?: IncomeServiceCancellation[]
+    ballboys?: IncomeServiceCancellation[]
+  } | null
+  classBooking?: { status?: string } | null
+}) {
+  const booking = invoice.booking
+  const services = [
+    ...(booking?.coaches ?? []).map((item) => ({
+      ...item,
+      kind: 'COACH' as const,
+    })),
+    ...(booking?.ballboys ?? []).map((item) => ({
+      ...item,
+      kind: 'BALLBOY' as const,
+    })),
+  ]
+  const cancelled = services.filter((item) => item.status === 'CANCELLED')
+  const fullyCancelled =
+    booking?.status === 'CANCELLED' ||
+    invoice.classBooking?.status === 'CANCELLED' ||
+    (!!cancelled.length &&
+      !booking?.details?.length &&
+      cancelled.length === services.length)
+  return {
+    paymentStatus: 'PAID' as const,
+    bookingStatus: booking?.status ?? invoice.classBooking?.status ?? null,
+    cancellationStatus: fullyCancelled
+      ? ('CANCELLED' as const)
+      : cancelled.length
+        ? ('PARTIAL' as const)
+        : ('NONE' as const),
+    cancelledServices: cancelled.map((item) => ({
+      kind: item.kind,
+      name:
+        item.slot?.staff?.name ?? (item.kind === 'COACH' ? 'Coach' : 'Ballboy'),
+      amount: item.price ?? 0,
+      cancelledAt: item.cancelledAt ?? null,
+      reason: item.cancellationReason ?? null,
+    })),
+  }
+}
+
 /**
  * Get income analytics separated by source
  * Sources: Online bookings, Cashier bookings, Class bookings, Memberships
@@ -92,10 +147,34 @@ export async function getIncomeBySourceAnalytics(
           },
         },
         coaches: {
-          select: { slot: { select: { startAt: true, endAt: true } } },
+          select: {
+            status: true,
+            price: true,
+            cancelledAt: true,
+            cancellationReason: true,
+            slot: {
+              select: {
+                startAt: true,
+                endAt: true,
+                staff: { select: { name: true } },
+              },
+            },
+          },
         },
         ballboys: {
-          select: { slot: { select: { startAt: true, endAt: true } } },
+          select: {
+            status: true,
+            price: true,
+            cancelledAt: true,
+            cancellationReason: true,
+            slot: {
+              select: {
+                startAt: true,
+                endAt: true,
+                staff: { select: { name: true } },
+              },
+            },
+          },
         },
       },
     },
@@ -285,6 +364,7 @@ export async function getIncomeBySourceAnalytics(
         invoice.booking?.serviceForBookingId ?? invoice.booking?.id ?? null,
       branchId: invoice.branchId,
       playingSchedules: incomePlayingSchedules(invoice.booking),
+      ...incomeCancellation(invoice),
       customerName: invoice.user?.name ?? 'Customer tidak tersedia',
       branchName: invoice.branch?.name ?? invoice.branchId,
       source: invoice.booking

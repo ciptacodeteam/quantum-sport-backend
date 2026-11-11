@@ -751,7 +751,11 @@ export const adminCheckoutHandler = factory.createHandlers(
             bookingId: booking.id,
             courtSlotIds: courtSlots ?? [],
             clubCoachSlots: selectedCoachSlots,
-            tariffRules: await getTariffPeriods(tx),
+            tariffRules: inHouseSelections.some(
+              (selection) => 'planId' in selection,
+            )
+              ? await getTariffPeriods(tx)
+              : [],
           })
           totalPrice += redemption.extraAmount - redemption.coveredCourtAmount
           courtDiscountPrice -= redemption.courtPriceAdjustment

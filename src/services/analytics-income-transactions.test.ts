@@ -233,3 +233,109 @@ it('records in-house package sales once in their own revenue source', async () =
   expect(data.bySource.InHouse).toMatchObject({ count: 1, total: 4500000 })
   expect(data.transactions[0].source).toBe('InHouse')
 })
+
+it('marks a cancelled paid ballboy-only invoice even when its booking remains confirmed', async () => {
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('cancelled-ballboy', 45000),
+      booking: {
+        id: 'service',
+        status: 'CONFIRMED',
+        cashierId: 'cashier',
+        details: [],
+        coaches: [],
+        ballboys: [
+          {
+            status: 'CANCELLED',
+            price: 45000,
+            cancelledAt: new Date('2026-10-01T01:00:00Z'),
+            cancellationReason: 'Customer membatalkan',
+            slot: {
+              startAt: new Date('2026-10-02T19:00:00Z'),
+              endAt: new Date('2026-10-02T20:00:00Z'),
+              staff: { name: 'Topan' },
+            },
+          },
+        ],
+      },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions[0]).toMatchObject({
+    paymentStatus: 'PAID',
+    bookingStatus: 'CONFIRMED',
+    cancellationStatus: 'CANCELLED',
+    amount: 45000,
+    cancelledServices: [
+      {
+        kind: 'BALLBOY',
+        name: 'Topan',
+        amount: 45000,
+        reason: 'Customer membatalkan',
+      },
+    ],
+  })
+  expect(data.summary.totalNetAmount).toBe(45000)
+  expect(
+    mocks.invoices.mock.calls[0][0].include.booking.include.ballboys.select,
+  ).toMatchObject({ status: true, cancelledAt: true, cancellationReason: true })
+})
+it('marks partial cancellations when the court or another service remains active', async () => {
+  const slot = {
+    startAt: new Date('2026-10-02T19:00:00Z'),
+    endAt: new Date('2026-10-02T20:00:00Z'),
+  }
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('partial', 345000),
+      booking: {
+        id: 'court',
+        status: 'CONFIRMED',
+        details: [{ slot: { ...slot, court: { name: 'Court 1' } } }],
+        coaches: [],
+        ballboys: [{ status: 'CANCELLED', price: 45000, slot }],
+      },
+    },
+    {
+      ...invoice('mixed-services', 90000),
+      booking: {
+        id: 'services',
+        status: 'CONFIRMED',
+        details: [],
+        ballboys: [
+          { status: 'CANCELLED', price: 45000, slot },
+          { status: 'CONFIRMED', price: 45000, slot },
+        ],
+      },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions.map((row) => row.cancellationStatus)).toEqual([
+    'PARTIAL',
+    'PARTIAL',
+  ])
+  expect(data.summary.totalGrossAmount).toBe(435000)
+})
+it('marks cancelled whole bookings and classes without assuming a refund', async () => {
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('court', 300000),
+      booking: { id: 'court', status: 'CANCELLED' },
+    },
+    {
+      ...invoice('class', 100000),
+      classBooking: { id: 'class', status: 'CANCELLED' },
+    },
+    {
+      ...invoice('active', 50000),
+      booking: { id: 'active', status: 'CONFIRMED' },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions.map((row) => row.cancellationStatus)).toEqual([
+    'CANCELLED',
+    'CANCELLED',
+    'NONE',
+  ])
+  expect(data.summary.totalGrossAmount).toBe(450000)
+})
