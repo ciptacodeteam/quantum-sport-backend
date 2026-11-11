@@ -1,3 +1,5 @@
+import { createIncomeSourceWorkbook } from '@/services/income-source-export'
+import clubTime from '@/lib/club-time'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -876,18 +878,45 @@ const dateRangeSchema = z.object({
   source: z.enum(['cashier', 'online']).optional(),
 })
 
+const incomeSourceDates = (query: z.infer<typeof dateRangeSchema>) => ({
+  startDate: query.startDate
+    ? new Date(query.startDate)
+    : dayjs().subtract(1, 'month').startOf('day').toDate(),
+  endDate: query.endDate
+    ? new Date(query.endDate)
+    : dayjs().endOf('day').toDate(),
+})
+
+export const exportIncomeBySourceHandler = factory.createHandlers(
+  zValidator('query', dateRangeSchema, validateHook),
+  async (c) => {
+    const query = c.req.valid('query')
+    const { startDate, endDate } = incomeSourceDates(query)
+    const report = await getIncomeBySourceAnalytics(
+      startDate,
+      endDate,
+      query.source,
+    )
+    const book = createIncomeSourceWorkbook(report)
+    c.header(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    c.header(
+      'Content-Disposition',
+      `attachment; filename="income-by-source-${clubTime(startDate).format('YYYY-MM-DD')}-${clubTime(endDate).format('YYYY-MM-DD')}.xlsx"`,
+    )
+    return c.body(XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }))
+  },
+)
+
 export const getIncomeBySourceHandler = factory.createHandlers(
   zValidator('query', dateRangeSchema, validateHook),
   async (c) => {
     try {
       const query = c.req.valid('query')
 
-      const startDate = query.startDate
-        ? new Date(query.startDate)
-        : dayjs().subtract(1, 'month').startOf('day').toDate()
-      const endDate = query.endDate
-        ? new Date(query.endDate)
-        : dayjs().endOf('day').toDate()
+      const { startDate, endDate } = incomeSourceDates(query)
 
       const source = (query.source as 'cashier' | 'online') || undefined
       const data = await getIncomeBySourceAnalytics(startDate, endDate, source)

@@ -679,84 +679,92 @@ it('rejects a direct scheduled coach that is not an active in-house coach', asyn
   ).rejects.toThrow(/tidak tersedia/)
 })
 
-it('uses consecutive additional-hour coach prices with fixed court pricing even when choices arrive reversed', async () => {
-  const first = {
-    id: 'coach-slot',
-    staffId: 'andi',
-    branchId: 'cemara',
-    price: 400000,
-    additionalHourPrice: 300000,
-    ...range,
-    staff: {
-      isActive: true,
-      role: 'COACH',
-      coachType: 'PADEL',
-      isInHouseCoach: true,
-    },
-  }
-  const second = {
-    ...first,
-    id: 'coach-second',
-    startAt: range.endAt,
-    endAt: new Date(+range.endAt + 3600000),
-  }
-  tx.slot.findMany = vi.fn().mockResolvedValue([second, first])
-  tx.slot.findFirst.mockImplementation(({ where }: any) =>
-    where.id === second.id ? second : first,
-  )
-  tx.bookingDetail.findFirst.mockImplementation(({ where }: any) => {
-    const slot = where.slotId === 'court-second' ? second : first
-    return {
-      id: `detail-${where.slotId}`,
-      slotId: where.slotId,
-      discountPrice: 300000,
-      slot: { ...slot, id: where.slotId, court: { sport: 'PADEL' } },
+it.each([1, 2, 3])(
+  'charges the full scheduled price per hour and separate extras for %s participants with reversed choices',
+  async (participants) => {
+    const first = {
+      id: 'coach-slot',
+      staffId: 'andi',
+      branchId: 'cemara',
+      price: 750000,
+      additionalHourPrice: 100000,
+      ...range,
+      staff: {
+        isActive: true,
+        role: 'COACH',
+        coachType: 'PADEL',
+        isInHouseCoach: true,
+      },
     }
-  })
-  const result = await redeemInHouseSelections(tx, {
-    ...input(),
-    courtSlotIds: ['court-slot', 'court-second'],
-    selections: [
-      {
-        staffId: 'andi',
-        coachSlotId: second.id,
-        courtSlotId: 'court-second',
-        participants: 1,
-      },
-      {
-        staffId: 'andi',
-        coachSlotId: first.id,
-        courtSlotId: 'court-slot',
-        participants: 1,
-      },
-    ],
-    tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: 250000 }],
-  })
-  expect(result).toEqual({
-    coveredCourtAmount: 100000,
-    courtPriceAdjustment: 100000,
-    extraAmount: 700000,
-  })
-})
+    const second = {
+      ...first,
+      id: 'coach-second',
+      startAt: range.endAt,
+      endAt: new Date(+range.endAt + 3600000),
+    }
+    tx.slot.findMany = vi.fn().mockResolvedValue([second, first])
+    tx.slot.findFirst.mockImplementation(({ where }: any) =>
+      where.id === second.id ? second : first,
+    )
+    tx.bookingDetail.findFirst.mockImplementation(({ where }: any) => {
+      const slot = where.slotId === 'court-second' ? second : first
+      return {
+        id: `detail-${where.slotId}`,
+        slotId: where.slotId,
+        discountPrice: 300000,
+        slot: { ...slot, id: where.slotId, court: { sport: 'PADEL' } },
+      }
+    })
+    const result = await redeemInHouseSelections(tx, {
+      ...input(),
+      courtSlotIds: ['court-slot', 'court-second'],
+      selections: [
+        {
+          staffId: 'andi',
+          coachSlotId: second.id,
+          courtSlotId: 'court-second',
+          participants,
+        },
+        {
+          staffId: 'andi',
+          coachSlotId: first.id,
+          courtSlotId: 'court-slot',
+          participants,
+        },
+      ],
+      tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: 250000 }],
+    })
+    expect(result).toEqual({
+      coveredCourtAmount: 100000,
+      courtPriceAdjustment: 100000,
+      extraAmount: 1500000 + (participants - 1) * 200000,
+    })
+    expect(tx.bookingCoach.create).toHaveBeenCalledTimes(2)
+    for (const call of tx.bookingCoach.create.mock.calls) {
+      expect(call[0].data.price).toBe(750000 + (participants - 1) * 100000)
+    }
+    expect(600000 - result.coveredCourtAmount + result.extraAmount).toBe(
+      2000000 + (participants - 1) * 200000,
+    )
+  },
+)
 
 it('uses the normal court price when fixed pricing is disabled, without reusing legacy discounts', async () => {
-  tx.slot.findMany = vi
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 'coach-slot',
-        staffId: 'andi',
-        branchId: 'cemara',
-        price: 400000,
-        ...range,
-        staff: {
-          isActive: true,
-          role: 'COACH',
-          coachType: 'PADEL',
-          isInHouseCoach: true,
-        },
+  tx.slot.findMany = vi.fn().mockResolvedValue([
+    {
+      id: 'coach-slot',
+      staffId: 'andi',
+      branchId: 'cemara',
+      price: 400000,
+      ...range,
+      staff: {
+        isActive: true,
+        role: 'COACH',
+        coachType: 'PADEL',
+        isInHouseCoach: true,
       },
-    ])
+    },
+  ])
   const result = await redeemInHouseSelections(tx, {
     ...input(),
     selections: [

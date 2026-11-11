@@ -1,4 +1,3 @@
-import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/prisma'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -237,7 +236,6 @@ export async function redeemInHouseSelections(
         include: { staff: true },
       })
     : []
-  const schedulePrices = priceCoachSessions(scheduleSlots)
   for (const selection of selections) {
     const prepaid = 'walletId' in selection
     const scheduled = 'staffId' in selection
@@ -258,8 +256,7 @@ export async function redeemInHouseSelections(
             branchId: scheduleSlot.branchId,
             staff: scheduleSlot.staff,
             name: 'tarif Jadwal & Harga',
-            hourlyPrice:
-              schedulePrices.get(scheduleSlot.id) ?? scheduleSlot.price,
+            hourlyPrice: scheduleSlot.price,
             courtHourlyShare: 0,
             extraParticipantHourlyPrice: 100000,
           }

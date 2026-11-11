@@ -13,6 +13,7 @@ import {
   getDashboardStatsHandler,
   getDailyTransactionsHandler,
   getIncomeBySourceHandler,
+  exportIncomeBySourceHandler,
   getPaymentMethodsHandler,
   getBusinessInsightsHandler,
   exportBulkDataHandler,
@@ -28,6 +29,7 @@ const adminAnalyticsRoute = createRouter()
   .get('/dashboard', ...getDashboardStatsHandler)
   .get('/daily-transactions', ...getDailyTransactionsHandler)
   .get('/income-by-source', ...getIncomeBySourceHandler)
+  .get('/income-by-source/export', ...exportIncomeBySourceHandler)
   .get('/payment-methods', ...getPaymentMethodsHandler)
   .get('/business-insights', ...getBusinessInsightsHandler)
   .get('/export/excel', ...exportAnalyticsToExcelHandler)
