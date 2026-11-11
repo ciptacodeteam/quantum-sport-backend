@@ -1,3 +1,8 @@
+import { serviceRescheduleContext } from '@/services/service-reschedule-context.service'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { validateHook } from '@/helpers/validate-hook'
+import { ok } from '@/lib/response'
 import { cancelCoachBookingHandler } from '@/handlers/admin/booked-coach.handler'
 import { createRouter } from '@/lib/create-app'
 import { requireAdmin, requireAnyAdminRole } from '@/middlewares/auth'
@@ -27,6 +32,24 @@ export default createRouter()
   .get('/', read, ...listCoachingHandler)
   .post('/', requireAdmin, ...createCoachingHandler)
   .get('/bookings', read, ...listCoachingBookingsHandler)
+  .get(
+    '/bookings/:id/reschedule-court',
+    write,
+    zValidator(
+      'query',
+      z.object({ kind: z.enum(['COACH', 'BALLBOY']) }),
+      validateHook,
+    ),
+    async (c) =>
+      c.json(
+        ok(
+          await serviceRescheduleContext(
+            c.req.valid('query').kind,
+            c.req.param('id'),
+          ),
+        ),
+      ),
+  )
   .patch(
     '/bookings/:id/club-settlement',
     requireAdmin,

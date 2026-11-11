@@ -13,6 +13,8 @@ import {
 } from '@/lib/booking-checkout'
 import { clubWallTime } from '@/lib/club-time'
 import { db } from '@/lib/prisma'
+import { allocateServicePayment } from './service-income.service'
+import { lastRescheduleAudit } from '@/lib/booking-reschedule-audit'
 import { BookingStatus, CourtSport, PaymentStatus } from '@prisma/client'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
@@ -68,8 +70,10 @@ type IncomeServiceCancellation = {
 
 /** Paid invoices remain payment history even when individual services are cancelled. */
 function incomeCancellation(invoice: {
+  status?: string
   booking?: {
     status?: string
+    serviceForBooking?: { status?: string } | null
     details?: unknown[]
     coaches?: IncomeServiceCancellation[]
     ballboys?: IncomeServiceCancellation[]
@@ -89,13 +93,15 @@ function incomeCancellation(invoice: {
   ]
   const cancelled = services.filter((item) => item.status === 'CANCELLED')
   const fullyCancelled =
+    invoice.status === 'CANCELLED' ||
+    booking?.serviceForBooking?.status === 'CANCELLED' ||
     booking?.status === 'CANCELLED' ||
     invoice.classBooking?.status === 'CANCELLED' ||
     (!!cancelled.length &&
       !booking?.details?.length &&
       cancelled.length === services.length)
   return {
-    paymentStatus: 'PAID' as const,
+    paymentStatus: invoice.status ?? 'PAID',
     bookingStatus: booking?.status ?? invoice.classBooking?.status ?? null,
     cancellationStatus: fullyCancelled
       ? ('CANCELLED' as const)
@@ -113,6 +119,36 @@ function incomeCancellation(invoice: {
   }
 }
 
+/** Exclude cancelled revenue without altering the historical payment or invoice. */
+function incomeRevenue(invoice: any) {
+  const paidNet = Math.max(
+    0,
+    (invoice.total ?? 0) - (invoice.processingFee ?? 0),
+  )
+  const cancellation = incomeCancellation(invoice)
+  let excludedAmount =
+    cancellation.cancellationStatus === 'CANCELLED' ? paidNet : 0
+  if (cancellation.cancellationStatus === 'PARTIAL') {
+    const services = [
+      ...(invoice.booking?.coaches ?? []),
+      ...(invoice.booking?.ballboys ?? []),
+    ]
+    const prices = services.map((item: any) => Math.max(0, item.price ?? 0))
+    const allocated = allocateServicePayment(
+      prices,
+      (invoice.booking?.totalPrice ?? paidNet) +
+        (invoice.booking?.promoDiscountAmount ?? 0),
+      paidNet,
+    )
+    excludedAmount = services.reduce(
+      (sum: number, item: any, index: number) =>
+        sum + (item.status === 'CANCELLED' ? allocated[index] : 0),
+      0,
+    )
+  }
+  return { netAmount: Math.max(0, paidNet - excludedAmount), excludedAmount }
+}
+
 /**
  * Get income analytics separated by source
  * Sources: Online bookings, Cashier bookings, Class bookings, Memberships
@@ -124,7 +160,7 @@ export async function getIncomeBySourceAnalytics(
 ) {
   // Build where clause with optional source filter
   const invoiceWhere: any = {
-    status: PaymentStatus.PAID,
+    status: { in: [PaymentStatus.PAID, PaymentStatus.CANCELLED] },
     paidAt: { gte: startDate, lte: endDate },
   }
 
@@ -135,6 +171,7 @@ export async function getIncomeBySourceAnalytics(
     booking: {
       include: {
         cashier: { select: { id: true, name: true, email: true } },
+        serviceForBooking: { select: { status: true } },
         details: {
           select: {
             slot: {
@@ -206,6 +243,7 @@ export async function getIncomeBySourceAnalytics(
   let totalProcessingFees = 0
   let totalGrossAmount = 0
   let totalNetAmount = 0
+  let totalExcludedAmount = 0
 
   const bookingIncome: Record<string, any> = {}
   const classIncome: Record<string, any> = {}
@@ -215,7 +253,8 @@ export async function getIncomeBySourceAnalytics(
   for (const invoice of invoices as any[]) {
     const gross = invoice.total || 0
     const processingFee = invoice.processingFee || 0
-    const netAmount = gross - processingFee
+    const { netAmount, excludedAmount } = incomeRevenue(invoice)
+    totalExcludedAmount += excludedAmount
     // Accumulate overall totals once per invoice
     totalGrossAmount += gross
     totalProcessingFees += processingFee
@@ -249,6 +288,7 @@ export async function getIncomeBySourceAnalytics(
         amount: invoice.total,
         processingFee,
         netAmount,
+        excludedAmount,
         date: invoice.paidAt,
       })
     }
@@ -260,6 +300,7 @@ export async function getIncomeBySourceAnalytics(
         amount: gross,
         processingFee,
         netAmount,
+        excludedAmount,
         date: invoice.paidAt,
       })
     }
@@ -267,7 +308,7 @@ export async function getIncomeBySourceAnalytics(
     // Class booking income
     if (invoice.classBooking) {
       const processingFee = invoice.processingFee || 0
-      const netAmount = (invoice.total || 0) - processingFee
+      const { netAmount } = incomeRevenue(invoice)
       classBookingIncome += netAmount
       if (!classIncome['Class Bookings']) {
         classIncome['Class Bookings'] = {
@@ -286,6 +327,7 @@ export async function getIncomeBySourceAnalytics(
         amount: invoice.total,
         processingFee,
         netAmount,
+        excludedAmount,
         date: invoice.paidAt,
       })
     }
@@ -293,7 +335,7 @@ export async function getIncomeBySourceAnalytics(
     // Membership income
     if (invoice.membershipUser) {
       const processingFee = invoice.processingFee || 0
-      const netAmount = (invoice.total || 0) - processingFee
+      const { netAmount } = incomeRevenue(invoice)
       membershipIncome += netAmount
       if (!membershipIncome_['Membership']) {
         membershipIncome_['Membership'] = {
@@ -312,6 +354,7 @@ export async function getIncomeBySourceAnalytics(
         amount: invoice.total,
         processingFee,
         netAmount,
+        excludedAmount,
         date: invoice.paidAt,
       })
     }
@@ -330,6 +373,7 @@ export async function getIncomeBySourceAnalytics(
       totalGrossAmount,
       totalProcessingFees,
       totalNetAmount,
+      totalExcludedAmount,
       onlineBookingIncome,
       cashierBookingIncome,
       classBookingIncome,
@@ -355,8 +399,8 @@ export async function getIncomeBySourceAnalytics(
           }
         : {}),
     } as Record<string, any>,
-    // One row per paid invoice, including invoices whose original product was
-    // removed. Use the exact same invoice set as the financial summary.
+    // Keep previously paid cancellations visible for audit, with zero cancelled revenue.
+    // Detail rows and source summaries use the same cancellation allocation.
     transactions: invoices.map((invoice: any) => ({
       id: invoice.id,
       invoiceNumber: invoice.number,
@@ -365,6 +409,8 @@ export async function getIncomeBySourceAnalytics(
       branchId: invoice.branchId,
       playingSchedules: incomePlayingSchedules(invoice.booking),
       ...incomeCancellation(invoice),
+      ...incomeRevenue(invoice),
+      reschedule: lastRescheduleAudit(invoice.booking?.adminNote),
       customerName: invoice.user?.name ?? 'Customer tidak tersedia',
       branchName: invoice.branch?.name ?? invoice.branchId,
       source: invoice.booking
@@ -382,7 +428,6 @@ export async function getIncomeBySourceAnalytics(
       paidAt: invoice.paidAt,
       amount: invoice.total || 0,
       processingFee: invoice.processingFee || 0,
-      netAmount: (invoice.total || 0) - (invoice.processingFee || 0),
     })),
     dateRange: { startDate, endDate },
   }

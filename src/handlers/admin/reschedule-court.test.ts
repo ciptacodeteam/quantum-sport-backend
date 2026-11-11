@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   claimSlot: vi.fn(),
   transaction: vi.fn(),
   updateDetail: vi.fn(),
+  updateBooking: vi.fn(),
 }))
 vi.mock('@/lib/create-app', () => ({
   factory: { createHandlers: (...handlers: unknown[]) => handlers },
@@ -19,6 +20,10 @@ vi.mock('@/lib/prisma', () => ({
       mocks.transaction(options)
       return fn({
         $queryRaw: vi.fn(),
+        booking: {
+          findUnique: vi.fn().mockResolvedValue({ adminNote: 'Catatan awal' }),
+          update: mocks.updateBooking,
+        },
         bookingCoach: { findMany: vi.fn().mockResolvedValue([]) },
         bookingBallboy: { findMany: vi.fn().mockResolvedValue([]) },
         bookingDetail: { findUnique: mocks.detail, update: mocks.updateDetail },
@@ -360,4 +365,23 @@ it('still forbids a past replacement slot for super admin', async () => {
     vi.useRealTimers()
   }
   expect(mocks.claimSlot).not.toHaveBeenCalled()
+})
+
+it('persists a structured reschedule marker while preserving existing notes', async () => {
+  setup('PADEL', 'PADEL')
+  await execute()
+  expect(mocks.updateBooking).toHaveBeenCalledWith({
+    where: { id: 'booking' },
+    data: {
+      adminNote: expect.stringContaining('Catatan awal\n[COURT_RESCHEDULE] '),
+    },
+  })
+  const note = mocks.updateBooking.mock.calls[0][0].data.adminNote
+  const audit = JSON.parse(note.split('[COURT_RESCHEDULE] ')[1])
+  expect(audit).toMatchObject({
+    actorId: 'actor',
+    bookingId: 'booking',
+    from: { startAt: '2040-01-05T02:00:00+07:00' },
+    to: { startAt: '2040-01-06T02:00:00+07:00' },
+  })
 })

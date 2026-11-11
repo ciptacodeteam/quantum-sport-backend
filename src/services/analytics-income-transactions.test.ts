@@ -5,6 +5,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 vi.mock('@/services/upload.service', () => ({ getFileUrl: vi.fn() }))
 import { getIncomeBySourceAnalytics } from './analytics.service'
+import { appendRescheduleAudit } from '@/lib/booking-reschedule-audit'
 
 const start = new Date('2026-09-30T17:00:00.000Z')
 const end = new Date('2026-10-01T16:59:59.999Z')
@@ -68,7 +69,10 @@ it('returns one identifiable customer row per paid invoice and reconciles all am
   expect(data.bySource.Cashier.total).toBe(250000)
   expect(mocks.invoices).toHaveBeenCalledWith(
     expect.objectContaining({
-      where: { status: 'PAID', paidAt: { gte: start, lte: end } },
+      where: {
+        status: { in: ['PAID', 'CANCELLED'] },
+        paidAt: { gte: start, lte: end },
+      },
       orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
       include: expect.objectContaining({
         user: { select: { id: true, name: true } },
@@ -275,7 +279,8 @@ it('marks a cancelled paid ballboy-only invoice even when its booking remains co
       },
     ],
   })
-  expect(data.summary.totalNetAmount).toBe(45000)
+  expect(data.summary.totalNetAmount).toBe(0)
+  expect(data.summary.totalExcludedAmount).toBe(45000)
   expect(
     mocks.invoices.mock.calls[0][0].include.booking.include.ballboys.select,
   ).toMatchObject({ status: true, cancelledAt: true, cancellationReason: true })
@@ -338,4 +343,113 @@ it('marks cancelled whole bookings and classes without assuming a refund', async
     'NONE',
   ])
   expect(data.summary.totalGrossAmount).toBe(450000)
+})
+
+it('retains paid cancellation history but excludes its entire revenue including child invoices', async () => {
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('court-cancelled', 300000, 2000),
+      status: 'CANCELLED',
+      booking: { id: 'root', status: 'CANCELLED', cashierId: 'cashier' },
+    },
+    {
+      ...invoice('child', 45000),
+      status: 'PAID',
+      booking: {
+        id: 'child',
+        cashierId: 'cashier',
+        status: 'CONFIRMED',
+        serviceForBooking: { status: 'CANCELLED' },
+      },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.summary).toMatchObject({
+    totalGrossAmount: 345000,
+    totalProcessingFees: 2000,
+    totalExcludedAmount: 343000,
+    totalNetAmount: 0,
+  })
+  expect(data.bySource.Cashier.total).toBe(0)
+  expect(data.transactions.map((row) => row.netAmount)).toEqual([0, 0])
+})
+it('excludes only the cancelled service share after an invoice discount', async () => {
+  const slot = {
+    startAt: new Date('2040-01-05T09:00:00Z'),
+    endAt: new Date('2040-01-05T10:00:00Z'),
+  }
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('partial-discount', 270000),
+      booking: {
+        id: 'root',
+        cashierId: 'cashier',
+        status: 'CONFIRMED',
+        totalPrice: 270000,
+        promoDiscountAmount: 30000,
+        details: [{ slot }],
+        ballboys: [{ status: 'CANCELLED', price: 60000, slot }],
+      },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions[0]).toMatchObject({
+    amount: 270000,
+    excludedAmount: 54000,
+    netAmount: 216000,
+    cancellationStatus: 'PARTIAL',
+  })
+  expect(data.bySource.Cashier.total).toBe(216000)
+})
+
+it('reports rescheduling only on the invoices whose court or service actually moved', async () => {
+  const event = {
+    at: '2026-11-11T03:00:00.000Z',
+    actorId: 'admin',
+    bookingId: 'parent',
+    from: {
+      court: 'Court 1',
+      startAt: '2026-11-12T19:00:00+07:00',
+      endAt: '2026-11-12T20:00:00+07:00',
+    },
+    to: {
+      court: 'Court 2',
+      startAt: '2026-11-13T19:00:00+07:00',
+      endAt: '2026-11-13T20:00:00+07:00',
+    },
+  }
+  mocks.invoices.mockResolvedValue([
+    {
+      ...invoice('court', 250000),
+      booking: {
+        id: 'parent',
+        cashierId: 'cashier',
+        adminNote: appendRescheduleAudit(null, event),
+      },
+    },
+    {
+      ...invoice('moved-service', 45000),
+      booking: {
+        id: 'service',
+        serviceForBookingId: 'parent',
+        adminNote: appendRescheduleAudit(null, event),
+      },
+    },
+    {
+      ...invoice('unmoved-service', 45000),
+      booking: {
+        id: 'another',
+        serviceForBookingId: 'parent',
+        serviceForBooking: {
+          status: 'CONFIRMED',
+          adminNote: appendRescheduleAudit(null, event),
+        },
+      },
+    },
+  ])
+  const data = await getIncomeBySourceAnalytics(start, end)
+  expect(data.transactions[0].reschedule).toEqual(event)
+  expect(data.transactions[1].reschedule).toEqual(event)
+  expect(data.transactions[2].reschedule).toBeNull()
+  expect(data.summary.totalNetAmount).toBe(340000)
 })

@@ -1,3 +1,5 @@
+import { appendRescheduleAudit } from '@/lib/booking-reschedule-audit'
+import { clubWallTime } from '@/lib/club-time'
 import { rescheduleCourtServices } from '@/services/reschedule-court-services.service'
 import { cancelCourtBookingServices } from '@/services/court-service-cancellation.service'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
@@ -1109,7 +1111,7 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
           }
 
           await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${bookingDetail.booking.id} FOR UPDATE`
-          await rescheduleCourtServices(
+          const movedServices = await rescheduleCourtServices(
             tx,
             bookingDetail.booking.id,
             bookingDetail.slot,
@@ -1152,6 +1154,39 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
               court: true,
             },
           })
+
+          const audit = {
+            at: new Date().toISOString(),
+            actorId: c.get('admin')?.id ?? 'admin',
+            bookingId: bookingDetail.booking.id,
+            from: {
+              court:
+                bookingDetail.court?.name ??
+                bookingDetail.slot.court?.name ??
+                'Lapangan',
+              startAt: clubWallTime(bookingDetail.slot.startAt).format(),
+              endAt: clubWallTime(bookingDetail.slot.endAt).format(),
+            },
+            to: {
+              court: newSlot.court?.name ?? 'Lapangan',
+              startAt: clubWallTime(newSlot.startAt).format(),
+              endAt: clubWallTime(newSlot.endAt).format(),
+            },
+          }
+          for (const affectedId of [
+            ...new Set([bookingDetail.booking.id, ...movedServices.bookingIds]),
+          ].sort()) {
+            const previous = await tx.booking.findUnique({
+              where: { id: affectedId },
+              select: { adminNote: true },
+            })
+            await tx.booking.update({
+              where: { id: affectedId },
+              data: {
+                adminNote: appendRescheduleAudit(previous?.adminNote, audit),
+              },
+            })
+          }
 
           const priceDifference = 0
           const updatedBooking = bookingDetail.booking

@@ -12,8 +12,8 @@ export async function rescheduleCourtServices(
   branchId: string,
 ) {
   const withinSource = {
-    startAt: { gte: source.startAt },
-    endAt: { lte: source.endAt },
+    startAt: { lt: source.endAt },
+    endAt: { gt: source.startAt },
   }
   const where = {
     status: { not: 'CANCELLED' as const },
@@ -36,7 +36,8 @@ export async function rescheduleCourtServices(
     ...coaches.map((item) => ({ ...item, kind: 'COACH' as const })),
     ...ballboys.map((item) => ({ ...item, kind: 'BALLBOY' as const })),
   ]
-  if (!services.length) return
+  if (!services.length)
+    return { bookingIds: [] as string[], coachSlots: 0, ballboySlots: 0 }
   for (const id of [...new Set(services.map((item) => item.bookingId))]
     .filter((id) => id !== bookingId)
     .sort())
@@ -137,4 +138,9 @@ export async function rescheduleCourtServices(
       },
       data: { isAvailable: true },
     })
+  return {
+    bookingIds: [...new Set(services.map((item) => item.bookingId))],
+    coachSlots: coaches.length,
+    ballboySlots: ballboys.length,
+  }
 }

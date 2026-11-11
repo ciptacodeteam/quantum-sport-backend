@@ -117,3 +117,27 @@ it('keeps a plain court reschedule independent from coaching', async () => {
   expect(mocks.claim).not.toHaveBeenCalled()
   expect(tx.slot.findFirst).not.toHaveBeenCalled()
 })
+
+it('detects a legacy service crossing the court hour and refuses to leave it behind', async () => {
+  tx.bookingCoach.findMany.mockResolvedValue([
+    {
+      ...service('coach'),
+      courtSlotId: null,
+      slot: {
+        ...source,
+        id: 'old-coach',
+        staffId: 'coach',
+        endAt: new Date(+source.endAt + 3600000),
+      },
+    },
+  ])
+  await expect(
+    rescheduleCourtServices(tx, 'court-booking', source, target, 'cemara'),
+  ).rejects.toThrow(/melewati/)
+  expect(tx.bookingCoach.findMany.mock.calls[0][0].where.OR[1].slot).toEqual({
+    startAt: { lt: source.endAt },
+    endAt: { gt: source.startAt },
+  })
+  expect(mocks.claim).not.toHaveBeenCalled()
+  expect(tx.bookingCoach.update).not.toHaveBeenCalled()
+})
