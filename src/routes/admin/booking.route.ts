@@ -1,3 +1,4 @@
+import { requireAnyAdminRole } from '@/middlewares/auth'
 import {
   previewRecurringBookingHandler,
   listRecurringBookingsHandler,
@@ -32,7 +33,11 @@ const adminBookingRoute = createRouter()
   .put('/recurring/:id/stop', ...stopRecurringBookingHandler)
   .get('/:id', ...getBookingTransactionDetailHandler)
   .put('/:id/approve', ...approveBookingTransactionHandler)
-  .put('/:id/cancel', ...cancelBookingHandler)
-  .put('/:id/reject', ...rejectBookingTransactionHandler)
+  .put('/:id/cancel', requireAnyAdminRole(['ADMIN']), ...cancelBookingHandler)
+  .put(
+    '/:id/reject',
+    requireAnyAdminRole(['ADMIN']),
+    ...rejectBookingTransactionHandler,
+  )
 
 export default adminBookingRoute

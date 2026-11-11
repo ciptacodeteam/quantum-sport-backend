@@ -1,3 +1,4 @@
+import { requireAnyAdminRole } from '@/middlewares/auth'
 import {
   adminCourtChangeOptionsHandler,
   adminChangeCourtHandler,
@@ -18,7 +19,7 @@ const adminBookedCourtRoute = createRouter()
   .get('/summary', ...getBookedCourtsSummaryHandler)
   .get('/:id', ...getBookedCourtDetailHandler)
   .get('/by-court/:id', ...getBookingsByCourtHandler)
-  .put('/:id/cancel', ...cancelBookingHandler)
+  .put('/:id/cancel', requireAnyAdminRole(['ADMIN']), ...cancelBookingHandler)
   .get('/:id/change-court-options', ...adminCourtChangeOptionsHandler)
   .put('/:id/change-court', ...adminChangeCourtHandler)
   .put('/:id/reschedule', ...rescheduleCourtBookingHandler)
