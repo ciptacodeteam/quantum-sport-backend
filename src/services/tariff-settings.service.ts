@@ -44,6 +44,10 @@ export async function saveTariffPeriod(
       false,
     )
     const inHouseDiscounts = {
+      inHouseCourtHourlyPrice:
+        data.inHouseCourtHourlyPrice === undefined
+          ? (previous.inHouseCourtHourlyPrice ?? null)
+          : data.inHouseCourtHourlyPrice,
       happyInHouseCoachDiscount:
         data.happyInHouseCoachDiscount === undefined
           ? (previous.happyInHouseCoachDiscount ?? null)

@@ -1020,6 +1020,7 @@ model TariffPeriod {
   happyAllDayDays Int[] @default([])
   happyCoachDiscount Int @default(0)
   peakCoachDiscount Int @default(0)
+  inHouseCourtHourlyPrice Int?
   happyInHouseCoachDiscount Int?
   peakInHouseCoachDiscount Int?
   id             String    @id @default(cuid())

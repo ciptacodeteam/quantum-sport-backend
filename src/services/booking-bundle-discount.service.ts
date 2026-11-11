@@ -79,3 +79,18 @@ export function getCourtCoachBundleDiscountByCourtSlot(
 
   return discountByCourtSlotId
 }
+
+/** Fixed court price for direct in-house sessions, independent of happy/peak bands. */
+export function getInHouseCourtHourlyPrice(
+  courtSlot: CourtBundleSlot,
+  rules: TariffRule[] = [],
+) {
+  return (
+    resolveTariffPeriod(
+      rules,
+      courtSlot.startAt,
+      courtSlot.branchId ?? branchContext.getStore()?.branchId ?? '',
+      courtSlot.court?.sport ?? CourtSport.PADEL,
+    ).inHouseCourtHourlyPrice ?? null
+  )
+}
