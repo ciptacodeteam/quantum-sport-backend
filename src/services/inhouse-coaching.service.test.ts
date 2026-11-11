@@ -555,7 +555,6 @@ it.each([0, 20000, 500000])(
       tariffRules: [
         {
           ...separateRule,
-          inHouseCourtHourlyPrice: 123456,
           happyInHouseCoachDiscount: discount,
           peakInHouseCoachDiscount: discount,
         },
@@ -611,7 +610,7 @@ it.each([0, -1, 1.5, 35791395])('rejects invalid package quota %s', (hours) => {
 })
 
 it.each([150000, 300000])(
-  'charges fixed 250k court plus scheduled coach for a normal court price of %s without a package',
+  'uses normal court pricing plus scheduled coach without the fixed-price schema for court price %s',
   async (courtPrice) => {
     tx.slot.findMany = vi.fn().mockResolvedValue([
       {
@@ -644,19 +643,25 @@ it.each([150000, 300000])(
           participants: 1,
         },
       ],
-      tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: 250000 }],
+      tariffRules: [
+        {
+          ...separateRule,
+          happyInHouseCoachDiscount: 50000,
+          peakInHouseCoachDiscount: 50000,
+        },
+      ],
     })
     expect(result).toEqual({
-      coveredCourtAmount: courtPrice - 250000,
-      courtPriceAdjustment: courtPrice - 250000,
+      coveredCourtAmount: 0,
+      courtPriceAdjustment: 0,
       extraAmount: 400000,
     })
     expect(courtPrice - result.coveredCourtAmount + result.extraAmount).toBe(
-      650000,
+      courtPrice + 400000,
     )
     expect(tx.bookingDetail.update).toHaveBeenCalledWith({
       where: { id: 'detail' },
-      data: { discountPrice: 250000 },
+      data: { discountPrice: courtPrice },
     })
     expect(tx.inHouseWallet.updateMany).not.toHaveBeenCalled()
     expect(tx.inHousePlan.findFirst).not.toHaveBeenCalled()
@@ -679,7 +684,7 @@ it('rejects a direct scheduled coach that is not an active in-house coach', asyn
   ).rejects.toThrow(/tidak tersedia/)
 })
 
-it('uses consecutive additional-hour coach prices with fixed court pricing even when choices arrive reversed', async () => {
+it('uses consecutive additional-hour coach prices with normal court pricing even when choices arrive reversed', async () => {
   const first = {
     id: 'coach-slot',
     staffId: 'andi',
@@ -730,33 +735,37 @@ it('uses consecutive additional-hour coach prices with fixed court pricing even 
         participants: 1,
       },
     ],
-    tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: 250000 }],
+    tariffRules: [
+      {
+        ...separateRule,
+        happyInHouseCoachDiscount: 50000,
+        peakInHouseCoachDiscount: 50000,
+      },
+    ],
   })
   expect(result).toEqual({
-    coveredCourtAmount: 100000,
-    courtPriceAdjustment: 100000,
+    coveredCourtAmount: 0,
+    courtPriceAdjustment: 0,
     extraAmount: 700000,
   })
 })
 
-it('uses the normal court price when fixed pricing is disabled, without reusing legacy discounts', async () => {
-  tx.slot.findMany = vi
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 'coach-slot',
-        staffId: 'andi',
-        branchId: 'cemara',
-        price: 400000,
-        ...range,
-        staff: {
-          isActive: true,
-          role: 'COACH',
-          coachType: 'PADEL',
-          isInHouseCoach: true,
-        },
+it('uses the normal court price for scheduled coaches without reusing legacy discounts', async () => {
+  tx.slot.findMany = vi.fn().mockResolvedValue([
+    {
+      id: 'coach-slot',
+      staffId: 'andi',
+      branchId: 'cemara',
+      price: 400000,
+      ...range,
+      staff: {
+        isActive: true,
+        role: 'COACH',
+        coachType: 'PADEL',
+        isInHouseCoach: true,
       },
-    ])
+    },
+  ])
   const result = await redeemInHouseSelections(tx, {
     ...input(),
     selections: [
@@ -767,7 +776,13 @@ it('uses the normal court price when fixed pricing is disabled, without reusing 
         participants: 1,
       },
     ],
-    tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: null }],
+    tariffRules: [
+      {
+        ...separateRule,
+        happyInHouseCoachDiscount: null,
+        peakInHouseCoachDiscount: null,
+      },
+    ],
   })
   expect(result).toEqual({
     coveredCourtAmount: 0,

@@ -41,7 +41,6 @@ it('saves and refreshes the same branch and sport atomically from the effective 
   expect(mocks.lock).toHaveBeenCalled()
   expect(mocks.upsert.mock.calls[0][0].create).toEqual({
     ...input,
-    inHouseCourtHourlyPrice: null,
     happyInHouseCoachDiscount: null,
     peakInHouseCoachDiscount: null,
     happyAllDayDays: [],
@@ -202,23 +201,5 @@ it('saves in-house discounts independently and preserves them when older callers
   expect(mocks.upsert.mock.calls[2][0].update).toMatchObject({
     happyInHouseCoachDiscount: null,
     peakInHouseCoachDiscount: null,
-  })
-})
-
-it('saves and retains the fixed in-house court price separately from legacy discounts', async () => {
-  await saveTariffPeriod(
-    'cemara',
-    { ...input, inHouseCourtHourlyPrice: 250000 },
-    now,
-  )
-  expect(mocks.upsert.mock.calls[0][0].create).toMatchObject({
-    inHouseCourtHourlyPrice: 250000,
-  })
-  mocks.list.mockResolvedValue([
-    { ...input, branchId: 'cemara', inHouseCourtHourlyPrice: 250000 },
-  ])
-  await saveTariffPeriod('cemara', input, now)
-  expect(mocks.upsert.mock.calls[1][0].update).toMatchObject({
-    inHouseCourtHourlyPrice: 250000,
   })
 })

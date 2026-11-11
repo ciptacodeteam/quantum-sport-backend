@@ -14,10 +14,7 @@ import { claimSlotsAtomically } from './slot-claim.service'
 import { assertCoachingSport } from '@/lib/coaching-policy'
 import { formatClubWallClock } from '@/lib/club-time'
 import type { z } from 'zod'
-import {
-  getInHouseCourtDiscount,
-  getInHouseCourtHourlyPrice,
-} from './booking-bundle-discount.service'
+import { getInHouseCourtDiscount } from './booking-bundle-discount.service'
 import type { TariffRule } from '@/lib/tariff-period'
 
 type Tx = Prisma.TransactionClient
@@ -339,24 +336,17 @@ export async function redeemInHouseSelections(
       : scheduled
         ? 0
         : getInHouseCourtDiscount(court.slot, input.tariffRules)
-    const fixedCourtPrice = prepaid
-      ? null
-      : getInHouseCourtHourlyPrice(court.slot, input.tariffRules)
     const courtDue =
-      fixedCourtPrice ??
-      (discount === null ? 0 : Math.max(0, court.discountPrice - discount))
+      discount === null ? 0 : Math.max(0, court.discountPrice - discount)
     const courtLinePrice =
-      fixedCourtPrice ??
-      (discount === null
+      discount === null
         ? price.courtAmount
-        : Math.max(0, court.discountPrice - discount))
+        : Math.max(0, court.discountPrice - discount)
     const coachDue = prepaid
       ? 0
-      : fixedCourtPrice !== null
-        ? price.coachAmount
-        : discount === null
-          ? terms.hourlyPrice
-          : price.coachAmount
+      : discount === null
+        ? terms.hourlyPrice
+        : price.coachAmount
     await tx.bookingCoach.create({
       data: {
         bookingId,
