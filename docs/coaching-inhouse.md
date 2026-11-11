@@ -16,17 +16,7 @@ An active coach marked **Coach In-house** appears under **Booking Lapangan → T
 
 In **Pengaturan Jam Tarif → Coach In-house · Satuan**, enable **Harga lapangan fixed** and enter the final court price per hour, e.g. Rp250,000. This is a final price, not a discount amount, and applies equally to happy and peak hours. The hourly checkout adds the scheduled coach charge and Rp100,000 per additional participant. A Rp150,000 happy-hour court and a Rp300,000 peak-hour court both become Rp250,000 when configured that way. With a Rp400,000 coach, either session totals Rp650,000 for one participant. The fixed setting does not alter prepaid quota or package allocations.
 
-Before deploying this feature, connect a PostgreSQL SQL editor (for example, pgAdmin or DBeaver) to the database used by the target backend and execute the SQL below directly. The same SQL is kept in `prisma/inhouse-fixed-court-price.sql` for reference; no package command or backend-container command is required for this schema change.
-
-```sql
-ALTER TABLE "tariff_periods" ADD COLUMN IF NOT EXISTS "inHouseCourtHourlyPrice" INTEGER;
-DO $$ BEGIN
-  ALTER TABLE "tariff_periods" ADD CONSTRAINT "inhouse_fixed_court_price_valid" CHECK ("inHouseCourtHourlyPrice" IS NULL OR "inHouseCourtHourlyPrice" >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-```
-
-The additive, repeatable SQL creates the nullable `tariff_periods.inHouseCourtHourlyPrice` column and rejects negative prices. Existing discount fields are retained for compatibility; they are never reinterpreted as final prices. Saving the new fixed-price form clears the old in-house discount fields for that rule. Previously saved 1-hour product checkouts remain supported. Apply this SQL before starting the updated backend; pushing or deploying code alone does not apply this schema change.
+Before deploying this feature, run `bun run db:inhouse-fixed-court-price` in the newly built backend container. The additive, repeatable SQL creates the nullable `tariff_periods.inHouseCourtHourlyPrice` column. Existing discount fields are retained for compatibility; they are never reinterpreted as final prices. Saving the new fixed-price form clears the old in-house discount fields for that rule. Previously saved 1-hour product checkouts remain supported.
 
 Direct sessions save the court allocation and coach amount on the booking lines and appear on its paid invoice. They do not issue, consume or restore prepaid quota; **Riwayat & Pembagian** remains the prepaid redemption ledger. Both direct and prepaid in-house sessions are excluded from club settlement. Cancel or reschedule through their linked court booking so the bundled court and coaching stay together.
 
