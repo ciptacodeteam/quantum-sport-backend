@@ -1,3 +1,4 @@
+import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/prisma'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -13,7 +14,10 @@ import { claimSlotsAtomically } from './slot-claim.service'
 import { assertCoachingSport } from '@/lib/coaching-policy'
 import { formatClubWallClock } from '@/lib/club-time'
 import type { z } from 'zod'
-import { getInHouseCourtDiscount } from './booking-bundle-discount.service'
+import {
+  getInHouseCourtDiscount,
+  getInHouseCourtHourlyPrice,
+} from './booking-bundle-discount.service'
 import type { TariffRule } from '@/lib/tariff-period'
 
 type Tx = Prisma.TransactionClient
@@ -221,29 +225,64 @@ export async function redeemInHouseSelections(
     throw new BadRequestException(
       'Jenis layanan in-house belum tersedia. Terapkan migrasi coaching in-house terlebih dahulu.',
     )
+  const scheduleSelections = selections.filter((s) => 'staffId' in s)
+  const scheduleSlots = scheduleSelections.length
+    ? await tx.slot.findMany({
+        where: {
+          id: { in: scheduleSelections.map((s) => s.coachSlotId) },
+          type: 'COACH',
+          scheduleClosed: false,
+          staff: { role: 'COACH', isActive: true, isInHouseCoach: true },
+        },
+        include: { staff: true },
+      })
+    : []
+  const schedulePrices = priceCoachSessions(scheduleSlots)
   for (const selection of selections) {
     const prepaid = 'walletId' in selection
-    if (!prepaid)
+    const scheduled = 'staffId' in selection
+    const scheduleSlot = scheduled
+      ? scheduleSlots.find(
+          (slot) =>
+            slot.id === selection.coachSlotId &&
+            slot.staffId === selection.staffId,
+        )
+      : undefined
+    if (!prepaid && !scheduled)
       await tx.$queryRaw`SELECT id FROM inhouse_plans WHERE id = ${selection.planId} FOR SHARE`
-    const terms = prepaid
-      ? await tx.inHouseWallet.findFirst({
-          where: {
-            id: selection.walletId,
-            deletedAt: null,
-            userId,
-            invoice: { status: 'PAID' },
-          },
-          include: { staff: true },
-        })
-      : await tx.inHousePlan.findFirst({
-          where: { id: selection.planId, hours: 1, isActive: true },
-          include: { staff: true },
-        })
+    const terms = scheduled
+      ? scheduleSlot?.staff
+        ? {
+            id: scheduleSlot.id,
+            staffId: scheduleSlot.staffId!,
+            branchId: scheduleSlot.branchId,
+            staff: scheduleSlot.staff,
+            name: 'tarif Jadwal & Harga',
+            hourlyPrice:
+              schedulePrices.get(scheduleSlot.id) ?? scheduleSlot.price,
+            courtHourlyShare: 0,
+            extraParticipantHourlyPrice: 100000,
+          }
+        : null
+      : prepaid
+        ? await tx.inHouseWallet.findFirst({
+            where: {
+              id: selection.walletId,
+              deletedAt: null,
+              userId,
+              invoice: { status: 'PAID' },
+            },
+            include: { staff: true },
+          })
+        : await tx.inHousePlan.findFirst({
+            where: { id: selection.planId, hours: 1, isActive: true },
+            include: { staff: true },
+          })
     if (!terms || !terms.staff.isActive || terms.staff.role !== 'COACH')
       throw new BadRequestException(
         prepaid
           ? 'Kuota in-house tidak tersedia untuk customer ini.'
-          : 'Tarif satuan 1 jam atau coach tidak tersedia.',
+          : 'Tarif satuan atau coach in-house tidak tersedia.',
       )
     const court = await tx.bookingDetail.findFirst({
       where: { bookingId, slotId: selection.courtSlotId },
@@ -297,18 +336,27 @@ export async function redeemInHouseSelections(
     // Tariff discounts apply only to direct hourly coaching; prepaid terms stay frozen.
     const discount = prepaid
       ? null
-      : getInHouseCourtDiscount(court.slot, input.tariffRules)
+      : scheduled
+        ? 0
+        : getInHouseCourtDiscount(court.slot, input.tariffRules)
+    const fixedCourtPrice = prepaid
+      ? null
+      : getInHouseCourtHourlyPrice(court.slot, input.tariffRules)
     const courtDue =
-      discount === null ? 0 : Math.max(0, court.discountPrice - discount)
+      fixedCourtPrice ??
+      (discount === null ? 0 : Math.max(0, court.discountPrice - discount))
     const courtLinePrice =
-      discount === null
+      fixedCourtPrice ??
+      (discount === null
         ? price.courtAmount
-        : Math.max(0, court.discountPrice - discount)
+        : Math.max(0, court.discountPrice - discount))
     const coachDue = prepaid
       ? 0
-      : discount === null
-        ? terms.hourlyPrice
-        : price.coachAmount
+      : fixedCourtPrice !== null
+        ? price.coachAmount
+        : discount === null
+          ? terms.hourlyPrice
+          : price.coachAmount
     await tx.bookingCoach.create({
       data: {
         bookingId,

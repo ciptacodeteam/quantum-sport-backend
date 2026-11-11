@@ -6,7 +6,7 @@ export const inHousePlanSchema = z
   .object({
     staffId: z.string().min(1),
     name: z.string().trim().min(1).max(100),
-    hours: z.union([z.literal(1), z.literal(5), z.literal(10)]),
+    hours: z.number().int().positive().max(35791394),
     hourlyPrice: money.refine((v) => v > 0),
     courtHourlyShare: money,
     extraParticipantHourlyPrice: z.literal(100000).default(100000),
@@ -26,6 +26,7 @@ export const INHOUSE_COACH_TYPE = 'Coaching In-house'
 export const inHouseSelectionSchema = z.union([
   z.object({ walletId: z.string().min(1), ...sessionFields }).strict(),
   z.object({ planId: z.string().min(1), ...sessionFields }).strict(),
+  z.object({ staffId: z.string().min(1), ...sessionFields }).strict(),
 ])
 export type InHouseSelection = z.infer<typeof inHouseSelectionSchema>
 

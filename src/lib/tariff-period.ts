@@ -9,6 +9,7 @@ export const defaultTariffPeriod = {
 }
 export type TariffBands = typeof defaultTariffPeriod
 export type CoachingDiscounts = {
+  inHouseCourtHourlyPrice?: number | null
   happyInHouseCoachDiscount?: number | null
   peakInHouseCoachDiscount?: number | null
   happyCoachDiscount?: number
@@ -45,6 +46,13 @@ export const tariffPeriodSchema = z
     happyEnd: z.number().int().min(1).max(24),
     peakStart: z.number().int().min(0).max(23),
     peakEnd: z.number().int().min(1).max(24),
+    inHouseCourtHourlyPrice: z
+      .number()
+      .int()
+      .min(0)
+      .max(2147483647)
+      .nullable()
+      .optional(),
     happyInHouseCoachDiscount: z
       .number()
       .int()

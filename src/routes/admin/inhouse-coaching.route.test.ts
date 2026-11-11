@@ -121,3 +121,19 @@ it.each(['ADMIN_VIEWER', 'COACH', 'BALLBOY', undefined])(
     expect(mocks.remove).not.toHaveBeenCalled()
   },
 )
+
+it('accepts a custom whole-hour package quota', async () => {
+  expect(
+    (
+      await request('plans', 'ADMIN', {
+        ...plan,
+        name: 'Andi 12 jam',
+        hours: 12,
+      })
+    ).status,
+  ).toBe(201)
+  expect(mocks.save).toHaveBeenCalledWith(
+    undefined,
+    expect.objectContaining({ hours: 12 }),
+  )
+})

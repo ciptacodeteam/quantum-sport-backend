@@ -120,6 +120,7 @@ export const getAvailableCoachesHandler = factory.createHandlers(
               image: true,
               role: true,
               coachType: true,
+              isInHouseCoach: true,
             },
           },
         },

@@ -148,7 +148,7 @@ it.each([0, 1.5, 101])('rejects invalid participant count %s', (count) =>
   expect(() => priceInHouseHour(terms, count)).toThrow(),
 )
 it('validates every package tier and rejects invalid financial terms', () => {
-  for (const hours of [1, 5, 10])
+  for (const hours of [1, 2, 5, 7, 10, 12, 24])
     expect(
       inHousePlanSchema.safeParse({
         staffId: 'andi',
@@ -555,6 +555,7 @@ it.each([0, 20000, 500000])(
       tariffRules: [
         {
           ...separateRule,
+          inHouseCourtHourlyPrice: 123456,
           happyInHouseCoachDiscount: discount,
           peakInHouseCoachDiscount: discount,
         },
@@ -596,4 +597,196 @@ it('charges the coach share plus discounted court for direct coaching', async ()
   expect(result.extraAmount).toBe(650000)
   expect(300000 - result.coveredCourtAmount + result.extraAmount).toBe(930000)
   expect(tx.bookingCoach.create.mock.calls[0][0].data.price).toBe(650000)
+})
+
+it.each([0, -1, 1.5, 35791395])('rejects invalid package quota %s', (hours) => {
+  expect(
+    inHousePlanSchema.safeParse({
+      staffId: 'andi',
+      name: 'Paket',
+      hours,
+      ...terms,
+    }).success,
+  ).toBe(false)
+})
+
+it.each([150000, 300000])(
+  'charges fixed 250k court plus scheduled coach for a normal court price of %s without a package',
+  async (courtPrice) => {
+    tx.slot.findMany = vi.fn().mockResolvedValue([
+      {
+        id: 'coach-slot',
+        staffId: 'andi',
+        branchId: 'cemara',
+        price: 400000,
+        ...range,
+        staff: {
+          id: 'andi',
+          isActive: true,
+          role: 'COACH',
+          coachType: 'PADEL',
+          isInHouseCoach: true,
+        },
+      },
+    ])
+    const court = await tx.bookingDetail.findFirst()
+    tx.bookingDetail.findFirst.mockResolvedValue({
+      ...court,
+      discountPrice: courtPrice,
+    })
+    const result = await redeemInHouseSelections(tx, {
+      ...input(),
+      selections: [
+        {
+          staffId: 'andi',
+          courtSlotId: 'court-slot',
+          coachSlotId: 'coach-slot',
+          participants: 1,
+        },
+      ],
+      tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: 250000 }],
+    })
+    expect(result).toEqual({
+      coveredCourtAmount: courtPrice - 250000,
+      courtPriceAdjustment: courtPrice - 250000,
+      extraAmount: 400000,
+    })
+    expect(courtPrice - result.coveredCourtAmount + result.extraAmount).toBe(
+      650000,
+    )
+    expect(tx.bookingDetail.update).toHaveBeenCalledWith({
+      where: { id: 'detail' },
+      data: { discountPrice: 250000 },
+    })
+    expect(tx.inHouseWallet.updateMany).not.toHaveBeenCalled()
+    expect(tx.inHousePlan.findFirst).not.toHaveBeenCalled()
+  },
+)
+it('rejects a direct scheduled coach that is not an active in-house coach', async () => {
+  tx.slot.findMany = vi.fn().mockResolvedValue([])
+  await expect(
+    redeemInHouseSelections(tx, {
+      ...input(),
+      selections: [
+        {
+          staffId: 'club',
+          courtSlotId: 'court-slot',
+          coachSlotId: 'coach-slot',
+          participants: 1,
+        },
+      ],
+    }),
+  ).rejects.toThrow(/tidak tersedia/)
+})
+
+it('uses consecutive additional-hour coach prices with fixed court pricing even when choices arrive reversed', async () => {
+  const first = {
+    id: 'coach-slot',
+    staffId: 'andi',
+    branchId: 'cemara',
+    price: 400000,
+    additionalHourPrice: 300000,
+    ...range,
+    staff: {
+      isActive: true,
+      role: 'COACH',
+      coachType: 'PADEL',
+      isInHouseCoach: true,
+    },
+  }
+  const second = {
+    ...first,
+    id: 'coach-second',
+    startAt: range.endAt,
+    endAt: new Date(+range.endAt + 3600000),
+  }
+  tx.slot.findMany = vi.fn().mockResolvedValue([second, first])
+  tx.slot.findFirst.mockImplementation(({ where }: any) =>
+    where.id === second.id ? second : first,
+  )
+  tx.bookingDetail.findFirst.mockImplementation(({ where }: any) => {
+    const slot = where.slotId === 'court-second' ? second : first
+    return {
+      id: `detail-${where.slotId}`,
+      slotId: where.slotId,
+      discountPrice: 300000,
+      slot: { ...slot, id: where.slotId, court: { sport: 'PADEL' } },
+    }
+  })
+  const result = await redeemInHouseSelections(tx, {
+    ...input(),
+    courtSlotIds: ['court-slot', 'court-second'],
+    selections: [
+      {
+        staffId: 'andi',
+        coachSlotId: second.id,
+        courtSlotId: 'court-second',
+        participants: 1,
+      },
+      {
+        staffId: 'andi',
+        coachSlotId: first.id,
+        courtSlotId: 'court-slot',
+        participants: 1,
+      },
+    ],
+    tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: 250000 }],
+  })
+  expect(result).toEqual({
+    coveredCourtAmount: 100000,
+    courtPriceAdjustment: 100000,
+    extraAmount: 700000,
+  })
+})
+
+it('uses the normal court price when fixed pricing is disabled, without reusing legacy discounts', async () => {
+  tx.slot.findMany = vi
+    .fn()
+    .mockResolvedValue([
+      {
+        id: 'coach-slot',
+        staffId: 'andi',
+        branchId: 'cemara',
+        price: 400000,
+        ...range,
+        staff: {
+          isActive: true,
+          role: 'COACH',
+          coachType: 'PADEL',
+          isInHouseCoach: true,
+        },
+      },
+    ])
+  const result = await redeemInHouseSelections(tx, {
+    ...input(),
+    selections: [
+      {
+        staffId: 'andi',
+        courtSlotId: 'court-slot',
+        coachSlotId: 'coach-slot',
+        participants: 1,
+      },
+    ],
+    tariffRules: [{ ...separateRule, inHouseCourtHourlyPrice: null }],
+  })
+  expect(result).toEqual({
+    coveredCourtAmount: 0,
+    courtPriceAdjustment: 0,
+    extraAmount: 400000,
+  })
+})
+it('accepts a scheduled coach identity but rejects browser prices and mixed package identities', () => {
+  const direct = {
+    staffId: 'andi',
+    courtSlotId: 'court',
+    coachSlotId: 'coach',
+    participants: 1,
+  }
+  expect(inHouseSelectionSchema.safeParse(direct).success).toBe(true)
+  expect(
+    inHouseSelectionSchema.safeParse({ ...direct, hourlyPrice: 1 }).success,
+  ).toBe(false)
+  expect(
+    inHouseSelectionSchema.safeParse({ ...direct, walletId: 'wallet' }).success,
+  ).toBe(false)
 })
