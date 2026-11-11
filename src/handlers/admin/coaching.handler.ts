@@ -110,6 +110,7 @@ export const createCoachingHandler = factory.createHandlers(
         phone: input.phone ? await formatPhone(input.phone) : null,
         isActive: input.isActive,
         adminServiceOnly: true,
+        isInHouseCoach: input.isInHouseCoach ?? false,
         coachingGroups: {
           create: (input.groupIds ?? []).map((groupId) => ({ groupId })),
         },
@@ -184,6 +185,9 @@ export const updateCoachingHandler = factory.createHandlers(
                   create: input.groupIds.map((groupId) => ({ groupId })),
                 },
               }
+            : {}),
+          ...(input.isInHouseCoach !== undefined
+            ? { isInHouseCoach: input.isInHouseCoach }
             : {}),
           name: input.name,
           phone: input.phone ? await formatPhone(input.phone) : null,

@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   existing: {} as any,
+  create: vi.fn(),
   tx: {
     $queryRaw: vi.fn(),
     bookingBallboy: { count: vi.fn() },
@@ -9,7 +10,10 @@ const mocks = vi.hoisted(() => ({
   },
 }))
 vi.mock('@/lib/prisma', () => ({
-  db: { $transaction: (fn: any) => fn(mocks.tx) },
+  db: {
+    staff: { create: mocks.create },
+    $transaction: (fn: any) => fn(mocks.tx),
+  },
 }))
 vi.mock('@/lib/create-app', () => ({
   factory: { createHandlers: (...handlers: any[]) => handlers },
@@ -33,7 +37,11 @@ vi.mock('@/services/coach-replacement.service', () => ({
   availableCoachReplacements: vi.fn(),
   replaceBookedCoach: vi.fn(),
 }))
-import { updateCoachingHandler } from './coaching.handler'
+vi.mock('@/lib/password', () => ({ hashPassword: async () => 'hashed' }))
+import {
+  createCoachingHandler,
+  updateCoachingHandler,
+} from './coaching.handler'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -128,5 +136,38 @@ it('allows existing ballboys at Padel-only branches without requiring Tennis cou
     expect.objectContaining({
       data: expect.objectContaining({ coachType: 'PADEL_TENNIS' }),
     }),
+  )
+})
+
+it('persists the in-house marker when creating a profile', async () => {
+  const handler = createCoachingHandler.at(-1) as any
+  await handler({
+    req: {
+      valid: () => ({
+        name: 'Coach In-house',
+        kind: 'COACH',
+        coachType: 'PADEL',
+        isActive: true,
+        isInHouseCoach: true,
+      }),
+    },
+    get: () => 'cemara',
+    json: (value: unknown) => value,
+  })
+  expect(mocks.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        role: 'COACH',
+        branchId: 'cemara',
+        isInHouseCoach: true,
+      }),
+    }),
+  )
+})
+it('preserves in-house classification during ordinary profile edits', async () => {
+  mocks.existing.isInHouseCoach = true
+  await update('PADEL_TENNIS')
+  expect(mocks.tx.staff.update.mock.calls[0][0].data).not.toHaveProperty(
+    'isInHouseCoach',
   )
 })

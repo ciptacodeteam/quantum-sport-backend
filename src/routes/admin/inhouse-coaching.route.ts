@@ -8,6 +8,7 @@ import { ok } from '@/lib/response'
 import { inHousePlanSchema } from '@/lib/inhouse-coaching'
 import {
   saveInHousePlan,
+  deleteUnusedInHouseWallet,
   sellInHousePlan,
   listInHouseUsage,
 } from '@/services/inhouse-coaching.service'
@@ -61,6 +62,7 @@ export default createRouter()
       ok(
         await db.inHouseWallet.findMany({
           where: {
+            deletedAt: null,
             ...(c.req.valid('query').userId
               ? { userId: c.req.valid('query').userId }
               : {}),
@@ -73,6 +75,7 @@ export default createRouter()
               : {}),
           },
           include: {
+            _count: { select: { usages: true } },
             user: { select: { id: true, name: true, phone: true } },
             staff: {
               select: { id: true, name: true, coachType: true, isActive: true },
@@ -84,6 +87,13 @@ export default createRouter()
           orderBy: { createdAt: 'desc' },
           take: 500,
         }),
+      ),
+    ),
+  )
+  .delete('/wallets/:id', sell, async (c) =>
+    c.json(
+      ok(
+        await deleteUnusedInHouseWallet(c.req.param('id'), c.get('admin')!.id),
       ),
     ),
   )

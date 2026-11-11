@@ -36,6 +36,7 @@ export const coachingSelect = {
   role: true,
   coachType: true,
   coachProfile: true,
+  isInHouseCoach: true,
   coachingGroups: { select: coachingGroupMembershipSelect },
   inHousePlans: { where: { isActive: true }, select: { id: true } },
   isActive: true,

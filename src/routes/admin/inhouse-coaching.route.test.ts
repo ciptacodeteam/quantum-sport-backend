@@ -1,11 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 const mocks = vi.hoisted(() => ({
+  remove: vi.fn(),
   save: vi.fn(),
   sell: vi.fn(),
   plans: vi.fn(),
 }))
 vi.mock('@/services/inhouse-coaching.service', () => ({
+  deleteUnusedInHouseWallet: mocks.remove,
   saveInHousePlan: mocks.save,
   sellInHousePlan: mocks.sell,
   listInHouseUsage: vi.fn(),
@@ -27,7 +29,12 @@ const sale = {
   paymentMethodId: 'cash',
   requestId: '550e8400-e29b-41d4-a716-446655440000',
 }
-function request(path: string, role?: string, payload?: unknown) {
+function request(
+  path: string,
+  role?: string,
+  payload?: unknown,
+  method = 'GET',
+) {
   const app = new Hono<any>()
   app.use('*', async (c, next) => {
     if (role) c.set('admin', { id: 'actor', role })
@@ -37,7 +44,7 @@ function request(path: string, role?: string, payload?: unknown) {
   return app.request(
     `/admin/inhouse-coaching/${path}`,
     payload === undefined
-      ? {}
+      ? { method }
       : {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -94,3 +101,23 @@ it('does not accept customer-provided prices or balances at sale', async () => {
   ).toBe(422)
   expect(mocks.sell).not.toHaveBeenCalled()
 })
+
+it.each(['ADMIN', 'SUPER_ADMIN', 'CASHIER'])(
+  'allows %s to delete unused quota',
+  async (role) => {
+    mocks.remove.mockResolvedValue({ id: 'wallet' })
+    expect(
+      (await request('wallets/wallet', role, undefined, 'DELETE')).status,
+    ).toBe(200)
+    expect(mocks.remove).toHaveBeenCalledWith('wallet', 'actor')
+  },
+)
+it.each(['ADMIN_VIEWER', 'COACH', 'BALLBOY', undefined])(
+  'blocks %s from deleting quota',
+  async (role) => {
+    expect(
+      (await request('wallets/wallet', role, undefined, 'DELETE')).status,
+    ).toBe(role ? 403 : 401)
+    expect(mocks.remove).not.toHaveBeenCalled()
+  },
+)

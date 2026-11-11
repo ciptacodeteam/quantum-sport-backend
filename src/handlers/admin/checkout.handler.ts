@@ -610,6 +610,7 @@ export const adminCheckoutHandler = factory.createHandlers(
                 select: {
                   id: true,
                   coachingGroups: { select: coachingGroupMembershipSelect },
+                  isInHouseCoach: true,
                   inHousePlans: {
                     where: { isActive: true },
                     select: { id: true },
@@ -643,7 +644,12 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
             )
           }
-          if (slotData.some((slot) => slot.staff?.inHousePlans?.length))
+          if (
+            slotData.some(
+              (slot) =>
+                slot.staff?.isInHouseCoach || slot.staff?.inHousePlans?.length,
+            )
+          )
             throw new BadRequestException(
               'Coach in-house harus menggunakan paket customer. Pilih paket in-house atau beli paket satu jam terlebih dahulu.',
             )

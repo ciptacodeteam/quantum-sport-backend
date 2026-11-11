@@ -1,0 +1,3 @@
+ALTER TABLE "inhouse_wallets"
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "deletedById" TEXT;

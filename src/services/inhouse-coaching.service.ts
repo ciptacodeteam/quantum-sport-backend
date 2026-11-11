@@ -21,11 +21,16 @@ export async function saveInHousePlan(
 ) {
   return db.$transaction(async (tx) => {
     const coach = await tx.staff.findFirst({
-      where: { id: input.staffId, role: 'COACH', isActive: true },
+      where: {
+        id: input.staffId,
+        role: 'COACH',
+        isActive: true,
+        isInHouseCoach: true,
+      },
     })
     if (!coach)
       throw new BadRequestException(
-        'Coach aktif tidak ditemukan di cabang ini.',
+        'Coach in-house aktif tidak ditemukan di cabang ini.',
       )
     if (id) {
       const previous = await tx.inHousePlan.findFirst({ where: { id } })
@@ -41,6 +46,31 @@ export async function saveInHousePlan(
     })
   })
 }
+/** Keep the sale and invoice for audit; serialize deletion with quota redemption. */
+export async function deleteUnusedInHouseWallet(id: string, actorId: string) {
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM inhouse_wallets WHERE id = ${id} FOR UPDATE`
+    const wallet = await tx.inHouseWallet.findFirst({
+      where: { id },
+      include: { _count: { select: { usages: true } } },
+    })
+    if (!wallet) throw new NotFoundException('Paket customer tidak ditemukan.')
+    if (wallet.deletedAt) return { id }
+    if (
+      wallet.remainingMinutes !== wallet.totalMinutes ||
+      wallet._count.usages > 0
+    )
+      throw new BadRequestException(
+        'Paket yang sudah pernah dipakai tidak dapat dihapus.',
+      )
+    await tx.inHouseWallet.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedById: actorId },
+    })
+    return { id }
+  })
+}
+
 export async function sellInHousePlan(
   input: {
     packageId: string
@@ -64,6 +94,10 @@ export async function sellInHousePlan(
         previous.packageId !== input.packageId
       )
         throw new BadRequestException('Referensi pembayaran telah dipakai.')
+      if (previous.deletedAt)
+        throw new BadRequestException(
+          'Paket dari pembayaran ini sudah dihapus.',
+        )
       return previous
     }
     await tx.$queryRaw`SELECT id FROM inhouse_plans WHERE id = ${input.packageId} FOR SHARE`
@@ -192,6 +226,7 @@ export async function redeemInHouseSelections(
       ? await tx.inHouseWallet.findFirst({
           where: {
             id: selection.walletId,
+            deletedAt: null,
             userId,
             invoice: { status: 'PAID' },
           },

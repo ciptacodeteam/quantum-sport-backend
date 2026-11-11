@@ -23,10 +23,15 @@ export const coachingProfileSchema = z
       .refine((v) => new Set(v).size === v.length)
       .optional(),
     coachProfile: z.string().trim().max(2000).optional(),
+    isInHouseCoach: z.boolean().optional(),
     isActive: z.boolean().default(true),
   })
   .strict()
   .refine((v) => v.kind !== 'COACH' || !!v.coachType, 'Pilih olahraga coach.')
+  .refine(
+    (v) => !v.isInHouseCoach || v.kind === 'COACH',
+    'Hanya coach yang dapat menjadi coach in-house.',
+  )
 export const coachingScheduleSchema = z
   .object({
     fromDate: date,

@@ -15,6 +15,7 @@ vi.mock('@/lib/utils', () => ({
   generateInvoiceNumber: async () => 'INV-INHOUSE',
 }))
 import {
+  deleteUnusedInHouseWallet,
   redeemInHouseSelections,
   restoreInHouseUsage,
   sellInHousePlan,
@@ -184,7 +185,12 @@ it('covers the full peak court payment and charges only extras, storing a 250k c
   })
   expect(tx.inHouseWallet.findFirst).toHaveBeenCalledWith(
     expect.objectContaining({
-      where: { id: 'wallet', userId: 'customer', invoice: { status: 'PAID' } },
+      where: {
+        id: 'wallet',
+        deletedAt: null,
+        userId: 'customer',
+        invoice: { status: 'PAID' },
+      },
     }),
   )
   expect(tx.inHouseWallet.updateMany).toHaveBeenCalledWith({
@@ -436,4 +442,94 @@ it('does not accept browser prices or combine a wallet with a single tariff', ()
   expect(
     inHouseSelectionSchema.safeParse({ ...direct, walletId: 'wallet' }).success,
   ).toBe(false)
+})
+
+it('deletes an unused wallet while keeping its sale and invoice', async () => {
+  tx.inHouseWallet.findFirst.mockResolvedValue({
+    id: 'wallet',
+    totalMinutes: 300,
+    remainingMinutes: 300,
+    deletedAt: null,
+    _count: { usages: 0 },
+  })
+  await expect(deleteUnusedInHouseWallet('wallet', 'cashier')).resolves.toEqual(
+    { id: 'wallet' },
+  )
+  expect(tx.$queryRaw).toHaveBeenCalled()
+  expect(tx.inHouseWallet.update).toHaveBeenCalledWith({
+    where: { id: 'wallet' },
+    data: { deletedAt: expect.any(Date), deletedById: 'cashier' },
+  })
+  expect(tx.invoice.create).not.toHaveBeenCalled()
+  expect(tx.payment.create).not.toHaveBeenCalled()
+})
+it.each([
+  { remainingMinutes: 240, usages: 1 },
+  { remainingMinutes: 300, usages: 1 },
+])(
+  'rejects used wallets even after quota was restored: %j',
+  async ({ remainingMinutes, usages }) => {
+    tx.inHouseWallet.findFirst.mockResolvedValue({
+      totalMinutes: 300,
+      remainingMinutes,
+      _count: { usages },
+    })
+    await expect(
+      deleteUnusedInHouseWallet('wallet', 'cashier'),
+    ).rejects.toThrow(/pernah dipakai/)
+    expect(tx.inHouseWallet.update).not.toHaveBeenCalled()
+  },
+)
+it('rejects a wallet outside the selected branch or missing', async () => {
+  tx.inHouseWallet.findFirst.mockResolvedValue(null)
+  await expect(deleteUnusedInHouseWallet('missing', 'cashier')).rejects.toThrow(
+    /tidak ditemukan/,
+  )
+})
+it('retries deletion without changing the original actor or time', async () => {
+  tx.inHouseWallet.findFirst.mockResolvedValue({ deletedAt: new Date() })
+  await deleteUnusedInHouseWallet('wallet', 'other')
+  expect(tx.inHouseWallet.update).not.toHaveBeenCalled()
+})
+it('does not revive a deleted wallet when its sale is retried', async () => {
+  tx.inHouseWallet.findFirst.mockResolvedValue({
+    userId: 'customer',
+    packageId: 'plan',
+    deletedAt: new Date(),
+  })
+  await expect(
+    sellInHousePlan(
+      {
+        userId: 'customer',
+        packageId: 'plan',
+        paymentMethodId: 'cash',
+        requestId: 'request',
+      },
+      'cashier',
+    ),
+  ).rejects.toThrow(/sudah dihapus/)
+  expect(tx.inHouseWallet.create).not.toHaveBeenCalled()
+})
+
+it('only accepts active in-house coaches when configuring a tariff', async () => {
+  tx.staff.findFirst.mockResolvedValue(null)
+  await expect(
+    saveInHousePlan(undefined, {
+      staffId: 'club-coach',
+      name: 'Paket',
+      hours: 5,
+      ...terms,
+      extraParticipantHourlyPrice: 100000,
+      isActive: true,
+    }),
+  ).rejects.toThrow(/Coach in-house aktif/)
+  expect(tx.staff.findFirst).toHaveBeenCalledWith({
+    where: {
+      id: 'club-coach',
+      role: 'COACH',
+      isActive: true,
+      isInHouseCoach: true,
+    },
+  })
+  expect(tx.inHousePlan.create).not.toHaveBeenCalled()
 })

@@ -113,3 +113,21 @@ it.each([null, 'TENNIS', 'PADEL', 'PADEL_TENNIS'])(
     ).not.toThrow()
   },
 )
+
+it('accepts in-house coach profiles and rejects in-house ballboys', () => {
+  expect(
+    coachingProfileSchema.safeParse({
+      name: 'In-house',
+      kind: 'COACH',
+      coachType: 'PADEL',
+      isInHouseCoach: true,
+    }).success,
+  ).toBe(true)
+  expect(
+    coachingProfileSchema.safeParse({
+      name: 'Ballboy',
+      kind: 'BALLBOY',
+      isInHouseCoach: true,
+    }).success,
+  ).toBe(false)
+})

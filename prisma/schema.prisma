@@ -207,6 +207,7 @@ model Staff {
   role         Role       @default(ADMIN)
   coachType    CoachType?
   coachProfile String?    @db.Text
+  isInHouseCoach Boolean @default(false)
   adminServiceOnly Boolean @default(false)
   rollingServiceSchedule Json?
   createdAt    DateTime   @default(now())
@@ -1188,6 +1189,8 @@ model InHouseWallet {
   courtHourlyShare            Int
   extraParticipantHourlyPrice Int
   createdById                 String
+  deletedAt                   DateTime?
+  deletedById                 String?
   createdAt                   DateTime       @default(now())
   package                     InHousePlan    @relation(fields: [packageId], references: [id])
   staff                       Staff          @relation(fields: [staffId], references: [id])
