@@ -211,3 +211,21 @@ export async function saveCoachingGroup(
       throw error
     })
 }
+
+/** Shared catalog deletion: preserve booking snapshots across every branch. */
+export async function deleteCoachingGroup(id: string) {
+  return db.$transaction(async (tx) => {
+    // Booking selection takes a shared lock on this same row.
+    await tx.$queryRaw`SELECT id FROM coaching_groups WHERE id = ${id} FOR UPDATE`
+    const group = await tx.coachingGroup.findUnique({ where: { id } })
+    if (!group) throw new NotFoundException('Grup coaching tidak ditemukan.')
+    // Preserve legacy names as well. Existing snapshots must never be renamed.
+    // This global-catalog operation deliberately includes all branches.
+    await tx.$executeRaw`UPDATE booking_coaches SET "coachingGroupName" = ${group.name}
+      WHERE "coachingGroupId" = ${id} AND ("coachingGroupName" IS NULL OR "coachingGroupName" = '')`
+    // FK rules remove memberships and branches, and null only the booking's
+    // group reference. Staff, bookings, and financial snapshots are retained.
+    await tx.coachingGroup.delete({ where: { id } })
+    return { id: group.id, name: group.name }
+  })
+}

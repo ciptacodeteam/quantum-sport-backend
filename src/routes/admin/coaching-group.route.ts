@@ -9,6 +9,7 @@ import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
 import { requireAnyAdminRole } from '@/middlewares/auth'
 import {
+  deleteCoachingGroup,
   coachingGroupSchema,
   coachingGroupUploadSchema,
   saveCoachingGroupUpload,
@@ -65,3 +66,6 @@ export default createRouter()
   )
   .post('/', write, (c) => saveGroupRequest(c))
   .put('/:id', write, (c) => saveGroupRequest(c, c.req.param('id')))
+  .delete('/:id', write, async (c) =>
+    c.json(ok(await deleteCoachingGroup(c.req.param('id')))),
+  )

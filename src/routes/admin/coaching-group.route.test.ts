@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 const mocks = vi.hoisted(() => ({
+  remove: vi.fn(),
   list: vi.fn(),
   save: vi.fn(),
   upload: vi.fn(),
@@ -10,6 +11,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 vi.mock('@/services/coaching-group.service', async (original) => ({
   ...(await original<typeof import('@/services/coaching-group.service')>()),
+  deleteCoachingGroup: mocks.remove,
   saveCoachingGroup: mocks.save,
   saveCoachingGroupUpload: mocks.upload,
 }))
@@ -144,3 +146,24 @@ it('rejects malformed multipart settings and simultaneous upload/removal', async
   ).toBe(422)
   expect(mocks.upload).not.toHaveBeenCalled()
 })
+
+it('allows a super admin to delete a shared group', async () => {
+  mocks.remove.mockResolvedValue({ id: 'northwest', name: 'Northwest' })
+  const response = await app('SUPER_ADMIN').request(
+    '/admin/coaching-groups/northwest',
+    { method: 'DELETE' },
+  )
+  expect(response.status).toBe(200)
+  expect(mocks.remove).toHaveBeenCalledExactlyOnceWith('northwest')
+})
+it.each(['ADMIN', 'CASHIER', 'ADMIN_VIEWER', 'COACH', 'BALLBOY', undefined])(
+  'blocks deletion by %s',
+  async (role) => {
+    const response = await app(role).request(
+      '/admin/coaching-groups/northwest',
+      { method: 'DELETE' },
+    )
+    expect(response.status).toBe(role ? 403 : 401)
+    expect(mocks.remove).not.toHaveBeenCalled()
+  },
+)

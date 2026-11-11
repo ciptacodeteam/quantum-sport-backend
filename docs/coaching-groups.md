@@ -6,6 +6,8 @@ Di Schedule, buka booking terkonfirmasi lalu **Tambah Coach â†’ Grup coaching â†
 
 Setiap layanan coach menyimpan `coachingGroupId` dan snapshot `coachingGroupName`. Perubahan nama/anggota/status grup tidak mengganti riwayat booking. Ganti/batalkan coach tetap khusus Super Admin. Penggantian coach dapat memilih grup lain dengan jadwal, olahraga, cabang dan harga yang sama; perubahan grup dicatat bersama penggantian. Pembatalan atau penonaktifan grup tidak otomatis membatalkan booking.
 
+Super Admin dapat memilih ikon **Hapus grup** pada kolom Aksi dan mengonfirmasi nama grup. Grup dihapus dari seluruh cabang dan keanggotaan coach dilepas; coach tanpa grup lain menjadi independen. Profil coach, paket in-house, booking, nominal invoice dan snapshot nama grup pada riwayat tidak dihapus. Penghapusan bukan pembatalan atau refund. Nama historis yang kosong dilengkapi sebelum referensi grup dilepas. Untuk hanya menghentikan pemilihan baru sambil mempertahankan katalog, gunakan status Nonaktif.
+
 ## Persiapan database sebelum deploy backend
 
 Jalankan pada database aplikasi yang dituju:
