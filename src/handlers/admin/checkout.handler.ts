@@ -58,6 +58,7 @@ const adminCheckoutSchema = z
           .object({
             slotId: z.string().min(1),
             coachingGroupId: z.string().min(1),
+            participants: z.number().int().min(1).max(100).optional(),
           })
           .strict(),
       )
@@ -722,6 +723,9 @@ export const adminCheckoutHandler = factory.createHandlers(
               coachGroups?.find((item) => item.slotId === slot.id)
                 ?.coachingGroupId,
             )
+            const participants = coachGroups?.find(
+              (item) => item.slotId === slot.id,
+            )?.participants
             totalPrice += coachPrice
             await tx.bookingCoach.create({
               data: {
@@ -730,7 +734,15 @@ export const adminCheckoutHandler = factory.createHandlers(
                 slotId: slot.id,
                 bookingCoachTypeId: defaultCoachType.id,
                 // Store names of members joining this coach session (if provided)
-                description: coachDescription?.trim() || undefined,
+                description:
+                  [
+                    participants != null
+                      ? `Jumlah member: ${participants}`
+                      : null,
+                    coachDescription?.trim(),
+                  ]
+                    .filter(Boolean)
+                    .join('\n') || undefined,
                 price: coachPrice,
               },
             })
@@ -745,7 +757,19 @@ export const adminCheckoutHandler = factory.createHandlers(
         }
 
         if (inHouseSelections?.length) {
+          // Eligibility is read from the customer record, never from browser-supplied flags.
+          const managementCustomer = inputUserId
+            ? await tx.user.findUnique({
+                where: { id: inputUserId },
+                select: {
+                  isManagement: true,
+                  managementValidFrom: true,
+                  managementValidUntil: true,
+                },
+              })
+            : null
           const redemption = await redeemInHouseSelections(tx, {
+            managementCustomer,
             selections: inHouseSelections,
             userId: resolvedUserId!,
             bookingId: booking.id,

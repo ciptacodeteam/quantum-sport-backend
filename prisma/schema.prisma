@@ -124,6 +124,10 @@ enum NotificationType {
 // Users & Auth
 // ------------------------------
 model User {
+  isManagement Boolean @default(false)
+  managementValidFrom DateTime? @db.Date
+  managementValidUntil DateTime? @db.Date
+  managementAssignedBy String?
   firstName String?
   lastName String?
   id            String  @id @default(cuid())
@@ -1017,6 +1021,8 @@ model Branch {
 
 // Effective-dated court tariff bands, in whole hours of Asia/Jakarta.
 model TariffPeriod {
+  managementCourtHourlyPrice Int?
+  managementCoachHourlyPrice Int?
   happyAllDayDays Int[] @default([])
   happyCoachDiscount Int @default(0)
   peakCoachDiscount Int @default(0)

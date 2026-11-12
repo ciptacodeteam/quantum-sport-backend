@@ -798,3 +798,85 @@ it('accepts a scheduled coach identity but rejects browser prices and mixed pack
     inHouseSelectionSchema.safeParse({ ...direct, walletId: 'wallet' }).success,
   ).toBe(false)
 })
+
+it.each([1, 2])(
+  'charges the approved Management rate for %s participants and records its source',
+  async (participants) => {
+    const coach = {
+      id: 'coach-slot',
+      staffId: 'andi',
+      branchId: 'cemara',
+      price: 750000,
+      ...range,
+      staff: {
+        isActive: true,
+        role: 'COACH',
+        coachType: 'PADEL',
+        isInHouseCoach: true,
+      },
+    }
+    tx.slot.findMany = vi.fn().mockResolvedValue([coach])
+    tx.slot.findFirst.mockResolvedValue(coach)
+    tx.bookingDetail.findFirst.mockResolvedValue({
+      id: 'detail',
+      slotId: 'court-slot',
+      discountPrice: 150000,
+      slot: { ...range, branchId: 'cemara', court: { sport: 'PADEL' } },
+    })
+    const result = await redeemInHouseSelections(tx, {
+      ...input(),
+      managementCustomer: {
+        isManagement: true,
+        managementValidUntil: '2040-11-03',
+      },
+      selections: [
+        {
+          staffId: 'andi',
+          courtSlotId: 'court-slot',
+          coachSlotId: 'coach-slot',
+          participants,
+        },
+      ],
+      tariffRules: [
+        {
+          ...separateRule,
+          inHouseCourtHourlyPrice: 250000,
+          managementCourtHourlyPrice: 200000,
+          managementCoachHourlyPrice: 600000,
+        },
+      ],
+    })
+    expect(result).toEqual({
+      coveredCourtAmount: -50000,
+      courtPriceAdjustment: -50000,
+      extraAmount: 600000 + (participants - 1) * 100000,
+    })
+    expect(tx.bookingDetail.update).toHaveBeenCalledWith({
+      where: { id: 'detail' },
+      data: { discountPrice: 200000 },
+    })
+    expect(tx.bookingCoach.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        price: 600000 + (participants - 1) * 100000,
+        description: expect.stringContaining('Management'),
+      }),
+    })
+  },
+)
+it('keeps prepaid package terms even when a Management rate exists', async () => {
+  const result = await redeemInHouseSelections(tx, {
+    ...input(),
+    managementCustomer: { isManagement: true },
+    tariffRules: [
+      {
+        ...separateRule,
+        managementCourtHourlyPrice: 1,
+        managementCoachHourlyPrice: 1,
+      },
+    ],
+  })
+  expect(result.extraAmount).toBe(200000)
+  expect(
+    tx.bookingCoach.create.mock.calls[0][0].data.description,
+  ).not.toContain('Management')
+})

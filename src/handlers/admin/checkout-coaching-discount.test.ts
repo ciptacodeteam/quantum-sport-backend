@@ -425,29 +425,25 @@ it.each([1, 3])(
       },
     ]
     mocks.tx.inHouseWallet = {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'wallet',
-          staffId: 'andi',
-          branchId: 'cemara',
-          userId: 'customer',
-          packageName: 'Andi 5 jam',
-          hourlyPrice: 900000,
-          courtHourlyShare: 250000,
-          extraParticipantHourlyPrice: 100000,
-          staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
-        }),
-      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-    }
-    mocks.tx.slot.findFirst = vi
-      .fn()
-      .mockResolvedValue({
-        id: 'coach-slot',
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'wallet',
         staffId: 'andi',
         branchId: 'cemara',
-        ...range,
-      })
+        userId: 'customer',
+        packageName: 'Andi 5 jam',
+        hourlyPrice: 900000,
+        courtHourlyShare: 250000,
+        extraParticipantHourlyPrice: 100000,
+        staff: { isActive: true, role: 'COACH', coachType: 'PADEL' },
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    }
+    mocks.tx.slot.findFirst = vi.fn().mockResolvedValue({
+      id: 'coach-slot',
+      staffId: 'andi',
+      branchId: 'cemara',
+      ...range,
+    })
     mocks.tx.bookingDetail.findFirst.mockResolvedValue({
       id: 'detail',
       slotId: 'court-slot',
@@ -585,3 +581,121 @@ it.each([
       expect(args.data.price).toBe(750000 + (participants - 1) * 100000)
   },
 )
+
+it('loads Management eligibility from the database and records its court and coach prices in the invoice', async () => {
+  mocks.rules[0] = {
+    ...mocks.rules[0],
+    inHouseCourtHourlyPrice: 250000,
+    managementCourtHourlyPrice: 200000,
+    managementCoachHourlyPrice: 600000,
+  }
+  mocks.payload = {
+    ...mocks.payload,
+    coachSlots: [],
+    expectedTotal: 800000,
+    inHouseSelections: [
+      {
+        staffId: 'andi',
+        courtSlotId: 'court-slot',
+        coachSlotId: 'coach-slot',
+        participants: 1,
+      },
+    ],
+  }
+  mocks.tx.user.findUnique.mockResolvedValue({
+    id: 'customer',
+    isManagement: true,
+    managementValidFrom: new Date('2040-01-01T00:00:00Z'),
+    managementValidUntil: new Date('2040-01-02T00:00:00Z'),
+  })
+  const coach = {
+    ...range,
+    id: 'coach-slot',
+    staffId: 'andi',
+    branchId: 'cemara',
+    price: 750000,
+    staff: {
+      id: 'andi',
+      role: 'COACH',
+      isActive: true,
+      isInHouseCoach: true,
+      coachType: 'PADEL',
+    },
+  }
+  const court = {
+    ...range,
+    id: 'court-slot',
+    branchId: 'cemara',
+    courtId: 'court',
+    court: { sport: 'PADEL' },
+    price: 150000,
+    discountPrice: 0,
+    bookingDetails: [],
+  }
+  mocks.tx.slot.findMany.mockImplementation(({ where }: any) =>
+    where.type === 'COACH' ? [coach] : [court],
+  )
+  mocks.tx.slot.findFirst = vi.fn().mockResolvedValue(coach)
+  mocks.tx.bookingDetail.findFirst.mockResolvedValue({
+    id: 'detail',
+    slotId: 'court-slot',
+    discountPrice: 150000,
+    slot: court,
+  })
+  await checkout()
+  expect(mocks.tx.user.findUnique).toHaveBeenCalledWith({
+    where: { id: 'customer' },
+    select: {
+      isManagement: true,
+      managementValidFrom: true,
+      managementValidUntil: true,
+    },
+  })
+  expect(mocks.tx.booking.update).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        courtDiscountPrice: 200000,
+        totalPrice: 800000,
+      }),
+    }),
+  )
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ total: 800000 }),
+    }),
+  )
+  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      price: 600000,
+      description: expect.stringContaining('Management'),
+    }),
+  })
+})
+
+it('records the club member count together with existing coach notes without multiplying the price', async () => {
+  mocks.payload.coachGroups = [
+    { slotId: 'coach-slot', coachingGroupId: 'academy', participants: 4 },
+  ]
+  mocks.payload.coachDescription = 'Andi, Budi, Citra, Dedi'
+  mocks.tx.coachingGroup = {
+    findFirst: vi.fn().mockResolvedValue({ id: 'academy', name: 'SR Academy' }),
+  }
+  const coach = (await mocks.tx.slot.findMany({ where: { type: 'COACH' } }))[0]
+  coach.staff.id = 'coach'
+  coach.branchId = 'cemara'
+  coach.staff.coachingGroups = [
+    {
+      coachingGroupId: 'academy',
+      group: { id: 'academy', name: 'SR Academy' },
+    },
+  ]
+  await checkout()
+  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        description: 'Jumlah member: 4\nAndi, Budi, Citra, Dedi',
+        price: 200000,
+      }),
+    }),
+  )
+})

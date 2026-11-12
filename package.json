@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "format": "prettier -w .",
     "test": "vitest run",
+    "db:management-customers": "prisma db execute --schema prisma/schema.prisma --file prisma/management-customers.sql",
     "db:generate": "prisma generate",
     "db:internal-court-bookings": "prisma db execute --schema prisma/schema.prisma --file prisma/internal-court-bookings.sql",
     "db:migrate": "prisma migrate dev",

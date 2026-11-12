@@ -222,3 +222,31 @@ it('saves and retains the fixed in-house court price separately from legacy disc
     inHouseCourtHourlyPrice: 250000,
   })
 })
+
+it('persists, preserves and explicitly disables paired Management rates', async () => {
+  const management = {
+    managementCourtHourlyPrice: 200000,
+    managementCoachHourlyPrice: 600000,
+  }
+  await saveTariffPeriod('cemara', { ...input, ...management }, now)
+  expect(mocks.upsert.mock.lastCall?.[0].create).toMatchObject(management)
+  expect(mocks.upsert.mock.lastCall?.[0].update).toMatchObject(management)
+  mocks.list.mockResolvedValue([
+    { ...input, ...management, branchId: 'cemara' },
+  ])
+  await saveTariffPeriod('cemara', input, now)
+  expect(mocks.upsert.mock.lastCall?.[0].create).toMatchObject(management)
+  await saveTariffPeriod(
+    'cemara',
+    {
+      ...input,
+      managementCourtHourlyPrice: null,
+      managementCoachHourlyPrice: null,
+    },
+    now,
+  )
+  expect(mocks.upsert.mock.lastCall?.[0].update).toMatchObject({
+    managementCourtHourlyPrice: null,
+    managementCoachHourlyPrice: null,
+  })
+})

@@ -1,3 +1,8 @@
+import {
+  managementInHouseRate,
+  type ManagementCustomer,
+} from '@/lib/management-pricing'
+import { resolveTariffPeriod } from '@/lib/tariff-period'
 import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/prisma'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -192,6 +197,7 @@ export async function redeemInHouseSelections(
     bookingId: string
     courtSlotIds: string[]
     tariffRules?: TariffRule[]
+    managementCustomer?: ManagementCustomer | null
     clubCoachSlots: { startAt: Date; endAt: Date }[]
   },
 ) {
@@ -329,7 +335,24 @@ export async function redeemInHouseSelections(
           'Sisa kuota coaching tidak cukup. Muat ulang pilihan paket.',
         )
     }
-    const price = priceInHouseHour(terms, selection.participants)
+    const managementRate = prepaid
+      ? null
+      : managementInHouseRate(
+          input.managementCustomer,
+          court.slot.startAt,
+          resolveTariffPeriod(
+            input.tariffRules ?? [],
+            court.slot.startAt,
+            court.slot.branchId,
+            court.slot.court?.sport ?? 'PADEL',
+          ),
+        )
+    const price = priceInHouseHour(
+      managementRate
+        ? { ...terms, hourlyPrice: managementRate.coach, courtHourlyShare: 0 }
+        : terms,
+      selection.participants,
+    )
     // Tariff discounts apply only to direct hourly coaching; prepaid terms stay frozen.
     const discount = prepaid
       ? null
@@ -338,7 +361,8 @@ export async function redeemInHouseSelections(
         : getInHouseCourtDiscount(court.slot, input.tariffRules)
     const fixedCourtPrice = prepaid
       ? null
-      : getInHouseCourtHourlyPrice(court.slot, input.tariffRules)
+      : (managementRate?.court ??
+        getInHouseCourtHourlyPrice(court.slot, input.tariffRules))
     const courtDue =
       fixedCourtPrice ??
       (discount === null ? 0 : Math.max(0, court.discountPrice - discount))
@@ -361,7 +385,7 @@ export async function redeemInHouseSelections(
         courtSlotId: court.slotId,
         bookingCoachTypeId: coachType.id,
         price: price.extraAmount + (prepaid ? 0 : price.coachAmount),
-        description: `In-house ${prepaid ? ('packageName' in terms ? terms.packageName : '') : `satuan ${'name' in terms ? terms.name : '1 jam'}`}; ${selection.participants} peserta`,
+        description: `${managementRate ? 'Management · ' : ''}In-house ${prepaid ? ('packageName' in terms ? terms.packageName : '') : `satuan ${'name' in terms ? terms.name : '1 jam'}`}; ${selection.participants} peserta`,
         ...(prepaid
           ? {
               inHouseUsage: {

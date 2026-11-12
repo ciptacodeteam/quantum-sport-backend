@@ -9,6 +9,8 @@ export const defaultTariffPeriod = {
 }
 export type TariffBands = typeof defaultTariffPeriod
 export type CoachingDiscounts = {
+  managementCourtHourlyPrice?: number | null
+  managementCoachHourlyPrice?: number | null
   inHouseCourtHourlyPrice?: number | null
   happyInHouseCoachDiscount?: number | null
   peakInHouseCoachDiscount?: number | null
@@ -46,6 +48,20 @@ export const tariffPeriodSchema = z
     happyEnd: z.number().int().min(1).max(24),
     peakStart: z.number().int().min(0).max(23),
     peakEnd: z.number().int().min(1).max(24),
+    managementCourtHourlyPrice: z
+      .number()
+      .int()
+      .min(0)
+      .max(2147483647)
+      .nullable()
+      .optional(),
+    managementCoachHourlyPrice: z
+      .number()
+      .int()
+      .min(0)
+      .max(2147483647)
+      .nullable()
+      .optional(),
     inHouseCourtHourlyPrice: z
       .number()
       .int()
@@ -71,6 +87,16 @@ export const tariffPeriodSchema = z
     peakCoachDiscount: z.number().int().min(0).max(2147483647).optional(),
   })
   .superRefine((value, ctx) => {
+    if (
+      (value.managementCourtHourlyPrice != null) !==
+      (value.managementCoachHourlyPrice != null)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['managementCourtHourlyPrice'],
+        message:
+          'Isi tarif lapangan dan coach Management, atau nonaktifkan keduanya.',
+      })
     if (
       (value.happyInHouseCoachDiscount != null) !==
       (value.peakInHouseCoachDiscount != null)

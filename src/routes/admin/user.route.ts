@@ -1,4 +1,8 @@
 import {
+  createManagementCustomerHandler,
+  updateManagementCustomerHandler,
+} from '@/handlers/admin/management-customer.handler'
+import {
   banUserHandler,
   getAllUsersHandler,
   getUserDetailHandler,
@@ -23,6 +27,8 @@ const adminUserRoute = createRouter()
   .basePath('/customers')
   .get('/', requireCustomerReadAccess, ...getAllUsersHandler)
   .get('/search', requireCustomerReadAccess, ...searchCustomersHandler)
+  .post('/management', requireAdmin, ...createManagementCustomerHandler)
+  .put('/:id/management', requireAdmin, ...updateManagementCustomerHandler)
   .get('/:id', requireCustomerReadAccess, ...getUserDetailHandler)
   .get(
     '/:id/membership',

@@ -17,10 +17,14 @@ const courtRoute = createRouter()
   .get('/tariff-periods', async (c) =>
     c.json(
       ok({
-        rules: await getTariffPeriods(
-          undefined,
-          c.get('branchId') ?? undefined,
-        ),
+        rules: (
+          await getTariffPeriods(undefined, c.get('branchId') ?? undefined)
+        ).map((rule) => {
+          const publicRule: Partial<typeof rule> = { ...rule }
+          delete publicRule.managementCourtHourlyPrice
+          delete publicRule.managementCoachHourlyPrice
+          return publicRule
+        }),
         defaults: defaultTariffPeriod,
       }),
     ),

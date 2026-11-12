@@ -486,6 +486,8 @@ it('uses the effective branch tariff instead of the old 15:00 boundary at custom
       happyCoachDiscount: 0,
       peakCoachDiscount: 0,
       inHouseCourtHourlyPrice: null,
+      managementCourtHourlyPrice: null,
+      managementCoachHourlyPrice: null,
       happyInHouseCoachDiscount: null,
       peakInHouseCoachDiscount: null,
       id: 'rule',
