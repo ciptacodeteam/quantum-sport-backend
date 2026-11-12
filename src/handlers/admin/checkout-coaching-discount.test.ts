@@ -672,30 +672,46 @@ it('loads Management eligibility from the database and records its court and coa
   })
 })
 
-it('records the club member count together with existing coach notes without multiplying the price', async () => {
-  mocks.payload.coachGroups = [
-    { slotId: 'coach-slot', coachingGroupId: 'academy', participants: 4 },
-  ]
-  mocks.payload.coachDescription = 'Andi, Budi, Citra, Dedi'
-  mocks.tx.coachingGroup = {
-    findFirst: vi.fn().mockResolvedValue({ id: 'academy', name: 'SR Academy' }),
-  }
-  const coach = (await mocks.tx.slot.findMany({ where: { type: 'COACH' } }))[0]
-  coach.staff.id = 'coach'
-  coach.branchId = 'cemara'
-  coach.staff.coachingGroups = [
-    {
-      coachingGroupId: 'academy',
-      group: { id: 'academy', name: 'SR Academy' },
-    },
-  ]
-  await checkout()
-  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
-    expect.objectContaining({
-      data: expect.objectContaining({
-        description: 'Jumlah member: 4\nAndi, Budi, Citra, Dedi',
-        price: 200000,
+it.each([2, 4])(
+  'charges configured extra member rates and records the count for %i club members',
+  async (participants) => {
+    mocks.payload.coachGroups = [
+      { slotId: 'coach-slot', coachingGroupId: 'academy', participants },
+    ]
+    mocks.payload.coachDescription = 'Andi, Budi, Citra, Dedi'
+    mocks.tx.coachingGroup = {
+      findFirst: vi
+        .fn()
+        .mockResolvedValue({ id: 'academy', name: 'SR Academy' }),
+    }
+    const coach = (
+      await mocks.tx.slot.findMany({ where: { type: 'COACH' } })
+    )[0]
+    coach.price = 150000
+    coach.additionalHourPrice = 50000
+    coach.staff.id = 'coach'
+    coach.branchId = 'cemara'
+    coach.staff.coachingGroups = [
+      {
+        coachingGroupId: 'academy',
+        group: { id: 'academy', name: 'SR Academy' },
+      },
+    ]
+    await checkout()
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          total: 105000 + 150000 + (participants - 1) * 50000,
+        }),
       }),
-    }),
-  )
-})
+    )
+    expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          description: `Jumlah member: ${participants}\nAndi, Budi, Citra, Dedi`,
+          price: 150000 + (participants - 1) * 50000,
+        }),
+      }),
+    )
+  },
+)

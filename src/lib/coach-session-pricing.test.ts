@@ -48,3 +48,33 @@ it('continues across midnight and respects null, zero, and per-slot pricing', ()
     ]).values(),
   ]).toEqual([200000, 0])
 })
+
+it('adds the configured extra member rate per slot, including consecutive hours, zero and unset rates', () => {
+  const club = {
+    ...slot(10),
+    price: 150000,
+    additionalHourPrice: 50000,
+    participants: 2,
+  }
+  expect(priceCoachSessions([club]).get(club.id)).toBe(200000)
+  expect(priceCoachSessions([{ ...club, participants: 3 }]).get(club.id)).toBe(
+    250000,
+  )
+  expect([
+    ...priceCoachSessions([
+      club,
+      {
+        ...slot(11),
+        price: 150000,
+        additionalHourPrice: 50000,
+        participants: 3,
+      },
+    ]).values(),
+  ]).toEqual([200000, 150000])
+  expect(
+    priceCoachSessions([{ ...club, additionalHourPrice: 0 }]).get(club.id),
+  ).toBe(150000)
+  expect(
+    priceCoachSessions([{ ...club, additionalHourPrice: null }]).get(club.id),
+  ).toBe(300000)
+})

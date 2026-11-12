@@ -709,7 +709,14 @@ export const adminCheckoutHandler = factory.createHandlers(
               'One or more coach slots not found or unavailable',
           })
 
-          const coachPrices = priceCoachSessions(slotData)
+          const coachPrices = priceCoachSessions(
+            slotData.map((slot) => ({
+              ...slot,
+              participants:
+                coachGroups?.find((item) => item.slotId === slot.id)
+                  ?.participants ?? 1,
+            })),
+          )
           for (const slot of slotData) {
             const coachPrice = coachPrices.get(slot.id)!
             const group = await resolveBookingCoachingGroup(
