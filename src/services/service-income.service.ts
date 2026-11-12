@@ -49,6 +49,7 @@ export type ServiceIncomeRow = {
   startAt: string
   endAt: string
   hours: number
+  description: string | null
   servicePrice: number
   discount: number
   amount: number
@@ -153,6 +154,8 @@ export function buildServiceIncome(
         startAt: formatClubWallClock(item.slot.startAt),
         endAt: formatClubWallClock(item.slot.endAt),
         hours: Math.max(0, (+item.slot.endAt - +item.slot.startAt) / 3600000),
+        description:
+          'description' in item ? (item.description as string | null) : null,
         servicePrice: prices[index],
         discount: prices[index] - amounts[index],
         amount: amounts[index],

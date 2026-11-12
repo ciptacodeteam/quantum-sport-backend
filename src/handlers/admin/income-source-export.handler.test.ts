@@ -47,7 +47,11 @@ it('downloads xlsx using exactly the requested date range and source', async () 
     'attachment; filename="income-by-source-2026-11-12-2026-11-12.xlsx"',
   )
   const book = XLSX.read(await response.arrayBuffer(), { type: 'array' })
-  expect(book.SheetNames).toEqual(['Ringkasan per sumber', 'Detail transaksi'])
+  expect(book.SheetNames).toEqual([
+    'Ringkasan per sumber',
+    'Revenue per layanan',
+    'Detail transaksi',
+  ])
 })
 it('rejects invalid date filters before loading report data', async () => {
   const response = await app.request(

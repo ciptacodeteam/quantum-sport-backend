@@ -91,6 +91,7 @@ export const serviceIncomeExportHandler = factory.createHandlers(
         Club: row.clubName,
         'Mulai sesi (WIB)': row.startAt,
         'Selesai sesi (WIB)': row.endAt,
+        'Keterangan sesi': row.description,
         'Biaya jasa': row.servicePrice,
         'Alokasi diskon': row.discount,
         'Hak club (100%)': row.amount,

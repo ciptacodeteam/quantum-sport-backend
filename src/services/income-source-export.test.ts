@@ -44,7 +44,11 @@ it('exports reconciled totals, cancellations, all invoice rows, numeric money an
     XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }),
     { type: 'buffer' },
   )
-  expect(saved.SheetNames).toEqual(['Ringkasan per sumber', 'Detail transaksi'])
+  expect(saved.SheetNames).toEqual([
+    'Ringkasan per sumber',
+    'Revenue per layanan',
+    'Detail transaksi',
+  ])
   const summary = XLSX.utils.sheet_to_json<any[]>(
     saved.Sheets['Ringkasan per sumber'],
     { header: 1 },
@@ -97,5 +101,5 @@ it('exports a usable empty report with headers and zero totals', async () => {
   )
   expect(rows.at(-1)).toEqual(['Total', 0, 0, 0, 0, 0])
   expect(book.Sheets['Detail transaksi'].A1.v).toBe('Invoice')
-  expect(book.Sheets['Detail transaksi']['!autofilter']?.ref).toBe('A1:P1')
+  expect(book.Sheets['Detail transaksi']['!autofilter']?.ref).toBe('A1:T1')
 })

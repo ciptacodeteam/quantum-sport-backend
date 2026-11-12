@@ -80,6 +80,20 @@ export function createIncomeSourceWorkbook(report: IncomeReport) {
     }
   }
   XLSX.utils.book_append_sheet(book, summarySheet, 'Ringkasan per sumber')
+  const breakdown = summary.revenueBreakdown
+  const allocationSheet = XLSX.utils.aoa_to_sheet([
+    ['Layanan', 'Revenue'],
+    ['Lapangan', breakdown?.court ?? 0],
+    ['Coach', breakdown?.coach ?? 0],
+    ['Ballboy', breakdown?.ballboy ?? 0],
+    ['Lainnya', breakdown?.other ?? summary.totalNetAmount],
+    ['Total', summary.totalNetAmount],
+  ])
+  allocationSheet['!cols'] = [{ wch: 28 }, { wch: 24 }]
+  for (let r = 1; r <= 5; r++)
+    allocationSheet[XLSX.utils.encode_cell({ r, c: 1 })].z =
+      '"Rp" #,##0;[Red]("Rp" #,##0)'
+  XLSX.utils.book_append_sheet(book, allocationSheet, 'Revenue per layanan')
   const headers = [
     'Invoice',
     'Pemesanan',
@@ -97,6 +111,10 @@ export function createIncomeSourceWorkbook(report: IncomeReport) {
     'Revenue',
     'Jadwal bermain (WIB)',
     'Layanan dibatalkan',
+    'Revenue lapangan',
+    'Revenue coach',
+    'Revenue ballboy',
+    'Revenue lainnya',
   ]
   const transactionRows = report.transactions.map((row) => [
     row.invoiceNumber,
@@ -125,16 +143,26 @@ export function createIncomeSourceWorkbook(report: IncomeReport) {
           `${service.kind} ${service.name} · Rp ${service.amount.toLocaleString('id-ID')}${service.reason ? ` · ${service.reason}` : ''}`,
       )
       .join('\n'),
+    row.revenueBreakdown?.court ?? 0,
+    row.revenueBreakdown?.coach ?? 0,
+    row.revenueBreakdown?.ballboy ?? 0,
+    row.revenueBreakdown?.other ?? row.netAmount,
   ])
   const details = XLSX.utils.aoa_to_sheet([headers, ...transactionRows])
   details['!cols'] = [
-    25, 28, 23, 30, 22, 26, 23, 21, 21, 24, 24, 21, 32, 24, 65, 65,
+    25, 28, 23, 30, 22, 26, 23, 21, 21, 24, 24, 21, 32, 24, 65, 65, 24, 24, 24,
+    24,
   ].map((wch) => ({ wch }))
   details['!autofilter'] = {
-    ref: `A1:P${Math.max(1, transactionRows.length + 1)}`,
+    ref: `A1:T${Math.max(1, transactionRows.length + 1)}`,
   }
   for (let r = 1; r <= transactionRows.length; r++) {
     for (let c = 10; c <= 13; c++)
+      details[XLSX.utils.encode_cell({ r, c })].z =
+        '"Rp" #,##0;[Red]("Rp" #,##0)'
+  }
+  for (let r = 1; r <= transactionRows.length; r++) {
+    for (let c = 16; c <= 19; c++)
       details[XLSX.utils.encode_cell({ r, c })].z =
         '"Rp" #,##0;[Red]("Rp" #,##0)'
   }

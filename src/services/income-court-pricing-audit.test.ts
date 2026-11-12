@@ -84,6 +84,15 @@ it.each([
     expect(sources.summary.totalNetAmount - services.summary.totalAmount).toBe(
       courtPrice * factor,
     )
+    expect(sources.summary.revenueBreakdown).toEqual({
+      court: courtPrice * factor,
+      coach: 200000 * factor,
+      ballboy: 50000 * factor,
+      other: 0,
+    })
+    expect(sources.transactions[0].revenueBreakdown).toEqual(
+      sources.summary.revenueBreakdown,
+    )
     expect(mocks.tariffs).not.toHaveBeenCalled()
   },
 )
@@ -147,6 +156,9 @@ it('exports the same discounted-court allocation in Income by Source and Income 
     sourceBook.Sheets['Detail transaksi'],
   )
   expect(sourceDetails[0].Revenue).toBe(319500)
+  expect(sourceDetails[0]['Revenue lapangan']).toBe(94500)
+  expect(sourceDetails[0]['Revenue coach']).toBe(180000)
+  expect(sourceDetails[0]['Revenue ballboy']).toBe(45000)
   const app = new Hono<any>()
   app.use('*', async (c, next) => {
     c.set('admin', { id: 'admin', role: 'ADMIN' })
@@ -169,4 +181,79 @@ it('exports the same discounted-court allocation in Income by Source and Income 
   expect(rows.find((row) => row.Jenis === 'BALLBOY')?.['Hak club (100%)']).toBe(
     45000,
   )
+})
+
+it.each([1, 2, 3])(
+  'reconciles full hourly coach income with %i club members and recorded coaching court rates',
+  async (participants) => {
+    const hourlyCoach = 150000 + (participants - 1) * 50000
+    const data = invoice(210000, hourlyCoach * 2)
+    data.booking.coaches = [0, 1].map((index) => ({
+      ...service(`coach-${index}`, hourlyCoach),
+      description: `Jumlah member: ${participants}`,
+      slot: {
+        ...range,
+        staff: { id: 'coach', name: 'Coach Fredy' },
+        startAt: new Date(+range.startAt + index * 3600000),
+        endAt: new Date(+range.endAt + index * 3600000),
+      },
+    }))
+    data.booking.details = [0, 1].map((index) => ({
+      price: 150000,
+      discountPrice: 105000,
+      slot: {
+        ...range,
+        court: { name: 'Court 2' },
+        startAt: new Date(+range.startAt + index * 3600000),
+        endAt: new Date(+range.endAt + index * 3600000),
+      },
+    }))
+    mocks.invoices.mockResolvedValue([data])
+    const sources = await getIncomeBySourceAnalytics(start, end)
+    const services = serviceReport(data)
+    expect(sources.summary.revenueBreakdown).toEqual({
+      court: 210000,
+      coach: hourlyCoach * 2,
+      ballboy: 50000,
+      other: 0,
+    })
+    expect(services.summary.coachAmount).toBe(hourlyCoach * 2)
+    expect(
+      services.clubs.find((club) => club.id === 'club-a')?.coachAmount,
+    ).toBe(hourlyCoach * 2)
+    expect(
+      services.staff.find((staff) => staff.service === 'COACH')?.amount,
+    ).toBe(hourlyCoach * 2)
+    expect(
+      services.rows
+        .filter((row) => row.service === 'COACH')
+        .map((row) => row.description),
+    ).toEqual([
+      `Jumlah member: ${participants}`,
+      `Jumlah member: ${participants}`,
+    ])
+    expect(
+      Object.values(sources.summary.revenueBreakdown).reduce(
+        (a, b) => a + b,
+        0,
+      ),
+    ).toBe(sources.summary.totalNetAmount)
+    expect(mocks.tariffs).not.toHaveBeenCalled()
+  },
+)
+
+it('keeps cancellation and whole-rupiah promo allocations reconciled with service income', async () => {
+  const data = invoice(105000, 200000, 1)
+  data.booking.coaches[0].status = 'CANCELLED'
+  mocks.invoices.mockResolvedValue([data])
+  const sources = await getIncomeBySourceAnalytics(start, end)
+  const services = serviceReport(data)
+  expect(sources.summary.revenueBreakdown.coach).toBe(0)
+  expect(sources.summary.revenueBreakdown.ballboy).toBe(
+    services.summary.ballboyAmount,
+  )
+  expect(
+    Object.values(sources.summary.revenueBreakdown).reduce((a, b) => a + b, 0),
+  ).toBe(sources.summary.totalNetAmount)
+  expect(mocks.tariffs).not.toHaveBeenCalled()
 })

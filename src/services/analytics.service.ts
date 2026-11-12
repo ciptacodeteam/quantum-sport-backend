@@ -132,7 +132,7 @@ function incomeRevenue(invoice: any) {
     const services = [
       ...(invoice.booking?.coaches ?? []),
       ...(invoice.booking?.ballboys ?? []),
-    ]
+    ].sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''))
     const prices = services.map((item: any) => Math.max(0, item.price ?? 0))
     const allocated = allocateServicePayment(
       prices,
@@ -147,6 +147,53 @@ function incomeRevenue(invoice: any) {
     )
   }
   return { netAmount: Math.max(0, paidNet - excludedAmount), excludedAmount }
+}
+
+/** Split recorded charges; current tariff settings must never reprice historical revenue. */
+function incomeBreakdown(invoice: any) {
+  const { netAmount } = incomeRevenue(invoice)
+  const result = { court: 0, coach: 0, ballboy: 0, other: 0 }
+  const booking = invoice.booking
+  if (!booking || netAmount === 0) return { ...result, other: netAmount }
+  const services = [
+    ...(booking.coaches ?? []).map((item: any) => ({
+      ...item,
+      kind: 'coach' as const,
+    })),
+    ...(booking.ballboys ?? []).map((item: any) => ({
+      ...item,
+      kind: 'ballboy' as const,
+    })),
+  ].sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''))
+  const prices = services.map((item) => Math.max(0, item.price ?? 0))
+  const paid = Math.max(0, (invoice.total ?? 0) - (invoice.processingFee ?? 0))
+  const beforePromo = Math.max(
+    booking.totalPrice + (booking.promoDiscountAmount ?? 0) || paid,
+    prices.reduce((a, b) => a + b, 0),
+  )
+  const amounts = allocateServicePayment(prices, beforePromo, paid)
+  services.forEach((item, index) => {
+    if (item.status !== 'CANCELLED')
+      result[item.kind as 'coach' | 'ballboy'] += amounts[index]
+  })
+  const serviceTotal = prices.reduce((a, b) => a + b, 0)
+  const remainderPaid = Math.max(0, paid - amounts.reduce((a, b) => a + b, 0))
+  const courtPrice = (booking.details ?? []).reduce(
+    (sum: number, item: any) =>
+      sum + Math.max(0, item.discountPrice ?? item.price ?? 0),
+    0,
+  )
+  result.court =
+    allocateServicePayment(
+      [courtPrice],
+      Math.max(0, beforePromo - serviceTotal),
+      remainderPaid,
+    )[0] ?? 0
+  result.other = Math.max(
+    0,
+    netAmount - result.court - result.coach - result.ballboy,
+  )
+  return result
 }
 
 /**
@@ -174,6 +221,8 @@ export async function getIncomeBySourceAnalytics(
         serviceForBooking: { select: { status: true } },
         details: {
           select: {
+            price: true,
+            discountPrice: true,
             slot: {
               select: {
                 startAt: true,
@@ -185,6 +234,7 @@ export async function getIncomeBySourceAnalytics(
         },
         coaches: {
           select: {
+            id: true,
             status: true,
             price: true,
             cancelledAt: true,
@@ -200,6 +250,7 @@ export async function getIncomeBySourceAnalytics(
         },
         ballboys: {
           select: {
+            id: true,
             status: true,
             price: true,
             cancelledAt: true,
@@ -244,6 +295,7 @@ export async function getIncomeBySourceAnalytics(
   let totalGrossAmount = 0
   let totalNetAmount = 0
   let totalExcludedAmount = 0
+  const revenueBreakdown = { court: 0, coach: 0, ballboy: 0, other: 0 }
 
   const bookingIncome: Record<string, any> = {}
   const classIncome: Record<string, any> = {}
@@ -254,6 +306,9 @@ export async function getIncomeBySourceAnalytics(
     const gross = invoice.total || 0
     const processingFee = invoice.processingFee || 0
     const { netAmount, excludedAmount } = incomeRevenue(invoice)
+    const breakdown = incomeBreakdown(invoice)
+    for (const key of ['court', 'coach', 'ballboy', 'other'] as const)
+      revenueBreakdown[key] += breakdown[key]
     totalExcludedAmount += excludedAmount
     // Accumulate overall totals once per invoice
     totalGrossAmount += gross
@@ -369,6 +424,7 @@ export async function getIncomeBySourceAnalytics(
 
   return {
     summary: {
+      revenueBreakdown,
       totalIncome,
       totalGrossAmount,
       totalProcessingFees,
@@ -410,6 +466,7 @@ export async function getIncomeBySourceAnalytics(
       playingSchedules: incomePlayingSchedules(invoice.booking),
       ...incomeCancellation(invoice),
       ...incomeRevenue(invoice),
+      revenueBreakdown: incomeBreakdown(invoice),
       reschedule: lastRescheduleAudit(invoice.booking?.adminNote),
       customerName: invoice.user?.name ?? 'Customer tidak tersedia',
       branchName: invoice.branch?.name ?? invoice.branchId,
