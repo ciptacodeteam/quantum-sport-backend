@@ -1,4 +1,4 @@
-/** Prices a continuous sequence per coach; gaps and coach changes start a new session. */
+/** Club selections use full hourly rates plus extra members; other coaches retain consecutive-hour pricing. */
 export function priceCoachSessions<
   T extends {
     id: string
@@ -14,6 +14,7 @@ export function priceCoachSessions<
   const ends = new Map<string, number>()
   for (const slot of [...slots].sort((a, b) => +a.startAt - +b.startAt)) {
     const consecutive =
+      slot.participants === undefined &&
       !!slot.staffId &&
       ends.get(slot.staffId) === +slot.startAt &&
       +slot.endAt - +slot.startAt === 3600000

@@ -715,3 +715,63 @@ it.each([2, 4])(
     )
   },
 )
+
+it.each([1, 2])(
+  'charges two full club coach hours for %i members in the actual invoice',
+  async (participants) => {
+    const [baseCourt] = await mocks.tx.slot.findMany({
+      where: { type: 'COURT' },
+    })
+    const [baseCoach] = await mocks.tx.slot.findMany({
+      where: { type: 'COACH' },
+    })
+    const courts = [0, 1].map((index) => ({
+      ...baseCourt,
+      id: `court-${index}`,
+      startAt: new Date(+range.startAt + index * 3600000),
+      endAt: new Date(+range.endAt + index * 3600000),
+    }))
+    const coaches = courts.map((court, index) => ({
+      ...baseCoach,
+      id: `coach-${index}`,
+      staffId: 'club-coach',
+      staff: { ...baseCoach.staff, id: 'club-coach' },
+      branchId: 'cemara',
+      price: 150000,
+      additionalHourPrice: 50000,
+      startAt: court.startAt,
+      endAt: court.endAt,
+    }))
+    mocks.tx.coachingGroup = {
+      findFirst: vi
+        .fn()
+        .mockResolvedValue({ id: 'academy', name: 'SR Academy' }),
+    }
+    const coachTotal = (150000 + (participants - 1) * 50000) * 2
+    mocks.payload = {
+      ...mocks.payload,
+      totalHours: 2,
+      courtSlots: courts.map((slot) => slot.id),
+      coachSlots: coaches.map((slot) => slot.id).reverse(),
+      coachGroups: coaches.map((slot) => ({
+        slotId: slot.id,
+        coachingGroupId: 'academy',
+        participants,
+      })),
+      expectedTotal: 210000 + coachTotal,
+    }
+    mocks.tx.slot.findMany.mockImplementation(({ where }: any) =>
+      where.type === 'COACH' ? coaches : courts,
+    )
+    await checkout()
+    const charged = mocks.tx.bookingCoach.create.mock.calls.map(
+      ([args]: any) => args.data.price,
+    )
+    expect(charged).toEqual([coachTotal / 2, coachTotal / 2])
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: 210000 + coachTotal }),
+      }),
+    )
+  },
+)

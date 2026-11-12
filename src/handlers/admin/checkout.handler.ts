@@ -710,12 +710,17 @@ export const adminCheckoutHandler = factory.createHandlers(
           })
 
           const coachPrices = priceCoachSessions(
-            slotData.map((slot) => ({
-              ...slot,
-              participants:
-                coachGroups?.find((item) => item.slotId === slot.id)
-                  ?.participants ?? 1,
-            })),
+            slotData.map((slot) => {
+              const groupSelection = coachGroups?.find(
+                (item) => item.slotId === slot.id,
+              )
+              return {
+                ...slot,
+                participants: groupSelection
+                  ? (groupSelection.participants ?? 1)
+                  : undefined,
+              }
+            }),
           )
           for (const slot of slotData) {
             const coachPrice = coachPrices.get(slot.id)!

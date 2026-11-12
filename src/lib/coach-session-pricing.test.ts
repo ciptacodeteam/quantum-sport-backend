@@ -70,7 +70,7 @@ it('adds the configured extra member rate per slot, including consecutive hours,
         participants: 3,
       },
     ]).values(),
-  ]).toEqual([200000, 150000])
+  ]).toEqual([200000, 250000])
   expect(
     priceCoachSessions([{ ...club, additionalHourPrice: 0 }]).get(club.id),
   ).toBe(150000)
@@ -78,3 +78,28 @@ it('adds the configured extra member rate per slot, including consecutive hours,
     priceCoachSessions([{ ...club, additionalHourPrice: null }]).get(club.id),
   ).toBe(300000)
 })
+
+it.each([1, 2, 3, 4, 5])(
+  'charges full club rates for %i consecutive hours',
+  (hours) => {
+    const slots = Array.from({ length: hours }, (_, index) => ({
+      ...slot(10 + index),
+      price: 150000,
+      additionalHourPrice: 50000,
+      participants: 1,
+    })).reverse()
+    expect(
+      [...priceCoachSessions(slots).values()].reduce(
+        (sum, price) => sum + price,
+        0,
+      ),
+    ).toBe(150000 * hours)
+    expect(
+      [
+        ...priceCoachSessions(
+          slots.map((slot) => ({ ...slot, participants: 2 })),
+        ).values(),
+      ].reduce((sum, price) => sum + price, 0),
+    ).toBe(200000 * hours)
+  },
+)
