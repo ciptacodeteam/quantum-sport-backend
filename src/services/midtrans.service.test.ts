@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   amountsMatch,
   buildChargeBody,
+  buildSnapBody,
   isPaidStatus,
   normalizeCharge,
   snapEnabledPayments,
@@ -133,5 +134,21 @@ describe('midtrans charge mapping', () => {
     expect(snapEnabledPayments('QRIS')).toEqual(['other_qris'])
     expect(snapEnabledPayments('CARDS')).toEqual(['credit_card'])
     expect(() => snapEnabledPayments('BSI_VIRTUAL_ACCOUNT')).toThrow('Snap')
+  })
+
+  it('sets credit_card.secure=true on Snap body for CARDS only', () => {
+    expect(
+      buildSnapBody({ orderId: 'INV-1', amount: 10000, channelCode: 'CARDS' }),
+    ).toMatchObject({
+      enabled_payments: ['credit_card'],
+      credit_card: { secure: true },
+    })
+    expect(
+      buildSnapBody({
+        orderId: 'INV-1',
+        amount: 10000,
+        channelCode: 'BRI_VIRTUAL_ACCOUNT',
+      }).credit_card,
+    ).toBeUndefined()
   })
 })

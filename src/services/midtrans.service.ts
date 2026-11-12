@@ -338,6 +338,53 @@ function assertChargeOk(json: MidtransBody) {
   throw new Error(String(json.status_message || 'Payment gateway error'))
 }
 
+/** Snap create-transaction body. Card channel must set credit_card.secure=true (3DS). */
+export function buildSnapBody(input: ChargeInput): MidtransBody {
+  const channel = input.channelCode.toUpperCase()
+  if (!isSupportedChannel(channel)) {
+    throw new Error('Metode pembayaran ini belum tersedia.')
+  }
+  if (!Number.isInteger(input.amount) || input.amount <= 0) {
+    throw new Error('Payment amount must be a positive whole number.')
+  }
+  if (!/^[A-Za-z0-9_~.-]{1,50}$/.test(input.orderId)) {
+    throw new Error('Invalid payment reference.')
+  }
+  const customer = splitName(input.customer?.name)
+  const phone = phoneForCharge(input.customer?.phone)
+  const body: MidtransBody = {
+    transaction_details: {
+      order_id: input.orderId,
+      gross_amount: input.amount,
+    },
+    item_details: [
+      {
+        id: '1',
+        price: input.amount,
+        quantity: 1,
+        name: (input.description || 'Payment').slice(0, 50),
+      },
+    ],
+    customer_details: {
+      ...customer,
+      ...(input.customer?.email ? { email: input.customer.email } : {}),
+      ...(phone ? { phone } : {}),
+    },
+    enabled_payments: snapEnabledPayments(channel),
+  }
+  // Midtrans Support: omit → Snap defaults secure=false (non-3DS); card pay fails.
+  if (channel === 'CARDS') {
+    body.credit_card = { secure: true }
+  }
+  if (input.expiryMinutes) {
+    body.expiry = {
+      unit: 'minutes',
+      duration: input.expiryMinutes,
+    }
+  }
+  return body
+}
+
 async function snapRequest(body: MidtransBody) {
   if (!env.midtrans.serverKey) {
     throw new Error(
@@ -391,43 +438,7 @@ export const midtransService = {
   },
   async createSnapTransaction(input: ChargeInput): Promise<SnapTransaction> {
     const channel = input.channelCode.toUpperCase()
-    if (!isSupportedChannel(channel)) {
-      throw new Error('Metode pembayaran ini belum tersedia.')
-    }
-    if (!Number.isInteger(input.amount) || input.amount <= 0) {
-      throw new Error('Payment amount must be a positive whole number.')
-    }
-    if (!/^[A-Za-z0-9_~.-]{1,50}$/.test(input.orderId)) {
-      throw new Error('Invalid payment reference.')
-    }
-    const customer = splitName(input.customer?.name)
-    const phone = phoneForCharge(input.customer?.phone)
-    const body: MidtransBody = {
-      transaction_details: {
-        order_id: input.orderId,
-        gross_amount: input.amount,
-      },
-      item_details: [
-        {
-          id: '1',
-          price: input.amount,
-          quantity: 1,
-          name: (input.description || 'Payment').slice(0, 50),
-        },
-      ],
-      customer_details: {
-        ...customer,
-        ...(input.customer?.email ? { email: input.customer.email } : {}),
-        ...(phone ? { phone } : {}),
-      },
-      enabled_payments: snapEnabledPayments(channel),
-    }
-    if (input.expiryMinutes) {
-      body.expiry = {
-        unit: 'minutes',
-        duration: input.expiryMinutes,
-      }
-    }
+    const body = buildSnapBody(input)
     const json = await snapRequest(body)
     return {
       token: json.token,
