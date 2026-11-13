@@ -25,14 +25,14 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.settle.mockResolvedValue({ isClubSettled: true })
 })
-it.each(['SUPER_ADMIN', 'ADMIN'])(
+it.each(['SUPER_ADMIN', 'ADMIN', 'CASHIER'])(
   'allows %s to record settlement',
   async (role) => {
     expect((await request(role)).status).toBe(200)
     expect(mocks.settle).toHaveBeenCalledWith('line', body, 'actor')
   },
 )
-it.each([undefined, 'CASHIER', 'ADMIN_VIEWER', 'COACH', 'BALLBOY'])(
+it.each([undefined, 'ADMIN_VIEWER', 'COACH', 'BALLBOY'])(
   'blocks %s from changing payables',
   async (role) => {
     expect((await request(role)).status).toBe(role ? 403 : 401)
@@ -49,12 +49,16 @@ it.each([
 })
 
 it.each([true, false])(
-  'blocks cashiers from setting settlement to %s',
+  'allows cashiers to set settlement to %s',
   async (isSettled) => {
     expect(
       (await request('CASHIER', { isSettled, expectedIsSettled: !isSettled }))
         .status,
-    ).toBe(403)
-    expect(mocks.settle).not.toHaveBeenCalled()
+    ).toBe(200)
+    expect(mocks.settle).toHaveBeenCalledWith(
+      'line',
+      { isSettled, expectedIsSettled: !isSettled },
+      'actor',
+    )
   },
 )

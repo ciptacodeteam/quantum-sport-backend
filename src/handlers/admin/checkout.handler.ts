@@ -333,10 +333,10 @@ export const adminCheckoutHandler = factory.createHandlers(
       )
     if (
       coachSettlements?.length &&
-      !['ADMIN', 'SUPER_ADMIN'].includes(c.get('admin')?.role ?? '')
+      !['ADMIN', 'SUPER_ADMIN', 'CASHIER'].includes(c.get('admin')?.role ?? '')
     )
       throw new ForbiddenException(
-        'Hanya Admin atau Super Admin yang dapat menandai coach lunas ke Club.',
+        'Hanya Admin, Super Admin, atau Cashier yang dapat mengubah status lunas coach ke Club.',
       )
     const ballboySelections = normalizeBallboySelections(rawBallboySlots)
     const ballboySlots = Array.from(

@@ -776,29 +776,32 @@ it.each([1, 2])(
   },
 )
 
-it('persists settled coach sessions at zero, retains the court coaching tariff and charges only the court', async () => {
-  mocks.payload.coachSettlements = [{ slotId: 'coach-slot', isSettled: true }]
-  mocks.payload.expectedTotal = 105000
-  await checkout()
-  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
-    expect.objectContaining({
-      data: expect.objectContaining({
-        price: 0,
-        isClubSettled: true,
-        clubSettlementUpdatedById: 'admin',
-        clubSettlementUpdatedAt: expect.any(Date),
+it.each(['ADMIN', 'SUPER_ADMIN', 'CASHIER'])(
+  '%s can book a settled coach at zero while retaining the court tariff',
+  async (role) => {
+    mocks.payload.coachSettlements = [{ slotId: 'coach-slot', isSettled: true }]
+    mocks.payload.expectedTotal = 105000
+    await checkout(role)
+    expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          price: 0,
+          isClubSettled: true,
+          clubSettlementUpdatedById: 'admin',
+          clubSettlementUpdatedAt: expect.any(Date),
+        }),
       }),
-    }),
-  )
-  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
-    expect.objectContaining({
-      data: expect.objectContaining({ total: 105000 }),
-    }),
-  )
-})
+    )
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: 105000 }),
+      }),
+    )
+  },
+)
 it('rejects unauthorized or unrelated coach settlement flags before creating a booking', async () => {
   mocks.payload.coachSettlements = [{ slotId: 'coach-slot', isSettled: true }]
-  await expect(checkout('CASHIER')).rejects.toThrow(/Admin/)
+  await expect(checkout('ADMIN_VIEWER')).rejects.toThrow(/Admin/)
   mocks.payload.coachSettlements = [{ slotId: 'not-selected', isSettled: true }]
   await expect(checkout()).rejects.toThrow(/Status lunas/)
 })

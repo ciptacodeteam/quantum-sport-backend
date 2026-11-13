@@ -52,7 +52,7 @@ export default createRouter()
   )
   .patch(
     '/bookings/:id/club-settlement',
-    requireAdmin,
+    write,
     ...setCoachClubSettlementHandler,
   )
   .get(
