@@ -37,3 +37,16 @@ export function lastRescheduleAudit(
   }
   return null
 }
+
+const courtChangeSchema = auditSchema.extend({
+  from: schedule.extend({ slotId: z.string() }),
+  to: schedule.extend({ slotId: z.string() }),
+})
+export function appendCourtChangeAudit(
+  note: string | null | undefined,
+  audit: z.infer<typeof courtChangeSchema>,
+) {
+  return [note, '[COURT_CHANGE] ' + JSON.stringify(courtChangeSchema.parse(audit))]
+    .filter(Boolean)
+    .join('\n')
+}

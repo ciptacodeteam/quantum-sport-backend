@@ -4,7 +4,8 @@ import { BadRequestException, NotFoundException } from '@/exceptions'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { branchContext, withBranchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
-import { formatClubWallClock } from '@/lib/club-time'
+import { clubWallTime } from '@/lib/club-time'
+import { appendCourtChangeAudit } from '@/lib/booking-reschedule-audit'
 import { courtBookingCutoff } from '@/lib/booking-time-policy'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
@@ -218,13 +219,27 @@ async function changeCourt(
           },
           data: { isAvailable: true },
         })
-        const audit = `[${evaluatedAt.toISOString()}] Admin ${adminId} pindah lapangan: ${detail.slotId} → ${target.id}; ${formatClubWallClock(target.startAt)} WIB; tanggal, jam dan biaya tetap.`
+        const audit = {
+          at: evaluatedAt.toISOString(),
+          actorId: adminId,
+          bookingId: detail.bookingId,
+          from: {
+            court: detail.slot.court!.name,
+            slotId: detail.slotId,
+            startAt: clubWallTime(detail.slot.startAt).format(),
+            endAt: clubWallTime(detail.slot.endAt).format(),
+          },
+          to: {
+            court: target.court!.name,
+            slotId: target.id,
+            startAt: clubWallTime(target.startAt).format(),
+            endAt: clubWallTime(target.endAt).format(),
+          },
+        }
         await tx.booking.update({
           where: { id: detail.bookingId },
           data: {
-            adminNote: [detail.booking.adminNote, audit]
-              .filter(Boolean)
-              .join('\n'),
+            adminNote: appendCourtChangeAudit(detail.booking.adminNote, audit),
           },
         })
         return {

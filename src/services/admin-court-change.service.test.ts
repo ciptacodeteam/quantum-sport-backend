@@ -43,7 +43,7 @@ const source = () => ({
     courtId: 'a',
     startAt: new Date('2030-01-02T10:00:00Z'),
     endAt: new Date('2030-01-02T11:00:00Z'),
-    court: { id: 'a', sport: 'TENNIS' },
+    court: { id: 'a', name: 'Court A', sport: 'TENNIS' },
   },
   booking: {
     id: 'booking',
@@ -269,9 +269,15 @@ it('lets an admin move a customer booking in the selected branch while locking t
     branchId: 'cemara',
   })
   expect(mocks.wallet).toHaveBeenCalledWith(expect.anything(), 'me')
-  expect(mocks.booking.mock.calls[0][0].data.adminNote).toContain(
-    'Admin admin pindah lapangan',
-  )
+  const note = mocks.booking.mock.calls[0][0].data.adminNote
+  expect(note).toContain('Existing note\n[COURT_CHANGE] ')
+  const audit = JSON.parse(note.split('[COURT_CHANGE] ')[1])
+  expect(audit).toMatchObject({
+    actorId: 'admin',
+    bookingId: 'booking',
+    from: { court: 'Court A', slotId: 'old', startAt: '2030-01-02T10:00:00+07:00' },
+    to: { court: 'Court B', slotId: 'new', startAt: '2030-01-02T10:00:00+07:00' },
+  })
 })
 it('rejects an admin request for a booking outside the selected branch before writing', async () => {
   mocks.detail.mockResolvedValue(null)
