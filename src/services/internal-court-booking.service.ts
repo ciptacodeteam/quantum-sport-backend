@@ -57,7 +57,7 @@ export async function createInternalCourtBooking(
       )
     if (slots.some((slot) => slot.startAt <= cutoff))
       throw new BadRequestException(
-        'Slot telah melewati batas pemesanan 15 menit.',
+        'Slot telah melewati batas pemesanan 30 menit.',
       )
 
     // Same atomic claim as regular checkout: branch, schedule, public horizon,

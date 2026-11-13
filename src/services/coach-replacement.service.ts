@@ -51,7 +51,7 @@ async function getReplacementContext(client: Client, id: string, now: Date) {
       'Batalkan tanda lunas ke club sebelum mengganti coach.',
     )
   if (current.slot.startAt <= courtBookingCutoff(now))
-    throw new BadRequestException('Jadwal melewati batas perubahan 15 menit.')
+    throw new BadRequestException('Jadwal melewati batas perubahan 30 menit.')
   const sports: CourtSport[] = current.courtSlot?.court
     ? [current.courtSlot.court.sport]
     : [

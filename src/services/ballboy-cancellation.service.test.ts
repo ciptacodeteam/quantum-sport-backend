@@ -146,7 +146,7 @@ it('rejects an unpaid invoice and elapsed hours', async () => {
   await expect(cancel()).rejects.toThrow('Invoice belum lunas')
   item.booking.invoice.status = 'PAID'
   item.slot.startAt = now
-  await expect(cancel()).rejects.toThrow('15 menit')
+  await expect(cancel()).rejects.toThrow('30 menit')
 })
 it('rejects a ballboy booking outside the current branch before locking', async () => {
   mocks.context.mockResolvedValue(null)

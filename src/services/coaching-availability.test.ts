@@ -121,7 +121,7 @@ it('rejects invalid or expired hours before any schedule maintenance', async () 
       'detail',
       '2030-01-02 10:00:00',
       '2030-01-02 11:00:00',
-      new Date('2030-01-02T10:15:00+07:00'),
+      new Date('2030-01-02T10:30:00+07:00'),
     ),
   ).toEqual([])
   expect(mocks.range).not.toHaveBeenCalled()

@@ -78,7 +78,7 @@ it.each(['COACH_TRAINING', 'EVENT'] as const)(
       expect.objectContaining({
         slotIds: ['slot-1'],
         type: 'COURT',
-        startsAfter: new Date('2026-11-06T08:45:00Z'),
+        startsAfter: new Date('2026-11-06T08:30:00Z'),
       }),
     )
     expect(mocks.create.mock.calls[0][0].data).not.toHaveProperty('invoice')
@@ -106,10 +106,10 @@ it('rejects slots outside this branch or unavailable slots', async () => {
   expect(mocks.create).not.toHaveBeenCalled()
 })
 
-it('rejects a slot at the exact end of its 15-minute grace period', async () => {
-  vi.setSystemTime(new Date('2026-11-06T12:15:00+07:00'))
+it('rejects a slot at the exact end of its 30-minute grace period', async () => {
+  vi.setSystemTime(new Date('2026-11-06T12:30:00+07:00'))
   await expect(createInternalCourtBooking(input, 'cashier')).rejects.toThrow(
-    '15 menit',
+    '30 menit',
   )
   expect(mocks.claim).not.toHaveBeenCalled()
 })

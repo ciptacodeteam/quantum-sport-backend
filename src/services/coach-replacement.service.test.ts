@@ -165,7 +165,7 @@ it('rejects a cancelled parent court booking and expired hours', async () => {
   await expect(change()).rejects.toThrow('terkonfirmasi')
   current.booking.serviceForBooking.status = 'CONFIRMED'
   current.slot.startAt = now
-  await expect(change()).rejects.toThrow('15 menit')
+  await expect(change()).rejects.toThrow('30 menit')
 })
 it('rejects an inaccessible booking before any locks or claims', async () => {
   mocks.context.mockResolvedValue(null)

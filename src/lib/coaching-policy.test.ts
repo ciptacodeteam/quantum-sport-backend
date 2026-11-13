@@ -32,14 +32,14 @@ describe('admin coaching rules', () => {
         coachingScheduleSchema.safeParse({ ...schedule, ...change }).success,
       ).toBe(false)
   })
-  it('keeps WIB wall time and closes exactly at 15 minutes after start', () => {
+  it('keeps WIB wall time and closes exactly at 30 minutes after start', () => {
     const before = buildCoachingSlots(
       schedule,
       new Date('2026-11-01T13:14:59+07:00'),
     )
     expect(before[0].startAt.toISOString()).toBe('2026-11-01T13:00:00.000Z')
     expect(
-      buildCoachingSlots(schedule, new Date('2026-11-01T13:15:00+07:00')),
+      buildCoachingSlots(schedule, new Date('2026-11-01T13:30:00+07:00')),
     ).toEqual([])
   })
   it('supports the last hour of a day without shifting its date', () => {

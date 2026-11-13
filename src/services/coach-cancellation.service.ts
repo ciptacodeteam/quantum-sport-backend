@@ -30,7 +30,7 @@ async function cancellationContext(
   if (item.status !== 'CONFIRMED' && item.status !== 'HOLD')
     throw new BadRequestException('Pemesanan coach sudah dibatalkan.')
   if (item.slot.startAt <= courtBookingCutoff(now))
-    throw new BadRequestException('Jadwal melewati batas pembatalan 15 menit.')
+    throw new BadRequestException('Jadwal melewati batas pembatalan 30 menit.')
   if (
     item.booking.status === 'CONFIRMED' &&
     item.booking.invoice &&

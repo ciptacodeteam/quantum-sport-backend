@@ -551,7 +551,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             )
           )
             throw new BadRequestException(
-              'One or more court slots are past the 15-minute booking grace period',
+              'One or more court slots are past the 30-minute booking grace period',
             )
           selectedCourtSlots = slotData
           const membershipTariffRules = await getTariffPeriods(tx)

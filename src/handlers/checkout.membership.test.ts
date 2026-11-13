@@ -256,7 +256,9 @@ it('uses the same ten-minute deadline for invoice, payment, reservation and gate
 it.each([
   ['2026-10-28T15:00:00+07:00', true],
   ['2026-10-28T15:14:59.999+07:00', true],
-  ['2026-10-28T15:15:00+07:00', false],
+  ['2026-10-28T15:22:00+07:00', true],
+  ['2026-10-28T15:29:59.999+07:00', true],
+  ['2026-10-28T15:30:00+07:00', false],
 ])('validates checkout grace period at %s', async (now, allowed) => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date(now))
@@ -283,13 +285,13 @@ it.each([
         expect.objectContaining({
           where: expect.objectContaining({
             startAt: {
-              gt: new Date(new Date(now).getTime() + 7 * 3_600_000 - 900_000),
+              gt: new Date(new Date(now).getTime() + 7 * 3_600_000 - 1800_000),
             },
           }),
         }),
       )
     } else {
-      await expect(result).rejects.toThrow('15-minute booking grace period')
+      await expect(result).rejects.toThrow('30-minute booking grace period')
       expect(mocks.gateway.charge).not.toHaveBeenCalled()
     }
   } finally {

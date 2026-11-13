@@ -74,7 +74,9 @@ const checkout = () =>
 it.each([
   ['2026-11-01T13:00:00+07:00', true],
   ['2026-11-01T13:14:59.999+07:00', true],
-  ['2026-11-01T13:15:00+07:00', false],
+  ['2026-11-01T13:15:00+07:00', true],
+  ['2026-11-01T13:22:00+07:00', true],
+  ['2026-11-01T13:29:59.999+07:00', true],
   ['2026-11-01T13:30:00+07:00', false],
   ['2026-11-02T13:00:00+07:00', false],
 ])(
@@ -82,7 +84,7 @@ it.each([
   async (now, allowed) => {
     vi.setSystemTime(new Date(now))
     await expect(checkout()).rejects.toThrow(
-      allowed ? 'test-stop-after-claim' : '15-minute booking grace period',
+      allowed ? 'test-stop-after-claim' : '30-minute booking grace period',
     )
     if (allowed)
       expect(mocks.claim).toHaveBeenCalledWith(
@@ -90,7 +92,7 @@ it.each([
         expect.objectContaining({
           slotIds: ['court-slot'],
           type: 'COURT',
-          startsAfter: new Date(Date.parse(now) + 7 * 3_600_000 - 15 * 60_000),
+          startsAfter: new Date(Date.parse(now) + 7 * 3_600_000 - 30 * 60_000),
         }),
       )
     else expect(mocks.claim).not.toHaveBeenCalled()

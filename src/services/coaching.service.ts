@@ -470,7 +470,7 @@ export async function attachCoachingService(
           'Slot layanan harus berada di dalam waktu booking lapangan.',
         )
       if (slot.startAt <= courtBookingCutoff(now))
-        throw new BadRequestException('Slot melewati batas pemesanan 15 menit.')
+        throw new BadRequestException('Slot melewati batas pemesanan 30 menit.')
       // At most one ballboy for each court interval.
       if (
         slot.type === 'BALLBOY' &&
