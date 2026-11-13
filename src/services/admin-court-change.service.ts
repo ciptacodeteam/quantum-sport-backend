@@ -4,7 +4,8 @@ import { BadRequestException, NotFoundException } from '@/exceptions'
 import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { branchContext, withBranchContext } from '@/lib/branch-context'
 import { db } from '@/lib/prisma'
-import { clubNowAsWallDate, formatClubWallClock } from '@/lib/club-time'
+import { formatClubWallClock } from '@/lib/club-time'
+import { courtBookingCutoff } from '@/lib/booking-time-policy'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
 import { rollingBookingWindowWhere } from '@/lib/rolling-booking-window'
 
@@ -29,9 +30,9 @@ function assertMovable(detail: Detail, now: Date) {
     throw new BadRequestException(
       'Hanya booking reguler terkonfirmasi dan lunas yang dapat dipindahkan.',
     )
-  if (detail.slot.startAt <= clubNowAsWallDate(now))
+  if (detail.slot.startAt <= courtBookingCutoff(now))
     throw new BadRequestException(
-      'Booking yang sudah mulai tidak dapat dipindahkan.',
+      'Pindah court hanya tersedia sebelum 30 menit setelah jam mulai booking.',
     )
   if (!detail.slot.court || detail.slot.type !== 'COURT')
     throw new BadRequestException('Booking lapangan tidak valid.')

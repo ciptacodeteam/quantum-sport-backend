@@ -169,17 +169,33 @@ it.each([
   await expect(execute()).rejects.toMatchObject({ status: 400 })
   expect(mocks.slots).not.toHaveBeenCalled()
 })
-it('uses WIB when blocking a booking that has already started', async () => {
+it.each(['10:30:00', '10:30:01', '11:00:00'])('blocks court changes at or after the 30-minute WIB cutoff (%s)', async (time) => {
   await expect(
     changeAdminCourt(
       'admin',
       'cemara',
       'detail',
       input,
-      new Date('2030-01-02T10:00:00+07:00'),
+      new Date(`2030-01-02T${time}+07:00`),
     ),
   ).rejects.toMatchObject({ status: 400 })
   expect(mocks.target).not.toHaveBeenCalled()
+})
+it.each(['10:00:00', '10:15:00', '10:29:59'])('allows options and court changes during the WIB grace period (%s)', async (time) => {
+  const evaluatedAt = new Date(`2030-01-02T${time}+07:00`)
+  mocks.targets.mockResolvedValueOnce([target()]).mockResolvedValueOnce([])
+  await expect(
+    getAdminCourtChangeOptions('admin', 'cemara', 'detail', evaluatedAt),
+  ).resolves.toEqual([{ slotId: 'new', courtId: 'b', courtName: 'Court B' }])
+  await expect(
+    changeAdminCourt('admin', 'cemara', 'detail', input, evaluatedAt),
+  ).resolves.toMatchObject({ slotId: 'new' })
+})
+it('does not offer courts at the 30-minute WIB cutoff', async () => {
+  await expect(
+    getAdminCourtChangeOptions('admin', 'cemara', 'detail', new Date('2030-01-02T10:30:00+07:00')),
+  ).rejects.toMatchObject({ status: 400 })
+  expect(mocks.targets).not.toHaveBeenCalled()
 })
 it('rejects repeated or stale requests after the original booking moved', async () => {
   mocks.detail.mockResolvedValue({ ...source(), slotId: 'already-moved' })
