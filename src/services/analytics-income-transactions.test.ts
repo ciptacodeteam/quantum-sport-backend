@@ -453,3 +453,33 @@ it('reports rescheduling only on the invoices whose court or service actually mo
   expect(data.transactions[2].reschedule).toBeNull()
   expect(data.summary.totalNetAmount).toBe(340000)
 })
+
+it.each(['PAID', 'CANCELLED'])(
+  'keeps a cancelled in-house sale visible with zero revenue even if its old invoice is %s',
+  async (status) => {
+    mocks.invoices.mockResolvedValue([
+      {
+        ...invoice('package', 4500000),
+        status,
+        inHouseWallet: {
+          id: 'wallet',
+          deletedAt: new Date('2026-11-13T08:00:00Z'),
+        },
+      },
+    ])
+    const data = await getIncomeBySourceAnalytics(start, end)
+    expect(data.summary).toMatchObject({
+      inHouseIncome: 0,
+      totalIncome: 0,
+      totalNetAmount: 0,
+      totalExcludedAmount: 4500000,
+    })
+    expect(data.bySource.InHouse.total).toBe(0)
+    expect(data.transactions[0]).toMatchObject({
+      cancellationStatus: 'CANCELLED',
+      amount: 4500000,
+      netAmount: 0,
+      excludedAmount: 4500000,
+    })
+  },
+)

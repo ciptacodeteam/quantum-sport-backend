@@ -56,8 +56,8 @@ export async function saveInHousePlan(
     })
   })
 }
-/** Keep the sale and invoice for audit; serialize deletion with quota redemption. */
-export async function deleteUnusedInHouseWallet(id: string, actorId: string) {
+/** Cancel unused quota and its invoice atomically, preserving the payment history. */
+export async function cancelUnusedInHouseWallet(id: string, actorId: string) {
   return db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM inhouse_wallets WHERE id = ${id} FOR UPDATE`
     const wallet = await tx.inHouseWallet.findFirst({
@@ -65,17 +65,23 @@ export async function deleteUnusedInHouseWallet(id: string, actorId: string) {
       include: { _count: { select: { usages: true } } },
     })
     if (!wallet) throw new NotFoundException('Paket customer tidak ditemukan.')
-    if (wallet.deletedAt) return { id }
     if (
-      wallet.remainingMinutes !== wallet.totalMinutes ||
-      wallet._count.usages > 0
+      !wallet.deletedAt &&
+      (wallet.remainingMinutes !== wallet.totalMinutes ||
+        wallet._count.usages > 0)
     )
       throw new BadRequestException(
-        'Paket yang sudah pernah dipakai tidak dapat dihapus.',
+        'Paket yang sudah pernah dipakai tidak dapat dibatalkan.',
       )
-    await tx.inHouseWallet.update({
-      where: { id },
-      data: { deletedAt: new Date(), deletedById: actorId },
+    const cancelledAt = wallet.deletedAt ?? new Date()
+    if (!wallet.deletedAt)
+      await tx.inHouseWallet.update({
+        where: { id },
+        data: { deletedAt: cancelledAt, deletedById: actorId },
+      })
+    await tx.invoice.updateMany({
+      where: { inHouseWalletId: id, status: { in: ['PAID', 'PENDING'] } },
+      data: { status: 'CANCELLED', cancelledAt },
     })
     return { id }
   })
@@ -106,7 +112,7 @@ export async function sellInHousePlan(
         throw new BadRequestException('Referensi pembayaran telah dipakai.')
       if (previous.deletedAt)
         throw new BadRequestException(
-          'Paket dari pembayaran ini sudah dihapus.',
+          'Paket dari pembayaran ini sudah dibatalkan.',
         )
       return previous
     }

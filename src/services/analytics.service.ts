@@ -91,6 +91,7 @@ type IncomeServiceCancellation = {
 function incomeCancellation(invoice: {
   payment?: { meta?: unknown } | null
   status?: string
+  inHouseWallet?: { deletedAt?: Date | null } | null
   booking?: {
     status?: string
     serviceForBooking?: { status?: string } | null
@@ -124,6 +125,7 @@ function incomeCancellation(invoice: {
   const cancelled = services.filter((item) => item.status === 'CANCELLED')
   const fullyCancelled =
     invoice.status === 'CANCELLED' ||
+    !!invoice.inHouseWallet?.deletedAt ||
     booking?.serviceForBooking?.status === 'CANCELLED' ||
     booking?.status === 'CANCELLED' ||
     invoice.classBooking?.status === 'CANCELLED' ||
@@ -323,7 +325,7 @@ export async function getIncomeBySourceAnalytics(
     },
     classBooking: true,
     membershipUser: true,
-    inHouseWallet: { select: { id: true } },
+    inHouseWallet: { select: { id: true, deletedAt: true } },
   }
 
   if (source === 'cashier') {

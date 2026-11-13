@@ -36,6 +36,7 @@ export const getAnalyticsHandler = factory.createHandlers(
       const paidInvoices = await db.invoice.findMany({
         where: {
           status: PaymentStatus.PAID,
+          NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
           paidAt: {
             gte: startDate,
             lte: endDate,
@@ -203,6 +204,7 @@ export const exportAnalyticsToExcelHandler = factory.createHandlers(
       const paidInvoices = await db.invoice.findMany({
         where: {
           status: PaymentStatus.PAID,
+          NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
           paidAt: {
             gte: startDate,
             lte: endDate,
@@ -472,6 +474,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
     const currentRevenue = await db.invoice.aggregate({
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: currentPeriodStart,
           lte: currentPeriodEnd,
@@ -485,6 +488,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
     const previousRevenue = await db.invoice.aggregate({
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: previousPeriodStart,
           lte: previousPeriodEnd,
@@ -517,6 +521,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
     const currentSales = await db.invoice.count({
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: currentPeriodStart,
           lte: currentPeriodEnd,
@@ -527,6 +532,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
     const previousSales = await db.invoice.count({
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: previousPeriodStart,
           lte: previousPeriodEnd,
@@ -584,6 +590,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
     const currentActiveInvoices = await db.invoice.findMany({
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: currentPeriodStart,
           lte: currentPeriodEnd,
@@ -597,6 +604,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
     const previousActiveInvoices = await db.invoice.findMany({
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: previousPeriodStart,
           lte: previousPeriodEnd,
@@ -635,6 +643,7 @@ export const getDashboardStatsHandler = factory.createHandlers(async (c) => {
       by: ['paidAt'],
       where: {
         status: PaymentStatus.PAID,
+        NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
         paidAt: {
           gte: last6MonthsStart,
           lte: currentPeriodEnd,
@@ -802,6 +811,7 @@ export const getDailyTransactionsHandler = factory.createHandlers(
       const invoices = await db.invoice.findMany({
         where: {
           status: PaymentStatus.PAID,
+          NOT: { inHouseWallet: { is: { deletedAt: { not: null } } } },
           paidAt: {
             gte: startDate,
             lte: endDate,

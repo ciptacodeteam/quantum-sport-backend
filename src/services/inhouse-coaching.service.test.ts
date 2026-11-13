@@ -15,7 +15,7 @@ vi.mock('@/lib/utils', () => ({
   generateInvoiceNumber: async () => 'INV-INHOUSE',
 }))
 import {
-  deleteUnusedInHouseWallet,
+  cancelUnusedInHouseWallet,
   redeemInHouseSelections,
   restoreInHouseUsage,
   sellInHousePlan,
@@ -126,6 +126,7 @@ beforeEach(() => {
     },
     payment: { create: vi.fn().mockResolvedValue({ id: 'payment' }) },
     invoice: {
+      updateMany: vi.fn(),
       create: vi.fn().mockResolvedValue({ id: 'invoice', status: 'PAID' }),
     },
   }
@@ -444,7 +445,7 @@ it('does not accept browser prices or combine a wallet with a single tariff', ()
   ).toBe(false)
 })
 
-it('deletes an unused wallet while keeping its sale and invoice', async () => {
+it('cancels an unused package and invoice while preserving payment history', async () => {
   tx.inHouseWallet.findFirst.mockResolvedValue({
     id: 'wallet',
     totalMinutes: 300,
@@ -452,13 +453,17 @@ it('deletes an unused wallet while keeping its sale and invoice', async () => {
     deletedAt: null,
     _count: { usages: 0 },
   })
-  await expect(deleteUnusedInHouseWallet('wallet', 'cashier')).resolves.toEqual(
+  await expect(cancelUnusedInHouseWallet('wallet', 'cashier')).resolves.toEqual(
     { id: 'wallet' },
   )
   expect(tx.$queryRaw).toHaveBeenCalled()
   expect(tx.inHouseWallet.update).toHaveBeenCalledWith({
     where: { id: 'wallet' },
     data: { deletedAt: expect.any(Date), deletedById: 'cashier' },
+  })
+  expect(tx.invoice.updateMany).toHaveBeenCalledWith({
+    where: { inHouseWalletId: 'wallet', status: { in: ['PAID', 'PENDING'] } },
+    data: { status: 'CANCELLED', cancelledAt: expect.any(Date) },
   })
   expect(tx.invoice.create).not.toHaveBeenCalled()
   expect(tx.payment.create).not.toHaveBeenCalled()
@@ -475,20 +480,20 @@ it.each([
       _count: { usages },
     })
     await expect(
-      deleteUnusedInHouseWallet('wallet', 'cashier'),
+      cancelUnusedInHouseWallet('wallet', 'cashier'),
     ).rejects.toThrow(/pernah dipakai/)
     expect(tx.inHouseWallet.update).not.toHaveBeenCalled()
   },
 )
 it('rejects a wallet outside the selected branch or missing', async () => {
   tx.inHouseWallet.findFirst.mockResolvedValue(null)
-  await expect(deleteUnusedInHouseWallet('missing', 'cashier')).rejects.toThrow(
+  await expect(cancelUnusedInHouseWallet('missing', 'cashier')).rejects.toThrow(
     /tidak ditemukan/,
   )
 })
 it('retries deletion without changing the original actor or time', async () => {
   tx.inHouseWallet.findFirst.mockResolvedValue({ deletedAt: new Date() })
-  await deleteUnusedInHouseWallet('wallet', 'other')
+  await cancelUnusedInHouseWallet('wallet', 'other')
   expect(tx.inHouseWallet.update).not.toHaveBeenCalled()
 })
 it('does not revive a deleted wallet when its sale is retried', async () => {
@@ -507,7 +512,7 @@ it('does not revive a deleted wallet when its sale is retried', async () => {
       },
       'cashier',
     ),
-  ).rejects.toThrow(/sudah dihapus/)
+  ).rejects.toThrow(/sudah dibatalkan/)
   expect(tx.inHouseWallet.create).not.toHaveBeenCalled()
 })
 

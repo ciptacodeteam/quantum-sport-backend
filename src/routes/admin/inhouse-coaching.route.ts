@@ -8,7 +8,7 @@ import { ok } from '@/lib/response'
 import { inHousePlanSchema } from '@/lib/inhouse-coaching'
 import {
   saveInHousePlan,
-  deleteUnusedInHouseWallet,
+  cancelUnusedInHouseWallet,
   sellInHousePlan,
   listInHouseUsage,
 } from '@/services/inhouse-coaching.service'
@@ -62,12 +62,12 @@ export default createRouter()
       ok(
         await db.inHouseWallet.findMany({
           where: {
-            deletedAt: null,
             ...(c.req.valid('query').userId
               ? { userId: c.req.valid('query').userId }
               : {}),
             ...(c.req.valid('query').availableOnly
               ? {
+                  deletedAt: null,
                   remainingMinutes: { gte: 60 },
                   invoice: { status: 'PAID' as const },
                   staff: { isActive: true, role: 'COACH' as const },
@@ -90,10 +90,18 @@ export default createRouter()
       ),
     ),
   )
+  .post('/wallets/:id/cancel', sell, async (c) =>
+    c.json(
+      ok(
+        await cancelUnusedInHouseWallet(c.req.param('id'), c.get('admin')!.id),
+      ),
+    ),
+  )
+  // Compatibility for older clients; this also cancels and never removes history.
   .delete('/wallets/:id', sell, async (c) =>
     c.json(
       ok(
-        await deleteUnusedInHouseWallet(c.req.param('id'), c.get('admin')!.id),
+        await cancelUnusedInHouseWallet(c.req.param('id'), c.get('admin')!.id),
       ),
     ),
   )

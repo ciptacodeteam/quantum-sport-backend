@@ -5,15 +5,19 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn(),
   sell: vi.fn(),
   plans: vi.fn(),
+  wallets: vi.fn(),
 }))
 vi.mock('@/services/inhouse-coaching.service', () => ({
-  deleteUnusedInHouseWallet: mocks.remove,
+  cancelUnusedInHouseWallet: mocks.remove,
   saveInHousePlan: mocks.save,
   sellInHousePlan: mocks.sell,
   listInHouseUsage: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
-  db: { inHousePlan: { findMany: mocks.plans } },
+  db: {
+    inHousePlan: { findMany: mocks.plans },
+    inHouseWallet: { findMany: mocks.wallets },
+  },
 }))
 import route from './inhouse-coaching.route'
 const plan = {
@@ -57,6 +61,7 @@ beforeEach(() => {
   mocks.save.mockResolvedValue({ id: 'plan' })
   mocks.sell.mockResolvedValue({ id: 'wallet' })
   mocks.plans.mockResolvedValue([])
+  mocks.wallets.mockResolvedValue([])
 })
 it.each(['ADMIN', 'SUPER_ADMIN'])(
   'allows %s to configure coach-specific packages',
@@ -136,4 +141,26 @@ it('accepts a custom whole-hour package quota', async () => {
     undefined,
     expect.objectContaining({ hours: 12 }),
   )
+})
+
+it.each(['ADMIN', 'SUPER_ADMIN', 'CASHIER'])(
+  'allows %s to cancel an unused package through the explicit action',
+  async (role) => {
+    mocks.remove.mockResolvedValue({ id: 'wallet' })
+    expect(
+      (await request('wallets/wallet/cancel', role, undefined, 'POST')).status,
+    ).toBe(200)
+    expect(mocks.remove).toHaveBeenCalledWith('wallet', 'actor')
+  },
+)
+it('retains cancelled packages in history while excluding them from available booking quota', async () => {
+  expect((await request('wallets', 'ADMIN')).status).toBe(200)
+  expect(mocks.wallets.mock.calls[0][0].where).not.toHaveProperty('deletedAt')
+  expect((await request('wallets?availableOnly=true', 'CASHIER')).status).toBe(
+    200,
+  )
+  expect(mocks.wallets.mock.calls[1][0].where).toMatchObject({
+    deletedAt: null,
+    invoice: { status: 'PAID' },
+  })
 })
