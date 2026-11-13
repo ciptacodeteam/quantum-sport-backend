@@ -70,7 +70,9 @@ it('scopes packages to the signed-in customer and separates confirmed usage from
   ])
   const response = await read({ id: 'customer-1' })
   expect(mocks.findMany).toHaveBeenCalledWith(
-    expect.objectContaining({ where: { userId: 'customer-1' } }),
+    expect.objectContaining({
+      where: { userId: 'customer-1', invoice: { status: 'PAID' } },
+    }),
   )
   expect(response.body.data.packages[0]).toMatchObject({
     remainingHours: 6,
@@ -154,4 +156,25 @@ it('reports recurring usage per charged package, separately from debt paid by a 
   })
   expect(response.body.data.packages[0].usage).toHaveLength(1)
   expect(response.body.data.packages[0].usage[0].hours).toBe(1)
+})
+
+it.each(['PENDING', 'CANCELLED', 'FAILED', 'EXPIRED', 'REFUNDED'])(
+  'omits %s purchases entirely from owned packages',
+  async (paymentStatus) => {
+    mocks.findMany.mockResolvedValue([
+      {
+        ...state,
+        id: 'unpaid',
+        invoice: { number: 'INCOMPLETE', status: paymentStatus },
+      },
+    ])
+    const response = await read({ id: 'customer-1' })
+    expect(response.body.data.packages).toEqual([])
+  },
+)
+it('does not treat a membership without a successful purchase invoice as owned', async () => {
+  mocks.findMany.mockResolvedValue([
+    { ...state, id: 'missing-payment', invoice: null },
+  ])
+  expect((await read({ id: 'customer-1' })).body.data.packages).toEqual([])
 })

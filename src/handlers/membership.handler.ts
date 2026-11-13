@@ -86,6 +86,7 @@ export const getUserMembershipsHandler = factory.createHandlers(async (c) => {
     const userMemberships = await db.membershipUser.findMany({
       where: {
         userId: user.id,
+        invoice: { status: 'PAID' },
       },
       include: {
         membership: {

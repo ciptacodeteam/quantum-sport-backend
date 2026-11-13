@@ -13,7 +13,7 @@ export const getMyMembershipTrackingHandler = factory.createHandlers(
         status.UNAUTHORIZED,
       )
     const packages = await db.membershipUser.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, invoice: { status: 'PAID' } },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -98,65 +98,70 @@ export const getMyMembershipTrackingHandler = factory.createHandlers(
     const now = new Date()
     return c.json(
       ok({
-        packages: packages.map((pack) => {
-          const normalUsage = pack.usedBookings.map((booking) => ({
-            id: booking.id,
-            status: booking.status,
-            hours: booking.membershipSessionsUsed,
-            createdAt: booking.createdAt,
-            invoiceNumber: booking.invoice?.number ?? null,
-            branch: booking.branch,
-            details: booking.details,
-          }))
-          const recurringUsage = new Map<string, (typeof normalUsage)[number]>()
-          for (const debit of pack.sessionDebits ?? []) {
-            const booking = debit.detail.booking
-            const entry = recurringUsage.get(booking.id) ?? {
+        packages: packages
+          .filter((pack) => pack.invoice?.status === 'PAID')
+          .map((pack) => {
+            const normalUsage = pack.usedBookings.map((booking) => ({
               id: booking.id,
               status: booking.status,
-              hours: 0,
+              hours: booking.membershipSessionsUsed,
               createdAt: booking.createdAt,
               invoiceNumber: booking.invoice?.number ?? null,
               branch: booking.branch,
-              details: [],
+              details: booking.details,
+            }))
+            const recurringUsage = new Map<
+              string,
+              (typeof normalUsage)[number]
+            >()
+            for (const debit of pack.sessionDebits ?? []) {
+              const booking = debit.detail.booking
+              const entry = recurringUsage.get(booking.id) ?? {
+                id: booking.id,
+                status: booking.status,
+                hours: 0,
+                createdAt: booking.createdAt,
+                invoiceNumber: booking.invoice?.number ?? null,
+                branch: booking.branch,
+                details: [],
+              }
+              entry.hours += debit.sessions
+              entry.details.push({
+                court: debit.detail.court,
+                slot: debit.detail.slot,
+              })
+              recurringUsage.set(booking.id, entry)
             }
-            entry.hours += debit.sessions
-            entry.details.push({
-              court: debit.detail.court,
-              slot: debit.detail.slot,
-            })
-            recurringUsage.set(booking.id, entry)
-          }
-          const usage = [...normalUsage, ...recurringUsage.values()]
-          return {
-            id: pack.id,
-            name: pack.membership.name,
-            sport: pack.membership.sport,
-            type: pack.membership.type,
-            status: getTrackedPackageStatus(pack, now),
-            totalHours: pack.membership.sessions,
-            remainingHours: pack.remainingSessions,
-            debtSettledHours: pack.debtSettledSessions ?? 0,
-            debtTransferredHours: (pack.debtsTransferred ?? []).reduce(
-              (sum, debt) => sum + debt.sessions - debt.restoredSessions,
-              0,
-            ),
-            usedHours: usage
-              .filter((booking) => booking.status === 'CONFIRMED')
-              .reduce((sum, booking) => sum + booking.hours, 0),
-            heldHours: usage
-              .filter((booking) => booking.status === 'HOLD')
-              .reduce((sum, booking) => sum + booking.hours, 0),
-            startDate: pack.startDate,
-            endDate: pack.endDate,
-            remainingDays: Math.max(
-              0,
-              Math.ceil((pack.endDate.getTime() - now.getTime()) / 86400000),
-            ),
-            purchaseInvoice: pack.invoice,
-            usage,
-          }
-        }),
+            const usage = [...normalUsage, ...recurringUsage.values()]
+            return {
+              id: pack.id,
+              name: pack.membership.name,
+              sport: pack.membership.sport,
+              type: pack.membership.type,
+              status: getTrackedPackageStatus(pack, now),
+              totalHours: pack.membership.sessions,
+              remainingHours: pack.remainingSessions,
+              debtSettledHours: pack.debtSettledSessions ?? 0,
+              debtTransferredHours: (pack.debtsTransferred ?? []).reduce(
+                (sum, debt) => sum + debt.sessions - debt.restoredSessions,
+                0,
+              ),
+              usedHours: usage
+                .filter((booking) => booking.status === 'CONFIRMED')
+                .reduce((sum, booking) => sum + booking.hours, 0),
+              heldHours: usage
+                .filter((booking) => booking.status === 'HOLD')
+                .reduce((sum, booking) => sum + booking.hours, 0),
+              startDate: pack.startDate,
+              endDate: pack.endDate,
+              remainingDays: Math.max(
+                0,
+                Math.ceil((pack.endDate.getTime() - now.getTime()) / 86400000),
+              ),
+              purchaseInvoice: pack.invoice,
+              usage,
+            }
+          }),
       }),
       status.OK,
     )
