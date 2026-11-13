@@ -49,6 +49,7 @@ export type ServiceIncomeRow = {
   startAt: string
   endAt: string
   hours: number
+  isClubSettled: boolean
   description: string | null
   servicePrice: number
   discount: number
@@ -122,7 +123,9 @@ export function buildServiceIncome(
       Math.max(0, invoice.total - invoice.processingFee),
     )
     services.forEach((item, index) => {
-      if (item.status !== 'CONFIRMED' || amounts[index] <= 0) return
+      const settled = item.service === 'COACH' && item.isClubSettled === true
+      if (item.status !== 'CONFIRMED' || (amounts[index] <= 0 && !settled))
+        return
       if (
         item.service === 'COACH' &&
         'inHouseUsage' in item &&
@@ -130,7 +133,7 @@ export function buildServiceIncome(
       )
         return
       // Keep settled prices in allocation so their share never moves to another club.
-      if (item.service === 'COACH' && item.isClubSettled) return
+      // Settled sessions remain visible at zero without transferring historic payment shares.
       allRows.push({
         id: `${item.service}:${item.id}`,
         invoiceId: invoice.id,
@@ -154,11 +157,12 @@ export function buildServiceIncome(
         startAt: formatClubWallClock(item.slot.startAt),
         endAt: formatClubWallClock(item.slot.endAt),
         hours: Math.max(0, (+item.slot.endAt - +item.slot.startAt) / 3600000),
+        isClubSettled: settled,
         description:
           'description' in item ? (item.description as string | null) : null,
-        servicePrice: prices[index],
-        discount: prices[index] - amounts[index],
-        amount: amounts[index],
+        servicePrice: settled ? 0 : prices[index],
+        discount: settled ? 0 : prices[index] - amounts[index],
+        amount: settled ? 0 : amounts[index],
       })
     })
   }

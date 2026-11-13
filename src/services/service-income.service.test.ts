@@ -328,7 +328,7 @@ it('omits cancelled services from the exported details and summary even when inv
   ])
 })
 
-it('excludes settled coach payables from every report total without reallocating their promo share', () => {
+it('shows settled coaches at zero without reallocating their promo share', () => {
   const data = invoice()
   data.total = 365000
   data.booking.totalPrice = 360000
@@ -340,22 +340,24 @@ it('excludes settled coach payables from every report total without reallocating
     isClubSettled: true,
   } as any
   const after = build([data])
-  expect(after.rows.map((row) => row.id)).not.toContain('COACH:coach')
-  expect(after.clubs.map((row) => row.id)).not.toContain('club-a')
-  expect(after.staff.map((row) => row.name)).not.toContain('Petugas coach')
+  expect(after.rows.map((row) => row.id)).toContain('COACH:coach')
+  expect(after.clubs.map((row) => row.id)).toContain('club-a')
+  expect(after.staff.map((row) => row.name)).toContain('Petugas coach')
   expect(after.summary.totalAmount).toBe(
     before.summary.totalAmount -
       before.rows.find((row) => row.id === 'COACH:coach')!.amount,
   )
   for (const row of after.rows)
-    expect(row.amount).toBe(before.rows.find((r) => r.id === row.id)!.amount)
+    expect(row.amount).toBe(
+      row.isClubSettled ? 0 : before.rows.find((r) => r.id === row.id)!.amount,
+    )
   data.booking.coaches[0] = {
     ...data.booking.coaches[0],
     isClubSettled: false,
   } as any
   expect(build([data]).summary).toEqual(before.summary)
 })
-it('exports only unsettled coach payables', async () => {
+it('exports settled coaches at zero with Lunas status', async () => {
   const data = invoice()
   data.booking.coaches[0] = {
     ...data.booking.coaches[0],
@@ -367,12 +369,24 @@ it('exports only unsettled coach payables', async () => {
     new Date('2026-11-30'),
     { service: 'COACH' },
   )
-  expect(report.rows).toEqual([])
+  expect(report.rows).toEqual([
+    expect.objectContaining({
+      isClubSettled: true,
+      servicePrice: 0,
+      amount: 0,
+    }),
+  ])
   expect(report.summary.totalAmount).toBe(0)
   const response = await request(`${valid}&service=COACH`, 'ADMIN', true)
   expect(response.status).toBe(200)
   const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
-  expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([])
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([
+    expect.objectContaining({
+      'Status coach': 'Lunas',
+      'Biaya jasa': 0,
+      'Hak club (100%)': 0,
+    }),
+  ])
 })
 
 it.each([
@@ -396,3 +410,23 @@ it.each([
     )
   },
 )
+
+it('keeps a newly booked zero-price settled coach visible as Lunas without adding any income', () => {
+  const data = invoice()
+  data.booking.coaches[0] = {
+    ...data.booking.coaches[0],
+    price: 0,
+    isClubSettled: true,
+  } as any
+  const report = build([data], { service: 'COACH' })
+  expect(report.rows).toEqual([
+    expect.objectContaining({
+      isClubSettled: true,
+      servicePrice: 0,
+      discount: 0,
+      amount: 0,
+    }),
+  ])
+  expect(report.summary.coachAmount).toBe(0)
+  expect(report.summary.totalAmount).toBe(0)
+})

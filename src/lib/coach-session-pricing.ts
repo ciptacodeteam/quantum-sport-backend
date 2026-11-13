@@ -8,6 +8,7 @@ export function priceCoachSessions<
     price: number
     additionalHourPrice?: number | null
     participants?: number
+    isClubSettled?: boolean
   },
 >(slots: T[]) {
   const result = new Map<string, number>()
@@ -20,9 +21,13 @@ export function priceCoachSessions<
       +slot.endAt - +slot.startAt === 3600000
     result.set(
       slot.id,
-      (consecutive ? (slot.additionalHourPrice ?? slot.price) : slot.price) +
-        ((slot.participants ?? 1) - 1) *
-          (slot.additionalHourPrice ?? slot.price),
+      slot.isClubSettled
+        ? 0
+        : (consecutive
+            ? (slot.additionalHourPrice ?? slot.price)
+            : slot.price) +
+            ((slot.participants ?? 1) - 1) *
+              (slot.additionalHourPrice ?? slot.price),
     )
     if (slot.staffId) ends.set(slot.staffId, +slot.endAt)
   }

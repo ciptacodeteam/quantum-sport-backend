@@ -91,6 +91,12 @@ export const serviceIncomeExportHandler = factory.createHandlers(
         Club: row.clubName,
         'Mulai sesi (WIB)': row.startAt,
         'Selesai sesi (WIB)': row.endAt,
+        'Status coach':
+          row.service === 'COACH'
+            ? row.isClubSettled
+              ? 'Lunas'
+              : 'Belum lunas'
+            : '',
         'Keterangan sesi': row.description,
         'Biaya jasa': row.servicePrice,
         'Alokasi diskon': row.discount,
@@ -100,7 +106,7 @@ export const serviceIncomeExportHandler = factory.createHandlers(
     append('Definisi', [
       {
         Keterangan:
-          'Berdasarkan tanggal pembayaran WIB. Hanya invoice lunas, booking reguler terkonfirmasi dan jasa aktif. Hak 100% dari pembayaran jasa setelah alokasi promo; biaya lapangan dan biaya proses tidak termasuk. Potongan Coach Club hanya mengubah biaya lapangan, bukan tarif jasa. Coach in-house tidak termasuk hak club. Baris jasa batal dan invoice refund tidak dihitung. Club coach memakai catatan saat booking. Ballboy dan jasa tanpa catatan club masuk Tanpa Club. Coach yang sudah ditandai Lunas ke Club dikeluarkan dari seluruh rekap dan rincian tagihan. Penanda lunas dicatat manual oleh Admin atau Super Admin.',
+          'Berdasarkan tanggal pembayaran WIB. Hanya invoice lunas, booking reguler terkonfirmasi dan jasa aktif. Hak 100% dari pembayaran jasa setelah alokasi promo; biaya lapangan dan biaya proses tidak termasuk. Potongan Coach Club hanya mengubah biaya lapangan, bukan tarif jasa. Coach in-house tidak termasuk hak club. Baris jasa batal dan invoice refund tidak dihitung. Club coach memakai catatan saat booking. Ballboy dan jasa tanpa catatan club masuk Tanpa Club. Coach yang ditandai Lunas ke Club tetap tampil dengan nominal Rp0 dan status Lunas, tanpa menambah pendapatan. Penanda lunas dicatat manual oleh Admin atau Super Admin.',
       },
     ])
     c.header(

@@ -109,11 +109,11 @@ beforeEach(() => {
     invoice: { create: vi.fn().mockResolvedValue({ id: 'invoice' }) },
   }
 })
-async function checkout() {
+async function checkout(role = 'ADMIN') {
   const json = vi.fn()
   await (adminCheckoutHandler.at(-1) as any)(
     {
-      get: () => ({ id: 'admin' }),
+      get: () => ({ id: 'admin', role }),
       req: { valid: () => mocks.payload },
       var: { logger: { info: vi.fn(), warn: vi.fn(), fatal: vi.fn() } },
       json,
@@ -775,3 +775,30 @@ it.each([1, 2])(
     )
   },
 )
+
+it('persists settled coach sessions at zero, retains the court coaching tariff and charges only the court', async () => {
+  mocks.payload.coachSettlements = [{ slotId: 'coach-slot', isSettled: true }]
+  mocks.payload.expectedTotal = 105000
+  await checkout()
+  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        price: 0,
+        isClubSettled: true,
+        clubSettlementUpdatedById: 'admin',
+        clubSettlementUpdatedAt: expect.any(Date),
+      }),
+    }),
+  )
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ total: 105000 }),
+    }),
+  )
+})
+it('rejects unauthorized or unrelated coach settlement flags before creating a booking', async () => {
+  mocks.payload.coachSettlements = [{ slotId: 'coach-slot', isSettled: true }]
+  await expect(checkout('CASHIER')).rejects.toThrow(/Admin/)
+  mocks.payload.coachSettlements = [{ slotId: 'not-selected', isSettled: true }]
+  await expect(checkout()).rejects.toThrow(/Status lunas/)
+})

@@ -12,7 +12,11 @@ import { lockCustomerWallet } from '@/services/membership-renewal.service'
 import { recurringBookingInputSchema } from '@/lib/recurring-booking'
 import { createRecurringBooking } from '@/services/recurring-booking.service'
 import { bookableCourtWhere } from '@/lib/court-branch-policy'
-import { BadRequestException, NotFoundException } from '@/exceptions'
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { isSlotAllowedForMembershipType } from '@/lib/membership-hours'
@@ -47,6 +51,14 @@ const adminCheckoutSchema = z
     expectedTotal: z.number().int().nonnegative().optional(),
     courtSlots: z.array(z.string()).optional(),
     coachSlots: z.array(z.string()).optional(),
+    coachSettlements: z
+      .array(
+        z
+          .object({ slotId: z.string().min(1), isSettled: z.boolean() })
+          .strict(),
+      )
+      .max(100)
+      .optional(),
     inHouseSelections: z
       .array(inHouseSelectionSchema)
       .min(1)
@@ -281,6 +293,7 @@ export const adminCheckoutHandler = factory.createHandlers(
       courtSlots: rawCourtSlots,
       coachSlots: rawCoachSlots,
       coachGroups,
+      coachSettlements,
       coachDescription,
       adminNote,
       useMembership,
@@ -308,6 +321,22 @@ export const adminCheckoutHandler = factory.createHandlers(
     )
       throw new BadRequestException(
         'Pilihan grup harus sesuai slot coach yang dipilih.',
+      )
+    if (
+      coachSettlements &&
+      (new Set(coachSettlements.map((item) => item.slotId)).size !==
+        coachSettlements.length ||
+        coachSettlements.some((item) => !coachSlots?.includes(item.slotId)))
+    )
+      throw new BadRequestException(
+        'Status lunas harus sesuai slot coach yang dipilih.',
+      )
+    if (
+      coachSettlements?.length &&
+      !['ADMIN', 'SUPER_ADMIN'].includes(c.get('admin')?.role ?? '')
+    )
+      throw new ForbiddenException(
+        'Hanya Admin atau Super Admin yang dapat menandai coach lunas ke Club.',
       )
     const ballboySelections = normalizeBallboySelections(rawBallboySlots)
     const ballboySlots = Array.from(
@@ -716,6 +745,9 @@ export const adminCheckoutHandler = factory.createHandlers(
               )
               return {
                 ...slot,
+                isClubSettled:
+                  coachSettlements?.find((item) => item.slotId === slot.id)
+                    ?.isSettled === true,
                 participants: groupSelection
                   ? (groupSelection.participants ?? 1)
                   : undefined,
@@ -745,6 +777,14 @@ export const adminCheckoutHandler = factory.createHandlers(
                 bookingId: booking.id,
                 slotId: slot.id,
                 bookingCoachTypeId: defaultCoachType.id,
+                ...(coachSettlements?.find((item) => item.slotId === slot.id)
+                  ?.isSettled
+                  ? {
+                      isClubSettled: true,
+                      clubSettlementUpdatedAt: new Date(),
+                      clubSettlementUpdatedById: cashierId,
+                    }
+                  : {}),
                 // Store names of members joining this coach session (if provided)
                 description:
                   [
