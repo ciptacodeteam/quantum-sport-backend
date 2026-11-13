@@ -175,11 +175,11 @@ it('rejects a Tennis target outside Cemara without changing the original booking
 })
 
 it.each([
-  ['2040-01-03T02:00:00.000Z', true],
-  ['2040-01-03T01:59:59.999Z', true],
-  ['2040-01-03T02:00:00.001Z', false],
-  ['2040-01-04T02:00:00.000Z', false],
-  ['2040-01-05T02:00:00.000Z', false],
+  ['2040-01-03T02:00:00.000+07:00', true],
+  ['2040-01-03T01:59:59.999+07:00', true],
+  ['2040-01-03T02:00:00.001+07:00', false],
+  ['2040-01-04T02:00:00.000+07:00', false],
+  ['2040-01-05T02:00:00.000+07:00', false],
 ])('enforces H-2 directly in the admin API at %s', async (now, allowed) => {
   setup('PADEL', 'PADEL')
   vi.useFakeTimers()
@@ -333,9 +333,8 @@ it('allows an eligible membership move without changing a paid invoice total', a
 })
 
 it.each([
-  '2040-01-04T02:00:00Z',
-  '2040-01-05T02:30:00Z',
-  '2040-01-05T04:00:00Z',
+  '2040-01-04T02:00:00+07:00',
+  '2040-01-05T02:29:59.999+07:00',
 ])(
   'allows only super admin to bypass the original booking deadline at %s',
   async (now) => {
@@ -352,6 +351,21 @@ it.each([
     }
   },
 )
+it.each(['2040-01-05T02:30:00+07:00', '2040-01-05T02:30:00.001+07:00', '2040-01-05T04:00:00+07:00'])(
+  'rejects super-admin rescheduling at or after 30 minutes at %s',
+  async (now) => {
+    setup('PADEL', 'PADEL')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(now))
+    try {
+      await expect(execute('SUPER_ADMIN')).rejects.toThrow('ditutup 30 menit')
+      expect(mocks.claimSlot).not.toHaveBeenCalled()
+      expect(mocks.updateDetail).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  },
+)
 it('still rejects an unavailable target for super admin despite the deadline exemption', async () => {
   setup('PADEL', 'PADEL')
   mocks.slot.mockResolvedValue({ ...(await mocks.slot()), isAvailable: false })
@@ -362,7 +376,7 @@ it('still rejects an unavailable target for super admin despite the deadline exe
 it('does not accept a forged super-admin role from the request body', async () => {
   setup('PADEL', 'PADEL')
   vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(new Date('2040-01-05T02:30:00Z'))
+  vi.setSystemTime(new Date('2040-01-05T02:30:00+07:00'))
   try {
     await expect(execute('CASHIER', 'SUPER_ADMIN')).rejects.toThrow(
       'minimal 48 jam',
@@ -375,7 +389,9 @@ it('does not accept a forged super-admin role from the request body', async () =
 it('still forbids a past replacement slot for super admin', async () => {
   setup('PADEL', 'PADEL')
   vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(new Date('2040-01-07T00:00:00Z'))
+  const target = await mocks.slot()
+  mocks.slot.mockResolvedValue({ ...target, startAt: new Date('2040-01-04T01:00:00Z'), endAt: new Date('2040-01-04T02:00:00Z') })
+  vi.setSystemTime(new Date('2040-01-05T02:29:00+07:00'))
   try {
     await expect(execute('SUPER_ADMIN')).rejects.toThrow('already passed')
   } finally {

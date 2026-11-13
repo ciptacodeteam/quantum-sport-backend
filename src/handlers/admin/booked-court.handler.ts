@@ -1008,7 +1008,9 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             )
           ) {
             throw new BadRequestException(
-              'Reschedule maksimal H-2 (minimal 48 jam sebelum jadwal asal).',
+              c.get('admin')?.role === 'SUPER_ADMIN'
+                ? 'Reschedule ditutup 30 menit setelah jadwal asal dimulai.'
+                : 'Reschedule maksimal H-2 (minimal 48 jam sebelum jadwal asal).',
             )
           }
 
