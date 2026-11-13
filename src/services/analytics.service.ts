@@ -1,4 +1,9 @@
 import {
+  readRescheduleCharge,
+  rescheduleSourceSelect,
+  rescheduleServiceState,
+} from '@/lib/reschedule-charge'
+import {
   courtBookingSearchWhere,
   courtBookingOrder,
   type CourtBookingSearch,
@@ -21,7 +26,7 @@ import * as XLSX from 'xlsx'
 import { getFileUrl } from './upload.service'
 
 /** Preserve slot wall-clock times while exposing actual WIB instants to clients. */
-function incomePlayingSchedules(booking: any) {
+function incomePlayingSchedules(booking: any, meta?: unknown) {
   const slots: { label: string; startAt: Date; endAt: Date }[] = [
     ...(booking?.details ?? []).map((item: any) => ({
       label: item.slot.court?.name
@@ -39,6 +44,20 @@ function incomePlayingSchedules(booking: any) {
       ...item.slot,
     })),
   ]
+  const charge = readRescheduleCharge(meta)
+  if (charge?.startAt && charge.endAt)
+    slots.push({
+      label: `Lapangan · ${charge.courtName ?? 'Reschedule'}`,
+      startAt: new Date(charge.startAt),
+      endAt: new Date(charge.endAt),
+    })
+  if (charge)
+    for (const line of charge.services)
+      slots.push({
+        label: line.kind === 'COACH' ? 'Coach' : 'Ballboy',
+        startAt: new Date(line.startAt),
+        endAt: new Date(line.endAt),
+      })
   slots.sort(
     (a, b) => a.label.localeCompare(b.label) || +a.startAt - +b.startAt,
   )
@@ -70,6 +89,7 @@ type IncomeServiceCancellation = {
 
 /** Paid invoices remain payment history even when individual services are cancelled. */
 function incomeCancellation(invoice: {
+  payment?: { meta?: unknown } | null
   status?: string
   booking?: {
     status?: string
@@ -81,6 +101,7 @@ function incomeCancellation(invoice: {
   classBooking?: { status?: string } | null
 }) {
   const booking = invoice.booking
+  const charge = readRescheduleCharge(invoice.payment?.meta)
   const services = [
     ...(booking?.coaches ?? []).map((item) => ({
       ...item,
@@ -89,6 +110,15 @@ function incomeCancellation(invoice: {
     ...(booking?.ballboys ?? []).map((item) => ({
       ...item,
       kind: 'BALLBOY' as const,
+    })),
+    ...(charge?.services ?? []).map((line) => ({
+      kind: line.kind,
+      price: line.amount,
+      status:
+        rescheduleServiceState(booking, line.serviceId)?.status ?? 'CONFIRMED',
+      slot: { staff: { name: line.staffName } },
+      cancelledAt: null,
+      cancellationReason: 'Layanan terkait dibatalkan',
     })),
   ]
   const cancelled = services.filter((item) => item.status === 'CANCELLED')
@@ -99,6 +129,7 @@ function incomeCancellation(invoice: {
     invoice.classBooking?.status === 'CANCELLED' ||
     (!!cancelled.length &&
       !booking?.details?.length &&
+      !charge?.courtAmount &&
       cancelled.length === services.length)
   return {
     paymentStatus: invoice.status ?? 'PAID',
@@ -146,6 +177,16 @@ function incomeRevenue(invoice: any) {
       0,
     )
   }
+  const charge = readRescheduleCharge(invoice.payment?.meta)
+  if (charge && cancellation.cancellationStatus !== 'CANCELLED') {
+    excludedAmount += charge.services
+      .filter(
+        (line) =>
+          rescheduleServiceState(invoice.booking, line.serviceId)?.status ===
+          'CANCELLED',
+      )
+      .reduce((sum, line) => sum + line.amount, 0)
+  }
   return { netAmount: Math.max(0, paidNet - excludedAmount), excludedAmount }
 }
 
@@ -154,6 +195,20 @@ function incomeBreakdown(invoice: any) {
   const { netAmount } = incomeRevenue(invoice)
   const result = { court: 0, coach: 0, ballboy: 0, other: 0 }
   const booking = invoice.booking
+  const charge = readRescheduleCharge(invoice.payment?.meta)
+  if (charge && netAmount > 0) {
+    result.court = charge.courtAmount
+    for (const line of charge.services)
+      if (
+        rescheduleServiceState(booking, line.serviceId)?.status !== 'CANCELLED'
+      )
+        result[line.kind === 'COACH' ? 'coach' : 'ballboy'] += line.amount
+    result.other = Math.max(
+      0,
+      netAmount - result.court - result.coach - result.ballboy,
+    )
+    return result
+  }
   if (!booking || netAmount === 0) return { ...result, other: netAmount }
   const services = [
     ...(booking.coaches ?? []).map((item: any) => ({
@@ -214,11 +269,11 @@ export async function getIncomeBySourceAnalytics(
   const includeClause: any = {
     user: { select: { id: true, name: true } },
     branch: { select: { name: true } },
-    payment: { select: { method: { select: { name: true } } } },
+    payment: { select: { meta: true, method: { select: { name: true } } } },
     booking: {
       include: {
         cashier: { select: { id: true, name: true, email: true } },
-        serviceForBooking: { select: { status: true } },
+        serviceForBooking: { select: rescheduleSourceSelect },
         details: {
           select: {
             price: true,
@@ -463,7 +518,10 @@ export async function getIncomeBySourceAnalytics(
       bookingId:
         invoice.booking?.serviceForBookingId ?? invoice.booking?.id ?? null,
       branchId: invoice.branchId,
-      playingSchedules: incomePlayingSchedules(invoice.booking),
+      playingSchedules: incomePlayingSchedules(
+        invoice.booking,
+        invoice.payment?.meta,
+      ),
       ...incomeCancellation(invoice),
       ...incomeRevenue(invoice),
       revenueBreakdown: incomeBreakdown(invoice),

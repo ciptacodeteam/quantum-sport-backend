@@ -1,3 +1,11 @@
+import { managementInHouseRate } from '@/lib/management-pricing'
+import { resolveTariffPeriod } from '@/lib/tariff-period'
+import { readRescheduleCharge } from '@/lib/reschedule-charge'
+import { recordRescheduleCharge } from '@/services/reschedule-charge.service'
+import {
+  getCourtCoachBundleDiscount,
+  getInHouseCourtHourlyPrice,
+} from '@/services/booking-bundle-discount.service'
 import { appendRescheduleAudit } from '@/lib/booking-reschedule-audit'
 import { clubWallTime } from '@/lib/club-time'
 import { rescheduleCourtServices } from '@/services/reschedule-court-services.service'
@@ -724,6 +732,9 @@ type CancelBookingSchema = z.infer<typeof cancelBookingSchema>
 
 const rescheduleCourtSchema = z.object({
   newSlotId: z.string().min(1, 'Target slot is required'),
+  preview: z.boolean().optional(),
+  expectedDifference: z.number().int().nonnegative().optional(),
+  paymentMethodId: z.string().min(1).optional(),
 })
 
 type RescheduleCourtSchema = z.infer<typeof rescheduleCourtSchema>
@@ -943,7 +954,8 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
   async (c) => {
     try {
       const { id: bookingDetailId } = c.req.valid('param') as IdSchema
-      const { newSlotId } = c.req.valid('json') as RescheduleCourtSchema
+      const { newSlotId, preview, expectedDifference, paymentMethodId } =
+        c.req.valid('json') as RescheduleCourtSchema
 
       const result = await db.$transaction(
         async (tx) => {
@@ -955,6 +967,7 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
               booking: {
                 include: {
                   invoice: true,
+                  user: true,
                   membershipUser: { include: { membership: true } },
                   coaches: {
                     include: {
@@ -1074,24 +1087,6 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
               'Jam pengganti tidak sesuai ketentuan membership.',
             )
           }
-          const oldCashPrice =
-            bookingDetail.discountPrice > 0
-              ? bookingDetail.discountPrice
-              : bookingDetail.price
-          const newCashPrice =
-            newSlot.discountPrice && newSlot.discountPrice > 0
-              ? newSlot.discountPrice
-              : newSlot.price
-          if (
-            !isInternalBooking &&
-            !usesMembership &&
-            oldCashPrice !== newCashPrice
-          ) {
-            throw new BadRequestException(
-              'Pilih jadwal pengganti dengan harga yang sama. Perubahan biaya tidak dapat diproses melalui reschedule.',
-            )
-          }
-
           if (!newSlot.isAvailable) {
             throw new BadRequestException(
               'Selected slot is no longer available',
@@ -1111,12 +1106,131 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
           }
 
           await tx.$queryRaw`SELECT id FROM bookings WHERE id = ${bookingDetail.booking.id} FOR UPDATE`
+          const priorBookings = await tx.booking.findMany({
+            where: {
+              serviceForBookingId: bookingDetail.booking.id,
+              invoice: { is: { status: 'PAID' } },
+            },
+            include: { invoice: { include: { payment: true } } },
+          })
+          const previousCharges = priorBookings
+            .map((booking) =>
+              readRescheduleCharge(booking.invoice?.payment?.meta),
+            )
+            .filter((charge): charge is NonNullable<typeof charge> => !!charge)
+          const rules = await getTariffPeriods(tx)
+          const managementRate = managementInHouseRate(
+            bookingDetail.booking.user,
+            newSlot.startAt,
+            resolveTariffPeriod(
+              rules,
+              newSlot.startAt,
+              bookingDetail.booking.branchId,
+              newSlot.court.sport,
+            ),
+          )
+          const serviceQuote = await rescheduleCourtServices(
+            tx,
+            bookingDetail.booking.id,
+            bookingDetail.slot,
+            newSlot,
+            bookingDetail.booking.branchId,
+            {
+              preview: true,
+              previousCharges,
+              targetInHouseCoachPrice: managementRate?.coach,
+            },
+          )
+          const oldCashPrice =
+            (bookingDetail.discountPrice ?? bookingDetail.price) +
+            previousCharges
+              .filter((charge) => charge.detailId === bookingDetailId)
+              .reduce((sum, charge) => sum + charge.courtAmount, 0)
+          const baseTarget =
+            newSlot.discountPrice && newSlot.discountPrice > 0
+              ? newSlot.discountPrice
+              : newSlot.price
+          let targetCourtPrice = baseTarget
+          if (serviceQuote.hasPrepaidInHouse) targetCourtPrice = oldCashPrice
+          else if (serviceQuote.hasInHouseCoach)
+            targetCourtPrice =
+              managementRate?.court ??
+              getInHouseCourtHourlyPrice(
+                { ...newSlot, branchId: bookingDetail.booking.branchId },
+                rules,
+              ) ??
+              baseTarget
+          else if (serviceQuote.hasClubCoach)
+            targetCourtPrice = Math.max(
+              0,
+              baseTarget -
+                getCourtCoachBundleDiscount(
+                  { ...newSlot, branchId: bookingDetail.booking.branchId },
+                  rules,
+                ),
+            )
+          const courtDifference =
+            isInternalBooking || usesMembership
+              ? 0
+              : Math.max(0, targetCourtPrice - oldCashPrice)
+          const charge = {
+            courtName: newSlot.court.name,
+            startAt: newSlot.startAt.toISOString(),
+            endAt: newSlot.endAt.toISOString(),
+            source: 'ADMIN_COURT_RESCHEDULE' as const,
+            detailId: bookingDetailId,
+            courtBookingId: bookingDetail.booking.id,
+            courtAmount: courtDifference,
+            services: isInternalBooking ? [] : serviceQuote.chargeLines,
+          }
+          const serviceDifference = charge.services.reduce(
+            (sum, line) => sum + line.amount,
+            0,
+          )
+          const priceDifference = courtDifference + serviceDifference
+          const pricing = {
+            courtDifference,
+            serviceDifference,
+            priceDifference,
+            previousCourtPrice: oldCashPrice,
+            targetCourtPrice,
+            retainedCourtPrice: Math.max(oldCashPrice, targetCourtPrice),
+          }
+          if (preview)
+            return {
+              updatedDetail: bookingDetail,
+              updatedBooking: bookingDetail.booking,
+              previousSlot: bookingDetail.slot,
+              ...pricing,
+              additionalInvoiceId: null,
+            }
+          if (priceDifference > 0 && expectedDifference == null)
+            throw new BadRequestException(
+              'Periksa dan konfirmasi selisih biaya reschedule terlebih dahulu.',
+            )
+          if (
+            expectedDifference != null &&
+            expectedDifference !== priceDifference
+          )
+            throw new BadRequestException(
+              'Selisih biaya berubah. Muat ulang perhitungan sebelum melanjutkan.',
+            )
+          const additionalInvoice = await recordRescheduleCharge(tx, charge, {
+            branchId: bookingDetail.booking.branchId,
+            userId:
+              bookingDetail.booking.userId ??
+              bookingDetail.booking.invoice?.userId ??
+              null,
+            actorId: c.get('admin')!.id,
+            paymentMethodId,
+          })
           const movedServices = await rescheduleCourtServices(
             tx,
             bookingDetail.booking.id,
             bookingDetail.slot,
             newSlot,
             bookingDetail.booking.branchId,
+            { previousCharges },
           )
 
           // Claim before releasing the original slot. Concurrent attempts cannot both win.
@@ -1146,7 +1260,8 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             where: { id: bookingDetailId },
             data: {
               slotId: newSlot.id,
-              price: isInternalBooking ? 0 : newSlot.price,
+              // Original paid charges stay immutable; extra payments have their own receipt.
+              price: bookingDetail.price,
               courtId: newSlot.courtId,
             },
             include: {
@@ -1174,7 +1289,13 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             },
           }
           for (const affectedId of [
-            ...new Set([bookingDetail.booking.id, ...movedServices.bookingIds]),
+            ...new Set([
+              bookingDetail.booking.id,
+              ...movedServices.bookingIds,
+              ...(additionalInvoice?.bookingId
+                ? [additionalInvoice.bookingId]
+                : []),
+            ]),
           ].sort()) {
             const previous = await tx.booking.findUnique({
               where: { id: affectedId },
@@ -1188,14 +1309,14 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             })
           }
 
-          const priceDifference = 0
           const updatedBooking = bookingDetail.booking
 
           return {
             updatedDetail,
             updatedBooking,
             previousSlot: bookingDetail.slot,
-            priceDifference,
+            ...pricing,
+            additionalInvoiceId: additionalInvoice?.id ?? null,
           }
         },
         { isolationLevel: 'Serializable' },
@@ -1216,6 +1337,12 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             },
             previousSlot: result.previousSlot,
             priceDifference: result.priceDifference,
+            courtDifference: result.courtDifference,
+            serviceDifference: result.serviceDifference,
+            previousCourtPrice: result.previousCourtPrice,
+            targetCourtPrice: result.targetCourtPrice,
+            retainedCourtPrice: result.retainedCourtPrice,
+            additionalInvoiceId: result.additionalInvoiceId,
           },
           'Court booking rescheduled successfully.',
         ),

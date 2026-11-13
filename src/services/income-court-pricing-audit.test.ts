@@ -257,3 +257,95 @@ it('keeps cancellation and whole-rupiah promo allocations reconciled with servic
   ).toBe(sources.summary.totalNetAmount)
   expect(mocks.tariffs).not.toHaveBeenCalled()
 })
+
+it('reconciles a separately paid reschedule increase without duplicating original court or service income', async () => {
+  const original: any = invoice(105000, 150000)
+  const extra: any = {
+    ...invoice(0, 0),
+    id: 'extra-invoice',
+    number: 'INV-EXTRA',
+    total: 295000,
+    processingFee: 0,
+    payment: {
+      method: { name: 'Tunai' },
+      meta: {
+        source: 'ADMIN_COURT_RESCHEDULE',
+        detailId: 'detail',
+        courtBookingId: 'booking-1',
+        courtAmount: 220000,
+        services: [
+          {
+            serviceId: 'coach',
+            kind: 'COACH',
+            isInHouse: false,
+            amount: 50000,
+            staffId: 'coach',
+            staffName: 'Coach',
+            clubId: 'club-a',
+            clubName: 'Club A',
+            startAt: range.startAt.toISOString(),
+            endAt: range.endAt.toISOString(),
+          },
+          {
+            serviceId: 'ballboy',
+            kind: 'BALLBOY',
+            isInHouse: false,
+            amount: 25000,
+            staffId: 'ballboy',
+            staffName: 'Ballboy',
+            clubId: null,
+            clubName: null,
+            startAt: range.startAt.toISOString(),
+            endAt: range.endAt.toISOString(),
+          },
+        ],
+      },
+    },
+    booking: {
+      id: 'extra-booking',
+      cashierId: 'cashier',
+      purpose: 'REGULAR',
+      status: 'CONFIRMED',
+      totalPrice: 295000,
+      promoDiscountAmount: 0,
+      details: [],
+      coaches: [],
+      ballboys: [],
+      serviceForBooking: {
+        status: 'CONFIRMED',
+        coaches: [{ id: 'coach', status: 'CONFIRMED', isClubSettled: false }],
+        ballboys: [{ id: 'ballboy', status: 'CONFIRMED' }],
+        serviceBookings: [],
+      },
+    },
+  }
+  mocks.invoices.mockResolvedValue([original, extra])
+  const sources = await getIncomeBySourceAnalytics(start, end)
+  const services = buildServiceIncome([original, extra])
+  expect(sources.summary.revenueBreakdown).toEqual({
+    court: 325000,
+    coach: 200000,
+    ballboy: 75000,
+    other: 0,
+  })
+  expect(sources.summary.totalNetAmount).toBe(600000)
+  expect(services.summary).toMatchObject({
+    coachAmount: 200000,
+    ballboyAmount: 75000,
+    sessions: 2,
+  })
+  expect(services.rows.filter((row) => row.hours === 0)).toHaveLength(2)
+  original.booking.coaches[0].status = 'CANCELLED'
+  extra.booking.serviceForBooking.coaches[0].status = 'CANCELLED'
+  const cancelledSources = await getIncomeBySourceAnalytics(start, end)
+  const cancelledServices = buildServiceIncome([original, extra])
+  expect(cancelledSources.summary.revenueBreakdown).toEqual({
+    court: 325000,
+    coach: 0,
+    ballboy: 75000,
+    other: 0,
+  })
+  expect(cancelledSources.summary.totalNetAmount).toBe(400000)
+  expect(cancelledServices.summary.coachAmount).toBe(0)
+  expect(cancelledServices.summary.ballboyAmount).toBe(75000)
+})

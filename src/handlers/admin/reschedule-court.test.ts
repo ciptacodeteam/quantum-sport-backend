@@ -3,6 +3,10 @@ vi.mock('@/services/tariff-policy.service', () => ({
 }))
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
+  coaches: vi.fn(),
+  serviceTarget: vi.fn(),
+  charge: vi.fn(),
+  prior: vi.fn(),
   detail: vi.fn(),
   slot: vi.fn(),
   updateSlot: vi.fn(),
@@ -10,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   updateDetail: vi.fn(),
   updateBooking: vi.fn(),
+}))
+vi.mock('@/services/reschedule-charge.service', () => ({
+  recordRescheduleCharge: mocks.charge,
 }))
 vi.mock('@/lib/create-app', () => ({
   factory: { createHandlers: (...handlers: unknown[]) => handlers },
@@ -21,14 +28,16 @@ vi.mock('@/lib/prisma', () => ({
       return fn({
         $queryRaw: vi.fn(),
         booking: {
+          findMany: mocks.prior,
           findUnique: vi.fn().mockResolvedValue({ adminNote: 'Catatan awal' }),
           update: mocks.updateBooking,
         },
-        bookingCoach: { findMany: vi.fn().mockResolvedValue([]) },
+        bookingCoach: { findMany: mocks.coaches },
         bookingBallboy: { findMany: vi.fn().mockResolvedValue([]) },
         bookingDetail: { findUnique: mocks.detail, update: mocks.updateDetail },
         slot: {
           findUnique: mocks.slot,
+          findFirst: mocks.serviceTarget,
           update: mocks.updateSlot,
           updateMany: mocks.claimSlot,
         },
@@ -39,6 +48,9 @@ vi.mock('@/lib/prisma', () => ({
 import { rescheduleCourtBookingHandler } from './booked-court.handler'
 
 function setup(source: 'PADEL' | 'TENNIS', target: 'PADEL' | 'TENNIS') {
+  mocks.coaches.mockResolvedValue([])
+  mocks.prior.mockResolvedValue([])
+  mocks.charge.mockResolvedValue(null)
   const oldSlot = {
     id: 'old',
     court: { sport: source },
@@ -81,7 +93,11 @@ function setup(source: 'PADEL' | 'TENNIS', target: 'PADEL' | 'TENNIS') {
   })
 }
 beforeEach(() => vi.clearAllMocks())
-const execute = (role = 'CASHIER', requestedRole?: string) =>
+const execute = (
+  role = 'CASHIER',
+  requestedRole?: string,
+  input: Record<string, unknown> = {},
+) =>
   (rescheduleCourtBookingHandler[2] as any)({
     get: () => ({ id: 'actor', role }),
     req: {
@@ -90,6 +106,7 @@ const execute = (role = 'CASHIER', requestedRole?: string) =>
           ? { id: 'detail' }
           : {
               newSlotId: 'new',
+              ...input,
               ...(requestedRole ? { role: requestedRole } : {}),
             },
     },
@@ -231,7 +248,7 @@ it('does not change a paid invoice amount during rescheduling', async () => {
   setup('PADEL', 'PADEL')
   const target = await mocks.slot()
   mocks.slot.mockResolvedValue({ ...target, price: 200000 })
-  await expect(execute()).rejects.toThrow('harga yang sama')
+  await expect(execute()).rejects.toThrow('Periksa dan konfirmasi')
   expect(mocks.claimSlot).not.toHaveBeenCalled()
 })
 
@@ -384,4 +401,135 @@ it('persists a structured reschedule marker while preserving existing notes', as
     from: { startAt: '2040-01-05T02:00:00+07:00' },
     to: { startAt: '2040-01-06T02:00:00+07:00' },
   })
+})
+
+it('previews a higher target without changing any slot or collecting payment', async () => {
+  setup('PADEL', 'PADEL')
+  const target = await mocks.slot()
+  mocks.slot.mockResolvedValue({ ...target, price: 250000 })
+  const result = await execute('CASHIER', undefined, { preview: true })
+  expect(result.body.data.priceDifference).toBe(100000)
+  expect(mocks.claimSlot).not.toHaveBeenCalled()
+  expect(mocks.charge).not.toHaveBeenCalled()
+})
+it('charges only an approved increase using a new receipt and preserves original paid prices', async () => {
+  setup('PADEL', 'PADEL')
+  const target = await mocks.slot()
+  mocks.slot.mockResolvedValue({ ...target, price: 250000 })
+  mocks.charge.mockResolvedValue({ id: 'extra-invoice' })
+  const result = await execute('CASHIER', undefined, {
+    expectedDifference: 100000,
+    paymentMethodId: 'cash',
+  })
+  expect(result.body.data.priceDifference).toBe(100000)
+  expect(result.body.data.additionalInvoiceId).toBe('extra-invoice')
+  expect(mocks.charge).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ courtAmount: 100000 }),
+    expect.objectContaining({ paymentMethodId: 'cash' }),
+  )
+  expect(mocks.updateDetail).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ price: 150000 }),
+    }),
+  )
+})
+it('allows peak to happy without refund and uses prior paid increases as the floor for future moves', async () => {
+  setup('PADEL', 'PADEL')
+  const target = await mocks.slot()
+  mocks.slot.mockResolvedValue({ ...target, price: 100000 })
+  const result = await execute()
+  expect(result.body.data.priceDifference).toBe(0)
+  expect(mocks.updateDetail).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ price: 150000 }),
+    }),
+  )
+  mocks.prior.mockResolvedValue([
+    {
+      invoice: {
+        payment: {
+          meta: {
+            source: 'ADMIN_COURT_RESCHEDULE',
+            detailId: 'detail',
+            courtBookingId: 'booking',
+            courtAmount: 100000,
+            services: [],
+          },
+        },
+      },
+    },
+  ])
+  mocks.slot.mockResolvedValue({ ...target, price: 250000 })
+  expect(
+    (await execute('CASHIER', undefined, { preview: true })).body.data
+      .priceDifference,
+  ).toBe(0)
+  mocks.slot.mockResolvedValue({ ...target, price: 300000 })
+  expect(
+    (await execute('CASHIER', undefined, { preview: true })).body.data
+      .priceDifference,
+  ).toBe(50000)
+})
+it('rejects a stale surcharge quote before collecting or changing any slot', async () => {
+  setup('PADEL', 'PADEL')
+  const target = await mocks.slot()
+  mocks.slot.mockResolvedValue({ ...target, price: 250000 })
+  await expect(
+    execute('CASHIER', undefined, { expectedDifference: 50000 }),
+  ).rejects.toThrow('Selisih biaya berubah')
+  expect(mocks.charge).not.toHaveBeenCalled()
+  expect(mocks.claimSlot).not.toHaveBeenCalled()
+})
+
+it('quotes the target coaching court tariff plus only the increased coach fee', async () => {
+  setup('PADEL', 'PADEL')
+  const current = await mocks.detail()
+  mocks.detail.mockResolvedValue({ ...current, discountPrice: 105000 })
+  const target = await mocks.slot()
+  mocks.slot.mockResolvedValue({
+    ...target,
+    price: 350000,
+    startAt: new Date('2040-01-06T16:00:00Z'),
+    endAt: new Date('2040-01-06T17:00:00Z'),
+  })
+  const { getTariffPeriods } = await import('@/services/tariff-policy.service')
+  vi.mocked(getTariffPeriods).mockResolvedValueOnce([
+    {
+      branchId: 'cemara',
+      sport: 'PADEL',
+      effectiveFrom: new Date('2039-01-01'),
+      happyStart: 6,
+      happyEnd: 15,
+      peakStart: 15,
+      peakEnd: 24,
+      happyCoachDiscount: 45000,
+      peakCoachDiscount: 25000,
+    },
+  ] as any)
+  mocks.coaches.mockResolvedValue([
+    {
+      id: 'coach',
+      bookingId: 'booking',
+      courtSlotId: 'old',
+      slotId: 'old-coach',
+      price: 150000,
+      description: 'Jumlah member: 1',
+      slot: {
+        ...current.slot,
+        id: 'old-coach',
+        staffId: 'coach',
+        staff: { name: 'Coach' },
+      },
+    },
+  ])
+  mocks.serviceTarget.mockResolvedValue({ id: 'new-coach', price: 200000 })
+  const result = await execute('CASHIER', undefined, { preview: true })
+  expect(result.body.data).toMatchObject({
+    targetCourtPrice: 325000,
+    courtDifference: 220000,
+    serviceDifference: 50000,
+    priceDifference: 270000,
+  })
+  expect(mocks.claimSlot).not.toHaveBeenCalled()
 })

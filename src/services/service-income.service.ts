@@ -1,13 +1,20 @@
+import {
+  readRescheduleCharge,
+  rescheduleSourceSelect,
+  rescheduleServiceState,
+} from '@/lib/reschedule-charge'
 import { isInHouseService } from '@/lib/inhouse-coaching'
 import { db } from '@/lib/prisma'
 import { formatClubWallClock } from '@/lib/club-time'
 import type { Prisma } from '@prisma/client'
 
 export const serviceIncomeInclude = {
+  payment: { select: { meta: true } },
   branch: { select: { name: true } },
   user: { select: { name: true } },
   booking: {
     include: {
+      serviceForBooking: { select: rescheduleSourceSelect },
       coaches: {
         include: {
           bookingCoachType: true,
@@ -102,6 +109,42 @@ export function buildServiceIncome(
       booking.purpose !== 'REGULAR'
     )
       continue
+    const charge = readRescheduleCharge(invoice.payment?.meta)
+    if (charge) {
+      for (const line of charge.services) {
+        const state = rescheduleServiceState(booking, line.serviceId)
+        if (
+          line.amount <= 0 ||
+          line.isInHouse ||
+          state?.status === 'CANCELLED' ||
+          booking.serviceForBooking?.status === 'CANCELLED'
+        )
+          continue
+        allRows.push({
+          id: `RESCHEDULE:${invoice.id}:${line.serviceId}`,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.number,
+          bookingId: charge.courtBookingId,
+          customerName: invoice.user.name,
+          branchId: invoice.branchId,
+          branchName: invoice.branch.name,
+          paidAt: invoice.paidAt,
+          service: line.kind,
+          staffId: line.staffId,
+          staffName: line.staffName,
+          clubId: line.clubId,
+          clubName: line.clubName || 'Tanpa Club',
+          startAt: formatClubWallClock(new Date(line.startAt)),
+          endAt: formatClubWallClock(new Date(line.endAt)),
+          hours: 0,
+          isClubSettled: state?.isClubSettled === true,
+          description: 'Selisih biaya reschedule (bukan sesi tambahan)',
+          servicePrice: state?.isClubSettled ? 0 : line.amount,
+          discount: 0,
+          amount: state?.isClubSettled ? 0 : line.amount,
+        })
+      }
+    }
     const services = [
       ...booking.coaches.map((item) => ({
         ...item,
@@ -213,7 +256,7 @@ export function buildServiceIncome(
     club[row.service === 'COACH' ? 'coachAmount' : 'ballboyAmount'] +=
       row.amount
     club.totalAmount += row.amount
-    club.sessions++
+    if (row.hours > 0) club.sessions++
     club.hours += row.hours
     clubs.set(clubId, club)
     const staffKey = `${row.service}:${row.staffId ?? row.staffName}:${clubId}`
@@ -226,7 +269,7 @@ export function buildServiceIncome(
       hours: 0,
       amount: 0,
     }
-    member.sessions++
+    if (row.hours > 0) member.sessions++
     member.hours += row.hours
     member.amount += row.amount
     staff.set(staffKey, member)
@@ -244,7 +287,7 @@ export function buildServiceIncome(
         .filter((row) => !row.clubId)
         .reduce((sum, row) => sum + row.amount, 0),
       invoiceCount: new Set(rows.map((row) => row.invoiceId)).size,
-      sessions: rows.length,
+      sessions: rows.filter((row) => row.hours > 0).length,
       clubCount: [...clubs.keys()].filter((id) => id !== 'unassigned').length,
     },
     clubs: [...clubs.values()].sort(
@@ -290,7 +333,11 @@ export async function getServiceIncome(
         is: {
           status: 'CONFIRMED',
           purpose: 'REGULAR',
-          OR: [{ coaches: { some: {} } }, { ballboys: { some: {} } }],
+          OR: [
+            { coaches: { some: {} } },
+            { ballboys: { some: {} } },
+            { serviceForBookingId: { not: null } },
+          ],
         },
       },
     },

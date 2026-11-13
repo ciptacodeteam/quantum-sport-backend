@@ -1,3 +1,5 @@
+import { isInHouseService } from '@/lib/inhouse-coaching'
+import type { RescheduleCharge } from '@/lib/reschedule-charge'
 import type { Prisma } from '@prisma/client'
 import { BadRequestException } from '@/exceptions'
 import { claimSlotsAtomically } from './slot-claim.service'
@@ -10,6 +12,11 @@ export async function rescheduleCourtServices(
   source: TimeSlot,
   target: TimeSlot,
   branchId: string,
+  options: {
+    preview?: boolean
+    previousCharges?: RescheduleCharge[]
+    targetInHouseCoachPrice?: number
+  } = {},
 ) {
   const withinSource = {
     startAt: { lt: source.endAt },
@@ -29,15 +36,34 @@ export async function rescheduleCourtServices(
     ],
   }
   const [coaches, ballboys] = await Promise.all([
-    tx.bookingCoach.findMany({ where, include: { slot: true } }),
-    tx.bookingBallboy.findMany({ where, include: { slot: true } }),
+    tx.bookingCoach.findMany({
+      where,
+      include: {
+        slot: { include: { staff: true } },
+        bookingCoachType: true,
+        inHouseUsage: true,
+      },
+    }),
+    tx.bookingBallboy.findMany({
+      where,
+      include: { slot: { include: { staff: true } } },
+    }),
   ])
   const services = [
     ...coaches.map((item) => ({ ...item, kind: 'COACH' as const })),
     ...ballboys.map((item) => ({ ...item, kind: 'BALLBOY' as const })),
   ]
+  const chargeLines: RescheduleCharge['services'] = []
   if (!services.length)
-    return { bookingIds: [] as string[], coachSlots: 0, ballboySlots: 0 }
+    return {
+      bookingIds: [] as string[],
+      coachSlots: 0,
+      ballboySlots: 0,
+      chargeLines,
+      hasClubCoach: false,
+      hasInHouseCoach: false,
+      hasPrepaidInHouse: false,
+    }
   for (const id of [...new Set(services.map((item) => item.bookingId))]
     .filter((id) => id !== bookingId)
     .sort())
@@ -90,6 +116,53 @@ export async function rescheduleCourtServices(
       throw new BadRequestException(
         `${item.kind === 'COACH' ? 'Coach' : 'Ballboy'} yang dipesan tidak tersedia pada jadwal pengganti. Pilih jadwal lain.`,
       )
+    const previousExtra = (options.previousCharges ?? [])
+      .flatMap((charge) => charge.services)
+      .filter((line) => line.serviceId === item.id)
+      .reduce((sum, line) => sum + line.amount, 0)
+    const inHouse = item.kind === 'COACH' && isInHouseService(item)
+    const settled = item.kind === 'COACH' && item.isClubSettled
+    const participants =
+      item.kind === 'COACH'
+        ? Number(
+            item.description?.match(/Jumlah member: (\d+)/)?.[1] ??
+              item.description?.match(/(\d+) peserta/)?.[1] ??
+              1,
+          )
+        : 1
+    const targetPrice = settled
+      ? 0
+      : inHouse
+        ? item.inHouseUsage
+          ? item.price
+          : (options.targetInHouseCoachPrice ??
+              replacement.price ??
+              item.price ??
+              0) +
+            Math.max(0, participants - 1) * 100000
+        : Math.max(0, replacement.price ?? item.price ?? 0) +
+          (item.kind === 'COACH'
+            ? Math.max(0, participants - 1) *
+              (replacement.additionalHourPrice ?? replacement.price ?? 0)
+            : 0)
+    const amount =
+      settled || sameTime
+        ? 0
+        : Math.max(0, targetPrice - (item.price ?? 0) - previousExtra)
+    if (amount > 0)
+      chargeLines.push({
+        isInHouse: inHouse,
+        serviceId: item.id,
+        kind: item.kind,
+        amount,
+        staffId: item.slot.staffId,
+        staffName: item.slot.staff?.name ?? item.kind,
+        clubId: item.kind === 'COACH' ? (item.coachingGroupId ?? null) : null,
+        clubName:
+          item.kind === 'COACH' ? (item.coachingGroupName ?? null) : null,
+        startAt: startAt.toISOString(),
+        endAt: endAt.toISOString(),
+      })
     moves.push({
       id: item.id,
       kind: item.kind,
@@ -97,6 +170,16 @@ export async function rescheduleCourtServices(
       newSlotId: replacement.id,
     })
   }
+  const summary = {
+    bookingIds: [...new Set(services.map((item) => item.bookingId))],
+    coachSlots: coaches.length,
+    ballboySlots: ballboys.length,
+    chargeLines,
+    hasClubCoach: coaches.some((item) => !isInHouseService(item)),
+    hasInHouseCoach: coaches.some((item) => isInHouseService(item)),
+    hasPrepaidInHouse: coaches.some((item) => !!item.inHouseUsage),
+  }
+  if (options.preview) return summary
   for (const type of ['COACH', 'BALLBOY'] as const) {
     const slotIds = moves
       .filter((move) => move.kind === type && move.oldSlotId !== move.newSlotId)
@@ -138,9 +221,5 @@ export async function rescheduleCourtServices(
       },
       data: { isAvailable: true },
     })
-  return {
-    bookingIds: [...new Set(services.map((item) => item.bookingId))],
-    coachSlots: coaches.length,
-    ballboySlots: ballboys.length,
-  }
+  return summary
 }

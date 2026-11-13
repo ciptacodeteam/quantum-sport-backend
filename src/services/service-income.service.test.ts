@@ -201,7 +201,11 @@ it('queries the same branch-scoped paid invoice set by payment date, not session
       is: {
         status: 'CONFIRMED',
         purpose: 'REGULAR',
-        OR: [{ coaches: { some: {} } }, { ballboys: { some: {} } }],
+        OR: [
+          { coaches: { some: {} } },
+          { ballboys: { some: {} } },
+          { serviceForBookingId: { not: null } },
+        ],
       },
     },
   })
