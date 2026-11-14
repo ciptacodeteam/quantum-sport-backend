@@ -3,9 +3,9 @@ import {
   rescheduleSourceSelect,
   rescheduleServiceState,
 } from '@/lib/reschedule-charge'
-import { isInHouseService } from '@/lib/inhouse-coaching'
+import { isInHouseService, INHOUSE_COACH_TYPE } from '@/lib/inhouse-coaching'
 import { db } from '@/lib/prisma'
-import { formatClubWallClock } from '@/lib/club-time'
+import { formatClubWallClock, clubNowAsWallDate } from '@/lib/club-time'
 import type { Prisma } from '@prisma/client'
 
 export const serviceIncomeInclude = {
@@ -37,7 +37,7 @@ type IncomeInvoice = Prisma.InvoiceGetPayload<{
 export type ServiceIncomeFilters = {
   clubId?: string
   staffId?: string
-  service?: 'COACH' | 'BALLBOY'
+  service?: 'COACH' | 'BALLBOY' | 'INHOUSE'
 }
 export type ServiceIncomeRow = {
   id: string
@@ -325,6 +325,134 @@ export async function getServiceIncome(
   endDate: Date,
   filters: ServiceIncomeFilters = {},
 ) {
+  // Package payments remain income at sale time. Usage is a separate operational
+  // report by session date, including sessions paid from an older package.
+  const usages = await db.inHouseUsage.findMany({
+    where: {
+      restoredAt: null,
+      wallet: { deletedAt: null, invoice: { is: { status: 'PAID' } } },
+      bookingCoach: {
+        status: 'CONFIRMED',
+        booking: { status: 'CONFIRMED', purpose: 'REGULAR' },
+        slot: {
+          startAt: {
+            gte: clubNowAsWallDate(startDate),
+            lte: clubNowAsWallDate(endDate),
+          },
+        },
+      },
+    },
+    include: {
+      wallet: {
+        include: {
+          user: { select: { name: true } },
+          staff: { select: { id: true, name: true } },
+        },
+      },
+      bookingCoach: {
+        include: {
+          slot: true,
+          booking: {
+            include: { invoice: { select: { id: true, number: true } } },
+          },
+        },
+      },
+    },
+    orderBy: [{ bookingCoach: { slot: { startAt: 'desc' } } }, { id: 'desc' }],
+  })
+  const hourly = await db.bookingCoach.findMany({
+    where: {
+      status: 'CONFIRMED',
+      inHouseUsage: { is: null },
+      bookingCoachType: { name: INHOUSE_COACH_TYPE },
+      booking: {
+        status: 'CONFIRMED',
+        purpose: 'REGULAR',
+        invoice: { is: { status: 'PAID' } },
+      },
+      slot: {
+        startAt: {
+          gte: clubNowAsWallDate(startDate),
+          lte: clubNowAsWallDate(endDate),
+        },
+      },
+    },
+    include: {
+      slot: { include: { staff: { select: { id: true, name: true } } } },
+      booking: {
+        include: {
+          user: { select: { name: true } },
+          invoice: {
+            select: {
+              id: true,
+              number: true,
+              user: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ slot: { startAt: 'desc' } }, { id: 'desc' }],
+  })
+  const inHouseRows = [
+    ...usages
+      .filter(
+        (usage) =>
+          (!filters.service ||
+            filters.service === 'COACH' ||
+            filters.service === 'INHOUSE') &&
+          !filters.clubId &&
+          (!filters.staffId || usage.wallet.staffId === filters.staffId),
+      )
+      .map((usage) => ({
+        id: usage.id,
+        bookingId: usage.bookingCoach.bookingId,
+        invoiceId: usage.bookingCoach.booking.invoice?.id ?? null,
+        invoiceNumber: usage.bookingCoach.booking.invoice?.number ?? null,
+        customerName: usage.wallet.user.name,
+        staffId: usage.wallet.staffId,
+        staffName: usage.wallet.staff.name,
+        packageName: usage.wallet.packageName,
+        startAt: formatClubWallClock(usage.bookingCoach.slot.startAt),
+        endAt: formatClubWallClock(usage.bookingCoach.slot.endAt),
+        hours: usage.minutes / 60,
+        participants: usage.participants,
+        coachAmount: usage.coachAmount,
+        extraAmount: usage.extraAmount as number | null,
+      })),
+    ...hourly
+      .filter(
+        (item) =>
+          (!filters.service ||
+            filters.service === 'COACH' ||
+            filters.service === 'INHOUSE') &&
+          !filters.clubId &&
+          (!filters.staffId || item.slot.staffId === filters.staffId),
+      )
+      .map((item) => ({
+        id: `HOURLY:${item.id}`,
+        bookingId: item.bookingId,
+        invoiceId: item.booking.invoice?.id ?? null,
+        invoiceNumber: item.booking.invoice?.number ?? null,
+        customerName:
+          item.booking.user?.name ??
+          item.booking.invoice?.user.name ??
+          'Pelanggan',
+        staffId: item.slot.staffId ?? '',
+        staffName: item.slot.staff?.name ?? 'Coach tidak tersedia',
+        packageName: 'Satuan',
+        startAt: formatClubWallClock(item.slot.startAt),
+        endAt: formatClubWallClock(item.slot.endAt),
+        hours: Math.max(0, (+item.slot.endAt - +item.slot.startAt) / 3600000),
+        participants: item.description?.match(/(\d+) peserta/)
+          ? Number(item.description.match(/(\d+) peserta/)![1])
+          : null,
+        coachAmount: item.price,
+        extraAmount: null,
+      })),
+  ].sort(
+    (a, b) => b.startAt.localeCompare(a.startAt) || a.id.localeCompare(b.id),
+  )
   const invoices = await db.invoice.findMany({
     where: {
       status: 'PAID',
@@ -344,8 +472,36 @@ export async function getServiceIncome(
     include: serviceIncomeInclude,
     orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
   })
+  const report = buildServiceIncome(invoices, filters)
+  report.options.staff = [
+    ...new Map(
+      [
+        ...report.options.staff,
+        ...usages.map((usage) => ({
+          id: usage.wallet.staffId,
+          name: usage.wallet.staff.name,
+        })),
+        ...hourly
+          .filter((item) => item.slot.staff)
+          .map((item) => ({
+            id: item.slot.staff!.id,
+            name: item.slot.staff!.name,
+          })),
+      ].map((staff) => [staff.id, staff]),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name))
   return {
-    ...buildServiceIncome(invoices, filters),
+    ...report,
+    inHouse: {
+      sessions: inHouseRows.length,
+      hours: inHouseRows.reduce((sum, row) => sum + row.hours, 0),
+      coachAmount: inHouseRows.reduce((sum, row) => sum + row.coachAmount, 0),
+      extraAmount: inHouseRows.reduce(
+        (sum, row) => sum + (row.extraAmount ?? 0),
+        0,
+      ),
+      rows: inHouseRows,
+    },
     dateRange: { startDate, endDate },
   }
 }

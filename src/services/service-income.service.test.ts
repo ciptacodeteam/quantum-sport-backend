@@ -1,9 +1,17 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import * as XLSX from 'xlsx'
-const mocks = vi.hoisted(() => ({ invoices: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  invoices: vi.fn(),
+  usages: vi.fn(),
+  hourly: vi.fn(),
+}))
 vi.mock('@/lib/prisma', () => ({
-  db: { invoice: { findMany: mocks.invoices } },
+  db: {
+    invoice: { findMany: mocks.invoices },
+    inHouseUsage: { findMany: mocks.usages },
+    bookingCoach: { findMany: mocks.hourly },
+  },
 }))
 import {
   allocateServicePayment,
@@ -52,6 +60,8 @@ const build = (data: unknown[], filters = {}) =>
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.invoices.mockResolvedValue([invoice()])
+  mocks.usages.mockResolvedValue([])
+  mocks.hourly.mockResolvedValue([])
 })
 
 it('pays 100% of service income, excludes court and fees, and keeps ballboys unassigned', () => {
@@ -433,4 +443,151 @@ it('keeps a newly booked zero-price settled coach visible as Lunas without addin
   ])
   expect(report.summary.coachAmount).toBe(0)
   expect(report.summary.totalAmount).toBe(0)
+})
+
+const usage = () => ({
+  id: 'usage-1',
+  minutes: 60,
+  participants: 2,
+  coachAmount: 200000,
+  extraAmount: 100000,
+  wallet: {
+    staffId: 'inhouse-coach',
+    staff: { name: 'Coach In-house' },
+    user: { name: 'Pemakai Paket' },
+    packageName: 'Paket 10 jam',
+  },
+  bookingCoach: {
+    bookingId: 'session-booking',
+    slot: item('slot', 0).slot,
+    booking: { invoice: { id: 'session-invoice', number: 'INV-SESSION' } },
+  },
+})
+it('reports in-house usage separately by session date without adding package allocations to club income', async () => {
+  mocks.usages.mockResolvedValue([usage()])
+  const report = await getServiceIncome(
+    new Date('2026-11-09T17:00:00Z'),
+    new Date('2026-11-10T16:59:59.999Z'),
+  )
+  expect(report.summary.totalAmount).toBe(200000)
+  expect(report.inHouse).toMatchObject({
+    sessions: 1,
+    hours: 1,
+    coachAmount: 200000,
+    extraAmount: 100000,
+  })
+  expect(report.inHouse.rows[0]).toMatchObject({
+    customerName: 'Pemakai Paket',
+    staffName: 'Coach In-house',
+    startAt: '2026-11-10 12:00:00',
+  })
+  expect(report.options.staff).toContainEqual({
+    id: 'inhouse-coach',
+    name: 'Coach In-house',
+  })
+  expect(mocks.usages).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: {
+        restoredAt: null,
+        wallet: { deletedAt: null, invoice: { is: { status: 'PAID' } } },
+        bookingCoach: {
+          status: 'CONFIRMED',
+          booking: { status: 'CONFIRMED', purpose: 'REGULAR' },
+          slot: {
+            startAt: {
+              gte: new Date('2026-11-10T00:00:00Z'),
+              lte: new Date('2026-11-10T23:59:59.999Z'),
+            },
+          },
+        },
+      },
+    }),
+  )
+})
+it.each([
+  [{ service: 'BALLBOY' }, 0],
+  [{ clubId: 'unassigned' }, 0],
+  [{ staffId: 'other' }, 0],
+  [{ service: 'INHOUSE', staffId: 'inhouse-coach' }, 1],
+  [{ service: 'COACH' }, 1],
+] as const)(
+  'filters in-house usage consistently: %j',
+  async (filters, sessions) => {
+    mocks.usages.mockResolvedValue([usage()])
+    const report = await getServiceIncome(
+      new Date('2026-11-01'),
+      new Date('2026-11-30'),
+      filters,
+    )
+    expect(report.inHouse.sessions).toBe(sessions)
+    if ('service' in filters && filters.service === 'INHOUSE')
+      expect(report.summary.totalAmount).toBe(0)
+  },
+)
+it('exports in-house customers and usage without treating package allocation as club revenue', async () => {
+  mocks.usages.mockResolvedValue([usage()])
+  const response = await request(`${valid}&service=INHOUSE`, 'ADMIN', true)
+  expect(response.status).toBe(200)
+  const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Pemakaian in-house'])).toEqual([
+    expect.objectContaining({
+      Pelanggan: 'Pemakai Paket',
+      Coach: 'Coach In-house',
+      Jam: 1,
+      'Nilai jasa / alokasi coach': 200000,
+    }),
+  ])
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([])
+})
+
+it('includes paid hourly in-house customers without a package and avoids duplicating package sessions', async () => {
+  mocks.hourly.mockResolvedValue([
+    {
+      id: 'hourly',
+      bookingId: 'hourly-booking',
+      price: 300000,
+      description: 'In-house satuan; 2 peserta',
+      slot: {
+        ...item('hourly', 0).slot,
+        staffId: 'hourly-coach',
+        staff: { id: 'hourly-coach', name: 'Coach Satuan' },
+      },
+      booking: {
+        user: { name: 'Pelanggan Satuan' },
+        invoice: { id: 'hourly-invoice', number: 'INV-HOURLY' },
+      },
+    },
+  ])
+  const report = await getServiceIncome(
+    new Date('2026-11-01'),
+    new Date('2026-11-30'),
+    { service: 'INHOUSE' },
+  )
+  expect(report.inHouse).toMatchObject({
+    sessions: 1,
+    hours: 1,
+    coachAmount: 300000,
+    extraAmount: 0,
+  })
+  expect(report.inHouse.rows[0]).toMatchObject({
+    customerName: 'Pelanggan Satuan',
+    packageName: 'Satuan',
+    participants: 2,
+    extraAmount: null,
+  })
+  expect(report.summary.totalAmount).toBe(0)
+  expect(mocks.hourly).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        inHouseUsage: { is: null },
+        status: 'CONFIRMED',
+        bookingCoachType: { name: 'Coaching In-house' },
+        booking: {
+          status: 'CONFIRMED',
+          purpose: 'REGULAR',
+          invoice: { is: { status: 'PAID' } },
+        },
+      }),
+    }),
+  )
 })

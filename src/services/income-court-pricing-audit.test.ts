@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({ invoices: vi.fn(), tariffs: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({
   db: {
     invoice: { findMany: mocks.invoices },
+    inHouseUsage: { findMany: async () => [] },
+    bookingCoach: { findMany: async () => [] },
     tariffPeriod: { findMany: mocks.tariffs },
   },
 }))

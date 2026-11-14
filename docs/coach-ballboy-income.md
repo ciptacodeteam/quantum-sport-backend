@@ -40,6 +40,26 @@ includes summary, club, staff, transactions and calculation definitions.
 
 No database migration is needed; existing booking/service snapshots are used.
 
+## In-house usage
+
+The separate in-house section and Excel sheet show customers, coaches, packages,
+session times, hours, participants, package coach allocation, and extra-participant
+charges. Paid hourly in-house bookings also appear as Satuan, with their recorded
+service price (including any participant surcharge). Participant counts for these
+rows follow the recorded session description; unavailable counts remain blank.
+The period follows session start time in WIB, so packages sold before the
+selected period still show their usage. Only active, unrestored usage from paid,
+undeleted wallets and confirmed regular coach bookings is included. Hourly rows
+require a paid booking invoice and exclude sessions linked to a package usage.
+Branch scoping
+is enforced by the existing Prisma client.
+
+These informational amounts do not increase club entitlements or recognize package
+revenue again. `service=INHOUSE` selects in-house usage only; `service=COACH` includes
+both coach categories in their separate sections. Staff filters apply to both;
+selecting a club excludes in-house usage. Search and pagination in the in-house
+table affect only its displayed rows; exports follow the report filters.
+
 ## Checks
 
 ```sh

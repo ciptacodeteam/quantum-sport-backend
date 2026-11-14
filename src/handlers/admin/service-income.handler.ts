@@ -14,7 +14,7 @@ export const serviceIncomeQuery = z
     endDate: z.iso.datetime(),
     clubId: z.string().min(1).max(200).optional(),
     staffId: z.string().min(1).max(200).optional(),
-    service: z.enum(['COACH', 'BALLBOY']).optional(),
+    service: z.enum(['COACH', 'BALLBOY', 'INHOUSE']).optional(),
   })
   .refine((q) => {
     const days = (+new Date(q.endDate) - +new Date(q.startDate)) / 86400000
@@ -103,7 +103,26 @@ export const serviceIncomeExportHandler = factory.createHandlers(
         'Hak club (100%)': row.amount,
       })),
     )
+    append(
+      'Pemakaian in-house',
+      report.inHouse.rows.map((row) => ({
+        Invoice: row.invoiceNumber,
+        Pelanggan: row.customerName,
+        Coach: row.staffName,
+        Paket: row.packageName,
+        'Mulai sesi (WIB)': row.startAt,
+        'Selesai sesi (WIB)': row.endAt,
+        Jam: row.hours,
+        Peserta: row.participants,
+        'Nilai jasa / alokasi coach': row.coachAmount,
+        'Biaya peserta tambahan paket': row.extraAmount,
+      })),
+    )
     append('Definisi', [
+      {
+        Keterangan:
+          'Pemakaian in-house berdasarkan tanggal sesi WIB, bukan tanggal pembayaran paket. Hanya pemakaian aktif dari paket lunas. Nilai alokasi paket dan biaya peserta tambahan ditampilkan sebagai informasi pemakaian, tidak ditambahkan ke hak club atau pendapatan baru.',
+      },
       {
         Keterangan:
           'Berdasarkan tanggal pembayaran WIB. Hanya invoice lunas, booking reguler terkonfirmasi dan jasa aktif. Hak 100% dari pembayaran jasa setelah alokasi promo; biaya lapangan dan biaya proses tidak termasuk. Potongan Coach Club hanya mengubah biaya lapangan, bukan tarif jasa. Coach in-house tidak termasuk hak club. Baris jasa batal dan invoice refund tidak dihitung. Club coach memakai catatan saat booking. Ballboy dan jasa tanpa catatan club masuk Tanpa Club. Coach yang ditandai Lunas ke Club tetap tampil dengan nominal Rp0 dan status Lunas, tanpa menambah pendapatan. Penanda lunas dicatat manual oleh Admin, Super Admin, atau Cashier.',
