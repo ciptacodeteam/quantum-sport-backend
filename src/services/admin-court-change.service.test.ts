@@ -41,6 +41,8 @@ const source = () => ({
     id: 'old',
     type: 'COURT',
     courtId: 'a',
+    price: 150000,
+    discountPrice: 120000,
     startAt: new Date('2030-01-02T10:00:00Z'),
     endAt: new Date('2030-01-02T11:00:00Z'),
     court: { id: 'a', name: 'Court A', sport: 'TENNIS' },
@@ -181,7 +183,7 @@ it.each(['10:30:00', '10:30:01', '11:00:00'])('blocks court changes at or after 
   ).rejects.toMatchObject({ status: 400 })
   expect(mocks.target).not.toHaveBeenCalled()
 })
-it.each(['10:00:00', '10:15:00', '10:29:59'])('allows options and court changes during the WIB grace period (%s)', async (time) => {
+it.each(['09:00:00', '10:00:00', '10:15:00', '10:29:59'])('allows options and court changes before the WIB cutoff (%s)', async (time) => {
   const evaluatedAt = new Date(`2030-01-02T${time}+07:00`)
   mocks.targets.mockResolvedValueOnce([target()]).mockResolvedValueOnce([])
   await expect(
@@ -213,6 +215,21 @@ it('rejects a price difference without touching the invoice or original slot', a
     .mockResolvedValue({ ...target(), discountPrice: 100000 })
   await expect(execute()).rejects.toMatchObject({ status: 400 })
   expect(mocks.slots).not.toHaveBeenCalled()
+})
+it('offers and moves to the same slot tariff when a coach bundle reduced the paid booking detail', async () => {
+  const detail = source()
+  mocks.detail.mockResolvedValue({ ...detail, discountPrice: 70000 })
+  mocks.targets.mockResolvedValueOnce([target()]).mockResolvedValueOnce([])
+  await expect(
+    getAdminCourtChangeOptions('cashier', 'cemara', 'detail', now),
+  ).resolves.toEqual([{ slotId: 'new', courtId: 'b', courtName: 'Court B' }])
+  await expect(
+    changeAdminCourt('cashier', 'cemara', 'detail', input, now),
+  ).resolves.toMatchObject({ slotId: 'new' })
+  expect(mocks.move).toHaveBeenCalledWith({
+    where: { id: 'detail', bookingId: 'booking', slotId: 'old' },
+    data: { slotId: 'new', courtId: 'b' },
+  })
 })
 it('does not release or move the original slot when another checkout wins the target', async () => {
   mocks.slots.mockResolvedValue({ count: 0 })

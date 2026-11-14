@@ -64,9 +64,11 @@ function samePrice(
   // Membership usage and invoice amounts stay attached to the original detail.
   if (detail.booking.membershipUserId && detail.discountPrice === 0)
     return target.price === detail.price
+  // Compare court tariffs. The paid detail can include coach bundle discounts
+  // that must remain attached to the booking when only its court changes.
   return (
     (target.discountPrice > 0 ? target.discountPrice : target.price) ===
-    (detail.discountPrice > 0 ? detail.discountPrice : detail.price)
+    (detail.slot.discountPrice > 0 ? detail.slot.discountPrice : detail.slot.price)
   )
 }
 
