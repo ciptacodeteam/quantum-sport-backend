@@ -16,6 +16,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { JAKARTA_TZ } from './config'
 import createApp from './lib/create-app'
 import adminAnalyticsRoute from './routes/admin/analytics.route'
+import adminMembershipMembersRoute from './routes/admin/membership-members.route'
 import adminAuthRoute from './routes/admin/auth.route'
 import adminBallboyRoute from './routes/admin/ballboy.route'
 import adminBallboyCostRoute from './routes/admin/ballboy-cost.route'
@@ -116,6 +117,7 @@ const adminRoutes = [
   adminBranchRoute,
   adminHomeRoute,
   adminAnalyticsRoute,
+  adminMembershipMembersRoute,
   adminAuthRoute,
   adminInventoryRoute,
   adminStaffRoute,
