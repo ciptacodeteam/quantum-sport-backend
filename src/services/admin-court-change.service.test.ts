@@ -171,31 +171,42 @@ it.each([
   await expect(execute()).rejects.toMatchObject({ status: 400 })
   expect(mocks.slots).not.toHaveBeenCalled()
 })
-it.each(['10:30:00', '10:30:01', '11:00:00'])('blocks court changes at or after the 30-minute WIB cutoff (%s)', async (time) => {
+it.each(['10:30:00', '10:30:01', '11:00:00'])(
+  'blocks court changes at or after the 30-minute WIB cutoff (%s)',
+  async (time) => {
+    await expect(
+      changeAdminCourt(
+        'admin',
+        'cemara',
+        'detail',
+        input,
+        new Date(`2030-01-02T${time}+07:00`),
+      ),
+    ).rejects.toMatchObject({ status: 400 })
+    expect(mocks.target).not.toHaveBeenCalled()
+  },
+)
+it.each(['09:00:00', '10:00:00', '10:15:00', '10:29:59'])(
+  'allows options and court changes before the WIB cutoff (%s)',
+  async (time) => {
+    const evaluatedAt = new Date(`2030-01-02T${time}+07:00`)
+    mocks.targets.mockResolvedValueOnce([target()]).mockResolvedValueOnce([])
+    await expect(
+      getAdminCourtChangeOptions('admin', 'cemara', 'detail', evaluatedAt),
+    ).resolves.toEqual([{ slotId: 'new', courtId: 'b', courtName: 'Court B' }])
+    await expect(
+      changeAdminCourt('admin', 'cemara', 'detail', input, evaluatedAt),
+    ).resolves.toMatchObject({ slotId: 'new' })
+  },
+)
+it('does not offer courts at the 30-minute WIB cutoff', async () => {
   await expect(
-    changeAdminCourt(
+    getAdminCourtChangeOptions(
       'admin',
       'cemara',
       'detail',
-      input,
-      new Date(`2030-01-02T${time}+07:00`),
+      new Date('2030-01-02T10:30:00+07:00'),
     ),
-  ).rejects.toMatchObject({ status: 400 })
-  expect(mocks.target).not.toHaveBeenCalled()
-})
-it.each(['09:00:00', '10:00:00', '10:15:00', '10:29:59'])('allows options and court changes before the WIB cutoff (%s)', async (time) => {
-  const evaluatedAt = new Date(`2030-01-02T${time}+07:00`)
-  mocks.targets.mockResolvedValueOnce([target()]).mockResolvedValueOnce([])
-  await expect(
-    getAdminCourtChangeOptions('admin', 'cemara', 'detail', evaluatedAt),
-  ).resolves.toEqual([{ slotId: 'new', courtId: 'b', courtName: 'Court B' }])
-  await expect(
-    changeAdminCourt('admin', 'cemara', 'detail', input, evaluatedAt),
-  ).resolves.toMatchObject({ slotId: 'new' })
-})
-it('does not offer courts at the 30-minute WIB cutoff', async () => {
-  await expect(
-    getAdminCourtChangeOptions('admin', 'cemara', 'detail', new Date('2030-01-02T10:30:00+07:00')),
   ).rejects.toMatchObject({ status: 400 })
   expect(mocks.targets).not.toHaveBeenCalled()
 })
@@ -292,8 +303,16 @@ it('lets an admin move a customer booking in the selected branch while locking t
   expect(audit).toMatchObject({
     actorId: 'admin',
     bookingId: 'booking',
-    from: { court: 'Court A', slotId: 'old', startAt: '2030-01-02T10:00:00+07:00' },
-    to: { court: 'Court B', slotId: 'new', startAt: '2030-01-02T10:00:00+07:00' },
+    from: {
+      court: 'Court A',
+      slotId: 'old',
+      startAt: '2030-01-02T10:00:00+07:00',
+    },
+    to: {
+      court: 'Court B',
+      slotId: 'new',
+      startAt: '2030-01-02T10:00:00+07:00',
+    },
   })
 })
 it('rejects an admin request for a booking outside the selected branch before writing', async () => {
@@ -312,4 +331,77 @@ it('offers admin court choices without requiring a customer login', async () => 
     id: 'detail',
     booking: { branchId: 'cemara' },
   })
+})
+
+it('moves a Training Coach reservation without an invoice or customer and keeps its charges at zero', async () => {
+  const detail = source()
+  mocks.detail.mockResolvedValue({
+    ...detail,
+    price: 0,
+    discountPrice: 0,
+    booking: {
+      ...detail.booking,
+      purpose: 'COACH_TRAINING',
+      userId: null,
+      invoice: null,
+      totalPrice: 0,
+    },
+  })
+  const differentTariff = { ...target(), price: 300000, discountPrice: 0 }
+  mocks.target
+    .mockReset()
+    .mockResolvedValueOnce(differentTariff)
+    .mockResolvedValue(null)
+  mocks.targets
+    .mockResolvedValueOnce([differentTariff])
+    .mockResolvedValueOnce([])
+  await expect(
+    getAdminCourtChangeOptions('cashier', 'cemara', 'detail', now),
+  ).resolves.toEqual([{ slotId: 'new', courtId: 'b', courtName: 'Court B' }])
+  await expect(
+    changeAdminCourt('cashier', 'cemara', 'detail', input, now),
+  ).resolves.toMatchObject({ slotId: 'new' })
+  expect(mocks.wallet).not.toHaveBeenCalled()
+  expect(mocks.move).toHaveBeenCalledWith({
+    where: { id: 'detail', bookingId: 'booking', slotId: 'old' },
+    data: { slotId: 'new', courtId: 'b' },
+  })
+  expect(mocks.booking).toHaveBeenCalledWith({
+    where: { id: 'booking' },
+    data: { adminNote: expect.any(String) },
+  })
+})
+it.each(['CANCELLED', 'HOLD'])(
+  'rejects %s Training Coach reservations',
+  async (status) => {
+    const detail = source()
+    mocks.detail.mockResolvedValue({
+      ...detail,
+      booking: {
+        ...detail.booking,
+        purpose: 'COACH_TRAINING',
+        status,
+        invoice: null,
+      },
+    })
+    await expect(execute()).rejects.toMatchObject({ status: 400 })
+    expect(mocks.slots).not.toHaveBeenCalled()
+  },
+)
+it('keeps the 30-minute cutoff for Training Coach moves', async () => {
+  const detail = source()
+  mocks.detail.mockResolvedValue({
+    ...detail,
+    booking: { ...detail.booking, purpose: 'COACH_TRAINING', invoice: null },
+  })
+  await expect(
+    changeAdminCourt(
+      'cashier',
+      'cemara',
+      'detail',
+      input,
+      new Date('2030-01-02T10:30:00+07:00'),
+    ),
+  ).rejects.toMatchObject({ status: 400 })
+  expect(mocks.slots).not.toHaveBeenCalled()
 })

@@ -23,13 +23,13 @@ const conflict = () =>
   })
 
 function assertMovable(detail: Detail, now: Date) {
-  if (
-    detail.booking.status !== 'CONFIRMED' ||
-    detail.booking.purpose !== 'REGULAR' ||
-    detail.booking.invoice?.status !== 'PAID'
-  )
+  const paidRegular =
+    detail.booking.purpose === 'REGULAR' &&
+    detail.booking.invoice?.status === 'PAID'
+  const training = detail.booking.purpose === 'COACH_TRAINING'
+  if (detail.booking.status !== 'CONFIRMED' || (!paidRegular && !training))
     throw new BadRequestException(
-      'Hanya booking reguler terkonfirmasi dan lunas yang dapat dipindahkan.',
+      'Pindah court tersedia untuk booking reguler yang lunas atau Training Coach, dengan status terkonfirmasi.',
     )
   if (detail.slot.startAt <= courtBookingCutoff(now))
     throw new BadRequestException(
@@ -61,6 +61,8 @@ function samePrice(
   detail: Detail,
   target: { price: number; discountPrice: number },
 ) {
+  // Training reservations have no invoice; moving courts keeps their zero charge.
+  if (detail.booking.purpose === 'COACH_TRAINING') return true
   // Membership usage and invoice amounts stay attached to the original detail.
   if (detail.booking.membershipUserId && detail.discountPrice === 0)
     return target.price === detail.price
@@ -68,7 +70,9 @@ function samePrice(
   // that must remain attached to the booking when only its court changes.
   return (
     (target.discountPrice > 0 ? target.discountPrice : target.price) ===
-    (detail.slot.discountPrice > 0 ? detail.slot.discountPrice : detail.slot.price)
+    (detail.slot.discountPrice > 0
+      ? detail.slot.discountPrice
+      : detail.slot.price)
   )
 }
 
@@ -149,7 +153,9 @@ async function changeCourt(
         })
         if (!target || !samePrice(detail, target))
           throw new BadRequestException(
-            'Pilih lapangan kosong pada cabang, olahraga, tanggal, jam, dan tarif yang sama.',
+            detail.booking.purpose === 'COACH_TRAINING'
+              ? 'Pilih lapangan kosong pada cabang, olahraga, tanggal, dan jam yang sama.'
+              : 'Pilih lapangan kosong pada cabang, olahraga, tanggal, jam, dan tarif yang sama.',
           )
         const overlap = await tx.slot.findFirst({
           where: {
