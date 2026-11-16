@@ -716,6 +716,11 @@ export const unbanUserHandler = factory.createHandlers(
 // Get customer details with active membership for checkout
 export const getCustomerMembershipDetailsHandler = factory.createHandlers(
   zValidator('param', idSchema, validateHook),
+  zValidator(
+    'query',
+    z.object({ sport: z.enum(['PADEL', 'TENNIS']).optional() }),
+    validateHook,
+  ),
   async (c) => {
     try {
       const { id } = c.req.valid('param') as IdSchema
@@ -728,11 +733,13 @@ export const getCustomerMembershipDetailsHandler = factory.createHandlers(
         throw new NotFoundException('User not found')
       }
 
-      // Find active membership
+      const { sport } = c.req.valid('query')
+      // Find active membership for the court category selected by the cashier.
       const now = new Date()
       const activeMembership = await db.membershipUser.findFirst({
         where: {
           userId: id,
+          ...(sport ? { membership: { sport } } : {}),
           isExpired: false,
           isSuspended: false,
           startDate: { lte: now }, // Membership must have started

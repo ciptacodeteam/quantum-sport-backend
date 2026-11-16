@@ -910,3 +910,48 @@ it('preserves a zero management court tariff through checkout and invoice creati
     expect.objectContaining({ data: expect.objectContaining({ total: 0 }) }),
   )
 })
+
+it.each([
+  ['PADEL', 'TENNIS'],
+  ['TENNIS', 'PADEL'],
+])(
+  'never debits a %s package for %s court slots',
+  async (packageSport, courtSport) => {
+    const [court] = await mocks.tx.slot.findMany({ where: { type: 'COURT' } })
+    court.court.sport = courtSport
+    mocks.tx.slot.findMany.mockResolvedValue([court])
+    mocks.payload.coachSlots = []
+    mocks.payload.useMembership = true
+    mocks.payload.expectedTotal = 150000
+    mocks.tx.membershipUser = {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          {
+            id: 'wrong-wallet',
+            remainingSessions: 78,
+            membership: { sport: packageSport, type: 'ALL_HOUR' },
+          },
+        ]),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    }
+    const json = await checkout('CASHIER')
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true }),
+      200,
+    )
+    expect(mocks.tx.membershipUser.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ membership: { sport: courtSport } }),
+      }),
+    )
+    expect(mocks.tx.membershipUser.update).not.toHaveBeenCalled()
+    expect(mocks.tx.membershipUser.updateMany).not.toHaveBeenCalled()
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: 150000 }),
+      }),
+    )
+  },
+)

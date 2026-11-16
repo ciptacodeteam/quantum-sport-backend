@@ -2,8 +2,17 @@ import { expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import { createFactory } from 'hono/factory'
 import type { AppEnv } from '@/types'
-const mocks = vi.hoisted(() => ({ findMany: vi.fn() }))
-vi.mock('@/lib/prisma', () => ({ db: { user: { findMany: mocks.findMany } } }))
+const mocks = vi.hoisted(() => ({
+  findMany: vi.fn(),
+  findUnique: vi.fn(),
+  membership: vi.fn(),
+}))
+vi.mock('@/lib/prisma', () => ({
+  db: {
+    user: { findMany: mocks.findMany, findUnique: mocks.findUnique },
+    membershipUser: { findFirst: mocks.membership },
+  },
+}))
 vi.mock('@/lib/create-app', () => ({ factory: createFactory<AppEnv>() }))
 vi.mock('@/services/password-reset.service', () => ({
   buildPasswordResetLink: vi.fn(),
@@ -13,7 +22,10 @@ vi.mock('@/services/upload.service', () => ({
   deleteFile: vi.fn(),
   uploadFile: vi.fn(),
 }))
-import { getAllUsersHandler } from './user.handler'
+import {
+  getAllUsersHandler,
+  getCustomerMembershipDetailsHandler,
+} from './user.handler'
 
 it('returns stored Management categories and validity dates for the customer table', async () => {
   const records = [
@@ -59,4 +71,63 @@ it('returns stored Management categories and validity dates for the customer tab
       managementValidUntil: null,
     },
   ])
+})
+
+it.each(['PADEL', 'TENNIS'])(
+  'returns only the selected %s membership when a customer owns both sports',
+  async (sport) => {
+    mocks.findUnique.mockResolvedValue({ id: 'customer', name: 'Pelanggan' })
+    const packs = ['PADEL', 'TENNIS'].map((category) => ({
+      id: `wallet-${category}`,
+      startDate: new Date('2026-01-01'),
+      endDate: new Date('2099-01-01'),
+      remainingSessions: 78,
+      remainingDuration: 30,
+      isExpired: false,
+      isSuspended: false,
+      membership: {
+        id: `pack-${category}`,
+        name: `Paket ${category}`,
+        price: 1000000,
+        sport: category,
+        type: 'ALL_HOUR',
+      },
+    }))
+    mocks.membership.mockImplementation(
+      async ({ where }) =>
+        packs.find(
+          (pack) =>
+            !where.membership?.sport ||
+            pack.membership.sport === where.membership.sport,
+        ) ?? null,
+    )
+    const app = new Hono<AppEnv>()
+    app.get('/customers/:id/membership', ...getCustomerMembershipDetailsHandler)
+    const response = await app.request(
+      `/customers/customer/membership?sport=${sport}`,
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      data: {
+        activeMembership: { id: `wallet-${sport}`, membership: { sport } },
+      },
+    })
+  },
+)
+it('does not return a padel package for a tennis-only membership request', async () => {
+  mocks.findUnique.mockResolvedValue({ id: 'customer', name: 'Pelanggan' })
+  mocks.membership.mockImplementation(async ({ where }) =>
+    where.membership?.sport === 'TENNIS'
+      ? null
+      : { id: 'padel', membership: { sport: 'PADEL' } },
+  )
+  const app = new Hono<AppEnv>()
+  app.get('/customers/:id/membership', ...getCustomerMembershipDetailsHandler)
+  const response = await app.request(
+    '/customers/customer/membership?sport=TENNIS',
+  )
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({
+    data: { activeMembership: null },
+  })
 })

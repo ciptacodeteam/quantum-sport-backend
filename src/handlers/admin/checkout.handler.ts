@@ -570,17 +570,19 @@ export const adminCheckoutHandler = factory.createHandlers(
           const membershipTariffRules = await getTariffPeriods(tx)
           activeMembership =
             activeMembershipCandidates.find((candidate) =>
-              slotData.every((slot) =>
-                isSlotAllowedForMembershipType(
-                  candidate.membership.type,
-                  slot.startAt,
-                  {
-                    rules: membershipTariffRules,
-                    branchId: slot.branchId,
-                    sport: slot.court?.sport,
-                    endAt: slot.endAt,
-                  },
-                ),
+              slotData.every(
+                (slot) =>
+                  candidate.membership.sport === slot.court?.sport &&
+                  isSlotAllowedForMembershipType(
+                    candidate.membership.type,
+                    slot.startAt,
+                    {
+                      rules: membershipTariffRules,
+                      branchId: slot.branchId,
+                      sport: slot.court?.sport,
+                      endAt: slot.endAt,
+                    },
+                  ),
               ),
             ) ?? null
 
