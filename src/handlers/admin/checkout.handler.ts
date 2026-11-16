@@ -1,4 +1,9 @@
 import { inHouseSelectionSchema } from '@/lib/inhouse-coaching'
+import {
+  managementInHouseRate,
+  type ManagementCustomer,
+} from '@/lib/management-pricing'
+import { resolveTariffPeriod } from '@/lib/tariff-period'
 import { redeemInHouseSelections } from '@/services/inhouse-coaching.service'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { assertCoachingSport } from '@/lib/coaching-policy'
@@ -369,6 +374,7 @@ export const adminCheckoutHandler = factory.createHandlers(
       const result = await db.$transaction(async (tx) => {
         // Resolve or create user
         let resolvedUserId = inputUserId
+        let managementCustomer: ManagementCustomer | null = null
         if (!resolvedUserId) {
           const formattedPhone = await formatPhone(phone!)
           // Try find by phone
@@ -395,11 +401,17 @@ export const adminCheckoutHandler = factory.createHandlers(
           // Validate provided userId exists
           const user = await tx.user.findUnique({
             where: { id: resolvedUserId },
-            select: { id: true },
+            select: {
+              id: true,
+              isManagement: true,
+              managementValidFrom: true,
+              managementValidUntil: true,
+            },
           })
           if (!user) {
             throw new NotFoundException('User not found')
           }
+          managementCustomer = user
         }
 
         await lockCustomerWallet(tx, resolvedUserId!)
@@ -490,6 +502,7 @@ export const adminCheckoutHandler = factory.createHandlers(
         let courtNormalPrice = 0
         let courtDiscountPrice = 0
         let courtCostCoveredByMembership = 0 // Track court costs covered by membership
+        const managementCourtSlotIds = new Set<string>()
         let selectedCourtSlots: Array<{
           id: string
           startAt: Date
@@ -595,10 +608,34 @@ export const adminCheckoutHandler = factory.createHandlers(
 
           for (const slot of slotData) {
             const normalPrice = slot.price
-            const discountedPrice =
+            const regularPrice =
               slot.discountPrice && slot.discountPrice > 0
                 ? slot.discountPrice
                 : slot.price
+            // In-house selections keep their own package/hourly pricing below.
+            const managementRate =
+              activeMembership ||
+              inHouseSelections?.some(
+                (choice) => choice.courtSlotId === slot.id,
+              )
+                ? null
+                : managementInHouseRate(
+                    managementCustomer,
+                    slot.startAt,
+                    resolveTariffPeriod(
+                      membershipTariffRules,
+                      slot.startAt,
+                      slot.branchId,
+                      slot.court?.sport ?? 'PADEL',
+                    ),
+                  )
+            const discountedPrice = managementRate
+              ? Math.round(
+                  managementRate.court *
+                    Math.max(0, (+slot.endAt - +slot.startAt) / 3600000),
+                )
+              : regularPrice
+            if (managementRate) managementCourtSlotIds.add(slot.id)
             courtNormalPrice += normalPrice
             courtDiscountPrice += discountedPrice
 
@@ -810,16 +847,6 @@ export const adminCheckoutHandler = factory.createHandlers(
 
         if (inHouseSelections?.length) {
           // Eligibility is read from the customer record, never from browser-supplied flags.
-          const managementCustomer = inputUserId
-            ? await tx.user.findUnique({
-                where: { id: inputUserId },
-                select: {
-                  isManagement: true,
-                  managementValidFrom: true,
-                  managementValidUntil: true,
-                },
-              })
-            : null
           const redemption = await redeemInHouseSelections(tx, {
             managementCustomer,
             selections: inHouseSelections,
@@ -853,6 +880,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             )
 
           for (const slot of selectedCourtSlots) {
+            if (managementCourtSlotIds.has(slot.id)) continue
             const rawDiscount = bundleDiscountByCourtSlot.get(slot.id) ?? 0
             if (rawDiscount <= 0) continue
 

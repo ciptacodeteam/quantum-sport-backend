@@ -646,6 +646,7 @@ it('loads Management eligibility from the database and records its court and coa
   expect(mocks.tx.user.findUnique).toHaveBeenCalledWith({
     where: { id: 'customer' },
     select: {
+      id: true,
       isManagement: true,
       managementValidFrom: true,
       managementValidUntil: true,
@@ -804,4 +805,108 @@ it('rejects unauthorized or unrelated coach settlement flags before creating a b
   await expect(checkout('ADMIN_VIEWER')).rejects.toThrow(/Admin/)
   mocks.payload.coachSettlements = [{ slotId: 'not-selected', isSettled: true }]
   await expect(checkout()).rejects.toThrow(/Status lunas/)
+})
+
+it.each(['ADMIN', 'CASHIER'])(
+  'charges the management court tariff without a coach for %s',
+  async (role) => {
+    mocks.payload.coachSlots = []
+    mocks.payload.expectedTotal = 100000
+    Object.assign(mocks.rules[0], {
+      managementCourtHourlyPrice: 100000,
+      managementCoachHourlyPrice: 0,
+    })
+    mocks.tx.user.findUnique.mockResolvedValue({
+      id: 'customer',
+      isManagement: true,
+    })
+    const json = await checkout(role)
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true }),
+      200,
+    )
+    expect(mocks.tx.bookingDetail.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ price: 150000, discountPrice: 100000 }),
+    })
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: 100000 }),
+      }),
+    )
+  },
+)
+it('does not subtract a club coach bundle discount from the fixed management court tariff', async () => {
+  Object.assign(mocks.rules[0], {
+    managementCourtHourlyPrice: 100000,
+    managementCoachHourlyPrice: 0,
+  })
+  mocks.tx.user.findUnique.mockResolvedValue({
+    id: 'customer',
+    isManagement: true,
+  })
+  mocks.payload.expectedTotal = 300000
+  const json = await checkout()
+  expect(json).toHaveBeenCalledWith(
+    expect.objectContaining({ success: true }),
+    200,
+  )
+  expect(mocks.tx.bookingDetail.update).not.toHaveBeenCalled()
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ total: 300000 }),
+    }),
+  )
+})
+it.each([
+  { isManagement: false },
+  {
+    isManagement: true,
+    managementValidUntil: new Date('2040-01-01T00:00:00Z'),
+  },
+  { isManagement: true, managementValidFrom: new Date('2040-01-03T00:00:00Z') },
+])(
+  'retains the regular court tariff outside management eligibility %j',
+  async (customer) => {
+    mocks.payload.coachSlots = []
+    Object.assign(mocks.rules[0], {
+      managementCourtHourlyPrice: 100000,
+      managementCoachHourlyPrice: 0,
+    })
+    mocks.tx.user.findUnique.mockResolvedValue({ id: 'customer', ...customer })
+    mocks.payload.expectedTotal = 150000
+    const json = await checkout()
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true }),
+      200,
+    )
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: 150000 }),
+      }),
+    )
+  },
+)
+
+it('preserves a zero management court tariff through checkout and invoice creation', async () => {
+  mocks.payload.coachSlots = []
+  mocks.payload.expectedTotal = 0
+  Object.assign(mocks.rules[0], {
+    managementCourtHourlyPrice: 0,
+    managementCoachHourlyPrice: 0,
+  })
+  mocks.tx.user.findUnique.mockResolvedValue({
+    id: 'customer',
+    isManagement: true,
+  })
+  const json = await checkout('CASHIER')
+  expect(json).toHaveBeenCalledWith(
+    expect.objectContaining({ success: true }),
+    200,
+  )
+  expect(mocks.tx.bookingDetail.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({ discountPrice: 0 }),
+  })
+  expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+    expect.objectContaining({ data: expect.objectContaining({ total: 0 }) }),
+  )
 })
