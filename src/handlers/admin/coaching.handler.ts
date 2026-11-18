@@ -1,3 +1,4 @@
+import { findCoachingCourt } from '@/lib/coaching-court'
 import { isInHouseService } from '@/lib/inhouse-coaching'
 import {
   coachingHistorySelect,
@@ -367,7 +368,11 @@ export const listCoachingBookingsHandler = factory.createHandlers(
   zValidator(
     'query',
     z
-      .object({ kind: z.enum(['COACH', 'BALLBOY']), ...bookingDateRangeFields })
+      .object({
+        kind: z.enum(['COACH', 'BALLBOY']),
+        coachingGroupId: z.string().min(1).optional(),
+        ...bookingDateRangeFields,
+      })
       .refine(validBookingDateRange, bookingDateRangeError),
     validateHook,
   ),
@@ -379,6 +384,17 @@ export const listCoachingBookingsHandler = factory.createHandlers(
       },
       booking: {
         include: {
+          details: {
+            select: {
+              slot: {
+                select: {
+                  startAt: true,
+                  endAt: true,
+                  court: { select: { name: true } },
+                },
+              },
+            },
+          },
           user: { select: { name: true, phone: true } },
           cashier: { select: { id: true, name: true } },
           invoice: {
@@ -405,7 +421,12 @@ export const listCoachingBookingsHandler = factory.createHandlers(
               bookingCoachType: true,
               inHouseUsage: { select: { id: true } },
             },
-            where,
+            where: {
+              ...where,
+              ...(query.coachingGroupId
+                ? { coachingGroupId: query.coachingGroupId }
+                : {}),
+            },
             orderBy: { createdAt: 'desc' },
             take: 500,
           })
@@ -437,13 +458,23 @@ export const listCoachingBookingsHandler = factory.createHandlers(
             : {}),
           cashier: item.booking.cashier,
           name: item.slot.staff?.name ?? '-',
+          coachingGroupId:
+            'coachingGroupId' in item ? item.coachingGroupId : null,
           coachingGroupName:
             'coachingGroupName' in item ? item.coachingGroupName : null,
           customer: item.booking.user?.name ?? 'Tanpa pelanggan',
           phone: item.booking.user?.phone ?? '',
           startAt: formatClubWallClock(item.slot.startAt),
           endAt: formatClubWallClock(item.slot.endAt),
-          court: item.courtSlot?.court?.name ?? '-',
+          court:
+            item.courtSlot?.court?.name ??
+            findCoachingCourt(
+              item.slot,
+              (item.booking.details ?? [])
+                .map((detail) => detail.slot)
+                .filter((slot) => slot.court !== null),
+            )?.court?.name ??
+            '-',
           price: item.price,
           status:
             item.status === 'CANCELLED' ? 'CANCELLED' : item.booking.status,

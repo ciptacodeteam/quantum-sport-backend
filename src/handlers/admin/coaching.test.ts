@@ -204,3 +204,82 @@ it.each(['COACH', 'BALLBOY'])(
     })
   },
 )
+
+it.each(['COACH', 'BALLBOY'])(
+  'recovers legacy %s courts by hour while preserving explicit links and ambiguous rows',
+  async (kind) => {
+    const slot = {
+      startAt: new Date('2026-11-25T17:00:00Z'),
+      endAt: new Date('2026-11-25T18:00:00Z'),
+      staff: { name: 'Coach' },
+    }
+    const court = { slot: { ...slot, court: { name: 'Court 7' } } }
+    const base = {
+      id: 'service',
+      bookingId: 'booking',
+      slot,
+      courtSlot: null,
+      status: 'CONFIRMED',
+      price: 0,
+      booking: { status: 'CONFIRMED', details: [court] },
+    }
+    const find = kind === 'COACH' ? mocks.coaches : mocks.ballboys
+    find.mockResolvedValue([
+      base,
+      { ...base, courtSlot: { court: { name: 'Court 1' } } },
+      { ...base, booking: { ...base.booking, details: [court, court] } },
+      { ...base, booking: { ...base.booking, details: [] } },
+      {
+        ...base,
+        booking: {
+          ...base.booking,
+          details: [
+            {
+              slot: { ...court.slot, endAt: new Date('2026-11-25T19:00:00Z') },
+            },
+          ],
+        },
+      },
+    ])
+    const response = await (listCoachingBookingsHandler.at(-1) as any)({
+      req: { valid: () => ({ kind }) },
+      json: (value: unknown) => value,
+    })
+    expect(response.data.map((row: any) => row.court)).toEqual([
+      'Court 7',
+      'Court 1',
+      '-',
+      '-',
+      '-',
+    ])
+    expect(find.mock.calls[0][0].include.booking.include.details).toBeDefined()
+  },
+)
+
+it('filters coach bookings by the saved club before the 500-row limit', async () => {
+  await (listCoachingBookingsHandler.at(-1) as any)({
+    req: {
+      valid: () => ({
+        kind: 'COACH',
+        coachingGroupId: 'club-a',
+        dateFrom: '2026-11-03',
+        dateTo: '2026-11-03',
+      }),
+    },
+    json: (value: unknown) => value,
+  })
+  expect(mocks.coaches).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: {
+        coachingGroupId: 'club-a',
+        slot: {
+          startAt: {
+            gte: new Date('2026-11-03T00:00:00Z'),
+            lt: new Date('2026-11-04T00:00:00Z'),
+          },
+        },
+      },
+      take: 500,
+    }),
+  )
+})

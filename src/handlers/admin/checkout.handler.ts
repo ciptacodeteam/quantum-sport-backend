@@ -1,3 +1,4 @@
+import { findCoachingCourt } from '@/lib/coaching-court'
 import { inHouseSelectionSchema } from '@/lib/inhouse-coaching'
 import {
   managementInHouseRate,
@@ -812,6 +813,7 @@ export const adminCheckoutHandler = factory.createHandlers(
             totalPrice += coachPrice
             await tx.bookingCoach.create({
               data: {
+                courtSlotId: findCoachingCourt(slot, selectedCourtSlots)?.id,
                 ...group,
                 bookingId: booking.id,
                 slotId: slot.id,

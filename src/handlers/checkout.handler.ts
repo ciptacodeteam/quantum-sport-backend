@@ -1,3 +1,4 @@
+import { findCoachingCourt } from '@/lib/coaching-court'
 import { clubNowAsWallDate } from '@/lib/club-time'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { getTariffPeriods } from '@/services/tariff-policy.service'
@@ -1003,6 +1004,7 @@ export const checkoutHandler = factory.createHandlers(
 
             await tx.bookingCoach.create({
               data: {
+                courtSlotId: findCoachingCourt(slot, selectedCourtSlots)?.id,
                 bookingId: booking.id,
                 slotId: slot.id,
                 bookingCoachTypeId: firstCoachType.id,

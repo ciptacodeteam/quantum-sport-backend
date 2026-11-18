@@ -955,3 +955,13 @@ it.each([
     )
   },
 )
+
+it('persists the matching court slot on a regular coach checkout', async () => {
+  await checkout()
+  expect(mocks.tx.bookingCoach.create).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      slotId: 'coach-slot',
+      courtSlotId: 'court-slot',
+    }),
+  })
+})
