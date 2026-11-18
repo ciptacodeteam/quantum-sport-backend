@@ -32,7 +32,7 @@ const item = (id: string, price: number, group = 'club-a') => ({
   coachingGroupId: group,
   coachingGroupName: group === 'club-a' ? 'Club A' : 'Club B',
   slot: {
-    staff: { id: `staff-${id}`, name: `Petugas ${id}` },
+    staff: { id: `staff-${id}`, name: `Petugas ${id}`, coachType: 'PADEL' },
     startAt: new Date('2026-11-10T12:00:00Z'),
     endAt: new Date('2026-11-10T13:00:00Z'),
   },
@@ -416,13 +416,14 @@ it('uses the current group for coach income recorded only in reschedule charges'
   mocks.coaches.mockResolvedValue([
     {
       id: 'staff-coach',
+      coachType: 'PADEL_TENNIS',
       coachingGroups: [{ group: { id: 'club-b', name: 'Club B' } }],
     },
   ])
   const report = await getServiceIncome(
     new Date('2026-11-01'),
     new Date('2026-11-30'),
-    { clubId: 'club-b' },
+    { clubId: 'club-b', coachType: 'PADEL_TENNIS' },
   )
   expect(report.rows).toEqual([
     expect.objectContaining({
@@ -685,7 +686,7 @@ const usage = () => ({
   extraAmount: 100000,
   wallet: {
     staffId: 'inhouse-coach',
-    staff: { name: 'Coach In-house' },
+    staff: { name: 'Coach In-house', coachType: 'PADEL' },
     user: { name: 'Pemakai Paket' },
     packageName: 'Paket 10 jam',
   },
@@ -822,4 +823,80 @@ it('includes paid hourly in-house customers without a package and avoids duplica
       }),
     }),
   )
+})
+
+it.each(['PADEL', 'TENNIS', 'PADEL_TENNIS'] as const)(
+  'filters exact coach types without mixing dual-sport coaches into %s',
+  (coachType) => {
+    const data = invoice()
+    data.booking.coaches = ['PADEL', 'TENNIS', 'PADEL_TENNIS'].map((type) => {
+      const coach = item(type, type === 'PADEL_TENNIS' ? 0 : 50000)
+      coach.slot.staff.coachType = type
+      return coach
+    })
+    data.booking.ballboys = []
+    const report = build([data], { coachType })
+    expect(report.rows.map((row) => row.id)).toEqual([`COACH:${coachType}`])
+    expect(report.summary.sessions).toBe(1)
+    expect(report.summary.totalAmount).toBe(
+      coachType === 'PADEL_TENNIS' ? 0 : 50000,
+    )
+  },
+)
+it.each(['PADEL', 'TENNIS', 'PADEL_TENNIS'] as const)(
+  'applies %s to in-house package and hourly sessions',
+  async (coachType) => {
+    mocks.usages.mockResolvedValue(
+      ['PADEL', 'TENNIS', 'PADEL_TENNIS'].map((type) => {
+        const row = usage()
+        row.id = type
+        row.wallet.staff.coachType = type
+        return row
+      }),
+    )
+    mocks.hourly.mockResolvedValue(
+      ['PADEL', 'TENNIS', 'PADEL_TENNIS'].map((type) => ({
+        id: type,
+        bookingId: 'booking',
+        price: 100000,
+        description: null,
+        slot: {
+          ...item(type, 0).slot,
+          staffId: type,
+          staff: { id: type, name: type, coachType: type },
+        },
+        booking: {
+          user: { name: 'Customer' },
+          invoice: { id: 'invoice', number: 'INV-1' },
+        },
+      })),
+    )
+    const report = await getServiceIncome(
+      new Date('2026-11-01'),
+      new Date('2026-11-30'),
+      { coachType },
+    )
+    expect(report.inHouse.rows.map((row) => row.id).sort()).toEqual(
+      [`HOURLY:${coachType}`, coachType].sort(),
+    )
+  },
+)
+it('exports only the selected dual-sport coach type', async () => {
+  const data = invoice()
+  data.booking.coaches[0].slot.staff.coachType = 'PADEL_TENNIS'
+  data.booking.coaches.push(item('padel', 50000))
+  const tennis = item('tennis', 50000)
+  tennis.slot.staff.coachType = 'TENNIS'
+  data.booking.coaches.push(tennis)
+  mocks.invoices.mockResolvedValue([data])
+  const response = await request(
+    `${valid}&coachType=PADEL_TENNIS&service=COACH`,
+    'ADMIN',
+    true,
+  )
+  expect(response.status).toBe(200)
+  const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([
+    expect.objectContaining({ Nama: 'Petugas coach' }),
+  ])
 })

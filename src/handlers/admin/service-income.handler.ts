@@ -15,6 +15,7 @@ export const serviceIncomeQuery = z
     clubId: z.string().min(1).max(200).optional(),
     staffId: z.string().min(1).max(200).optional(),
     service: z.enum(['COACH', 'BALLBOY', 'INHOUSE']).optional(),
+    coachType: z.enum(['PADEL', 'TENNIS', 'PADEL_TENNIS']).optional(),
   })
   .refine((q) => {
     const days = (+new Date(q.endDate) - +new Date(q.startDate)) / 86400000

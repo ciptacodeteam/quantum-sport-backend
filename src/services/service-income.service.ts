@@ -19,7 +19,11 @@ export const serviceIncomeInclude = {
         include: {
           bookingCoachType: true,
           inHouseUsage: true,
-          slot: { include: { staff: { select: { id: true, name: true } } } },
+          slot: {
+            include: {
+              staff: { select: { id: true, name: true, coachType: true } },
+            },
+          },
         },
       },
       ballboys: {
@@ -59,11 +63,13 @@ function incomeCoachClub(
   }
 }
 export type ServiceIncomeFilters = {
+  coachType?: 'PADEL' | 'TENNIS' | 'PADEL_TENNIS'
   clubId?: string
   staffId?: string
   service?: 'COACH' | 'BALLBOY' | 'INHOUSE'
 }
 export type ServiceIncomeRow = {
+  coachType: string | null
   id: string
   invoiceId: string
   invoiceNumber: string
@@ -122,6 +128,7 @@ export function buildServiceIncome(
   invoices: IncomeInvoice[],
   filters: ServiceIncomeFilters = {},
   currentCoachClubs?: CurrentCoachClubs,
+  currentCoachTypes?: Map<string, string | null>,
 ) {
   const allRows: ServiceIncomeRow[] = []
   for (const invoice of invoices) {
@@ -155,6 +162,12 @@ export function buildServiceIncome(
           branchName: invoice.branch.name,
           paidAt: invoice.paidAt,
           service: line.kind,
+          coachType:
+            line.kind === 'BALLBOY'
+              ? 'PADEL_TENNIS'
+              : line.staffId
+                ? (currentCoachTypes?.get(line.staffId) ?? null)
+                : null,
           staffId: line.staffId,
           staffName: line.staffName,
           ...(line.kind === 'COACH'
@@ -223,6 +236,10 @@ export function buildServiceIncome(
         branchName: invoice.branch.name,
         paidAt: invoice.paidAt!,
         service: item.service,
+        coachType:
+          item.service === 'BALLBOY'
+            ? 'PADEL_TENNIS'
+            : (item.slot.staff?.coachType ?? null),
         staffId: item.slot.staff?.id ?? null,
         staffName:
           item.slot.staff?.name ??
@@ -251,6 +268,7 @@ export function buildServiceIncome(
   }
   const rows = allRows.filter(
     (row) =>
+      (!filters.coachType || row.coachType === filters.coachType) &&
       (!filters.clubId ||
         (filters.clubId === 'unassigned'
           ? !row.clubId
@@ -386,7 +404,7 @@ export async function getServiceIncome(
       wallet: {
         include: {
           user: { select: { name: true } },
-          staff: { select: { id: true, name: true } },
+          staff: { select: { id: true, name: true, coachType: true } },
         },
       },
       bookingCoach: {
@@ -418,7 +436,11 @@ export async function getServiceIncome(
       },
     },
     include: {
-      slot: { include: { staff: { select: { id: true, name: true } } } },
+      slot: {
+        include: {
+          staff: { select: { id: true, name: true, coachType: true } },
+        },
+      },
       booking: {
         include: {
           user: { select: { name: true } },
@@ -442,6 +464,8 @@ export async function getServiceIncome(
             filters.service === 'COACH' ||
             filters.service === 'INHOUSE') &&
           !filters.clubId &&
+          (!filters.coachType ||
+            usage.wallet.staff.coachType === filters.coachType) &&
           (!filters.staffId || usage.wallet.staffId === filters.staffId),
       )
       .map((usage) => ({
@@ -467,6 +491,8 @@ export async function getServiceIncome(
             filters.service === 'COACH' ||
             filters.service === 'INHOUSE') &&
           !filters.clubId &&
+          (!filters.coachType ||
+            item.slot.staff?.coachType === filters.coachType) &&
           (!filters.staffId || item.slot.staffId === filters.staffId),
       )
       .map((item) => ({
@@ -533,6 +559,7 @@ export async function getServiceIncome(
         where: { id: { in: coachIds }, role: 'COACH' },
         select: {
           id: true,
+          coachType: true,
           coachingGroups: {
             select: { group: { select: { id: true, name: true } } },
           },
@@ -545,7 +572,15 @@ export async function getServiceIncome(
       coach.coachingGroups.map((membership) => membership.group),
     ]),
   )
-  const report = buildServiceIncome(invoices, filters, currentClubs)
+  const currentTypes = new Map(
+    currentCoaches.map((coach) => [coach.id, coach.coachType ?? null]),
+  )
+  const report = buildServiceIncome(
+    invoices,
+    filters,
+    currentClubs,
+    currentTypes,
+  )
   report.options.staff = [
     ...new Map(
       [
