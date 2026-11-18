@@ -7,6 +7,7 @@ vi.mock('@/lib/prisma', () => ({
     invoice: { findMany: mocks.invoices },
     inHouseUsage: { findMany: async () => [] },
     bookingCoach: { findMany: async () => [] },
+    staff: { findMany: async () => [] },
     tariffPeriod: { findMany: mocks.tariffs },
   },
 }))

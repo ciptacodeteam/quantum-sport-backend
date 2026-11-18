@@ -1,4 +1,8 @@
 import { isInHouseService } from '@/lib/inhouse-coaching'
+import {
+  coachingHistorySelect,
+  canDeleteCoachingProfile,
+} from '@/services/coaching-profile-lifecycle.service'
 import { setCoachClubSettlement } from '@/services/coach-club-settlement.service'
 import { validateCoachGroups } from '@/services/coaching-group.service'
 import {
@@ -68,10 +72,17 @@ const dateRange = z
 export const listCoachingHandler = factory.createHandlers(async (c) => {
   const items = await db.staff.findMany({
     where: { role: { in: ['COACH', 'BALLBOY'] } },
-    select: coachingSelect,
+    select: { ...coachingSelect, _count: { select: coachingHistorySelect } },
     orderBy: [{ role: 'asc' }, { name: 'asc' }],
   })
-  return c.json(ok(items))
+  return c.json(
+    ok(
+      items.map(({ _count, ...person }) => ({
+        ...person,
+        canDelete: canDeleteCoachingProfile(_count),
+      })),
+    ),
+  )
 })
 export const getCoachingHandler = factory.createHandlers(
   zValidator('param', params, validateHook),

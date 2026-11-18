@@ -1,4 +1,8 @@
 import { serviceRescheduleContext } from '@/services/service-reschedule-context.service'
+import {
+  setCoachingProfileActiveHandler,
+  deleteCoachingProfileHandler,
+} from '@/handlers/admin/coaching-profile-lifecycle.handler'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { validateHook } from '@/helpers/validate-hook'
@@ -80,5 +84,7 @@ export default createRouter()
   .patch('/slots/:id', requireAdmin, ...toggleCoachingSlotHandler)
   .get('/:id', read, ...getCoachingHandler)
   .put('/:id', requireAdmin, ...updateCoachingHandler)
+  .patch('/:id/status', requireAdmin, ...setCoachingProfileActiveHandler)
+  .delete('/:id', requireAdmin, ...deleteCoachingProfileHandler)
   .get('/:id/schedule', read, ...getCoachingScheduleHandler)
   .post('/:id/schedule', requireAdmin, ...saveCoachingScheduleHandler)

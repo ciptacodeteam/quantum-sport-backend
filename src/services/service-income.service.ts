@@ -34,6 +34,30 @@ export const serviceIncomeInclude = {
 type IncomeInvoice = Prisma.InvoiceGetPayload<{
   include: typeof serviceIncomeInclude
 }>
+type CoachClub = { id: string; name: string }
+type CurrentCoachClubs = Map<string, CoachClub[]>
+
+function incomeCoachClub(
+  staffId: string | null | undefined,
+  recordedId: string | null,
+  recordedName: string | null,
+  currentClubs?: CurrentCoachClubs,
+) {
+  const groups = staffId ? currentClubs?.get(staffId) : undefined
+  if (groups?.length === 1)
+    return { clubId: groups[0].id, clubName: groups[0].name }
+  if (groups?.length === 0) return { clubId: null, clubName: 'Tanpa Club' }
+  // Multiple memberships do not identify a unique recipient. Keep the recorded
+  // transaction attribution, using the current group name when still assigned.
+  const matched = groups?.find((group) => group.id === recordedId)
+  return {
+    clubId:
+      matched?.id ??
+      recordedId ??
+      (recordedName ? `archived:${recordedName}` : null),
+    clubName: matched?.name ?? recordedName ?? 'Tanpa Club',
+  }
+}
 export type ServiceIncomeFilters = {
   clubId?: string
   staffId?: string
@@ -97,6 +121,7 @@ export function allocateServicePayment(
 export function buildServiceIncome(
   invoices: IncomeInvoice[],
   filters: ServiceIncomeFilters = {},
+  currentCoachClubs?: CurrentCoachClubs,
 ) {
   const allRows: ServiceIncomeRow[] = []
   for (const invoice of invoices) {
@@ -132,8 +157,14 @@ export function buildServiceIncome(
           service: line.kind,
           staffId: line.staffId,
           staffName: line.staffName,
-          clubId: line.clubId,
-          clubName: line.clubName || 'Tanpa Club',
+          ...(line.kind === 'COACH'
+            ? incomeCoachClub(
+                line.staffId,
+                line.clubId,
+                line.clubName,
+                currentCoachClubs,
+              )
+            : { clubId: line.clubId, clubName: line.clubName || 'Tanpa Club' }),
           startAt: formatClubWallClock(new Date(line.startAt)),
           endAt: formatClubWallClock(new Date(line.endAt)),
           hours: 0,
@@ -198,10 +229,14 @@ export function buildServiceIncome(
           (item.service === 'COACH'
             ? 'Coach tidak tersedia'
             : 'Ballboy tidak tersedia'),
-        // Use the club captured on the booking, never today's coach membership.
-        clubId:
-          item.clubId ?? (item.clubName ? `archived:${item.clubName}` : null),
-        clubName: item.clubName || 'Tanpa Club',
+        ...(item.service === 'COACH'
+          ? incomeCoachClub(
+              item.slot.staff?.id,
+              item.clubId,
+              item.clubName,
+              currentCoachClubs,
+            )
+          : { clubId: null, clubName: 'Tanpa Club' }),
         startAt: formatClubWallClock(item.slot.startAt),
         endAt: formatClubWallClock(item.slot.endAt),
         hours: Math.max(0, (+item.slot.endAt - +item.slot.startAt) / 3600000),
@@ -477,7 +512,40 @@ export async function getServiceIncome(
     include: serviceIncomeInclude,
     orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
   })
-  const report = buildServiceIncome(invoices, filters)
+  // Resolve live memberships once for the whole report, including coach IDs
+  // stored only in reschedule charges. Booking/payment snapshots stay intact.
+  const coachIds = [
+    ...new Set(
+      invoices.flatMap((invoice) => [
+        ...(invoice.booking?.coaches ?? []).flatMap((coach) =>
+          coach.slot.staff?.id ? [coach.slot.staff.id] : [],
+        ),
+        ...(
+          readRescheduleCharge(invoice.payment?.meta)?.services ?? []
+        ).flatMap((line) =>
+          line.kind === 'COACH' && line.staffId ? [line.staffId] : [],
+        ),
+      ]),
+    ),
+  ]
+  const currentCoaches = coachIds.length
+    ? await db.staff.findMany({
+        where: { id: { in: coachIds }, role: 'COACH' },
+        select: {
+          id: true,
+          coachingGroups: {
+            select: { group: { select: { id: true, name: true } } },
+          },
+        },
+      })
+    : []
+  const currentClubs = new Map(
+    currentCoaches.map((coach) => [
+      coach.id,
+      coach.coachingGroups.map((membership) => membership.group),
+    ]),
+  )
+  const report = buildServiceIncome(invoices, filters, currentClubs)
   report.options.staff = [
     ...new Map(
       [

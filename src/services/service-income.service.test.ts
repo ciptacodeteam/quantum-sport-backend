@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => ({
   invoices: vi.fn(),
   usages: vi.fn(),
   hourly: vi.fn(),
+  coaches: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   db: {
     invoice: { findMany: mocks.invoices },
     inHouseUsage: { findMany: mocks.usages },
     bookingCoach: { findMany: mocks.hourly },
+    staff: { findMany: mocks.coaches },
   },
 }))
 import {
@@ -55,13 +57,22 @@ const invoice = () => ({
     ballboys: [item('ballboy', 50000)],
   },
 })
-const build = (data: unknown[], filters = {}) =>
-  buildServiceIncome(data as Parameters<typeof buildServiceIncome>[0], filters)
+const build = (
+  data: unknown[],
+  filters = {},
+  clubs?: Parameters<typeof buildServiceIncome>[2],
+) =>
+  buildServiceIncome(
+    data as Parameters<typeof buildServiceIncome>[0],
+    filters,
+    clubs,
+  )
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.invoices.mockResolvedValue([invoice()])
   mocks.usages.mockResolvedValue([])
   mocks.hourly.mockResolvedValue([])
+  mocks.coaches.mockResolvedValue([])
 })
 
 it('pays 100% of service income, excludes court and fees, and keeps ballboys unassigned', () => {
@@ -303,6 +314,130 @@ const request = (query: string, role?: string, exportFile = false) => {
   return app.request(`/report?${query}`)
 }
 const valid = 'startDate=2026-11-05T17:00:00Z&endDate=2026-11-06T16:59:59.999Z'
+it('moves historic income, zero-price sessions, filter options and Excel rows to the current coach group', async () => {
+  const data = invoice()
+  data.booking.coaches.push(item('free', 0))
+  mocks.invoices.mockResolvedValue([data])
+  mocks.coaches.mockResolvedValue(
+    ['staff-coach', 'staff-free'].map((id) => ({
+      id,
+      coachingGroups: [{ group: { id: 'club-b', name: 'Club B' } }],
+    })),
+  )
+  const report = await getServiceIncome(
+    new Date('2026-11-01'),
+    new Date('2026-11-30'),
+    { clubId: 'club-b' },
+  )
+  expect(report.rows).toHaveLength(2)
+  expect(
+    report.rows.every(
+      (row) => row.clubId === 'club-b' && row.clubName === 'Club B',
+    ),
+  ).toBe(true)
+  expect(report.summary).toMatchObject({ totalAmount: 150000, sessions: 2 })
+  expect(report.options.clubs).not.toContainEqual({
+    id: 'club-a',
+    name: 'Club A',
+  })
+  // The original booking remains an audit snapshot rather than being rewritten.
+  expect(data.booking.coaches[0].coachingGroupId).toBe('club-a')
+  const response = await request(
+    `${valid}&clubId=club-b&service=COACH`,
+    'ADMIN',
+    true,
+  )
+  const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
+  const rows = XLSX.utils.sheet_to_json(
+    book.Sheets['Detail transaksi'],
+  ) as any[]
+  expect(rows).toHaveLength(2)
+  expect(rows.every((row) => row.Club === 'Club B')).toBe(true)
+  expect(rows.reduce((sum, row) => sum + row['Hak club (100%)'], 0)).toBe(
+    150000,
+  )
+  const old = await getServiceIncome(
+    new Date('2026-11-01'),
+    new Date('2026-11-30'),
+    { clubId: 'club-a' },
+  )
+  expect(old.rows).toEqual([])
+})
+
+it('keeps recorded attribution for multiple memberships and treats an independent coach as unassigned', () => {
+  const data = invoice()
+  const clubs = new Map([
+    [
+      'staff-coach',
+      [
+        { id: 'club-a', name: 'Club A' },
+        { id: 'club-b', name: 'Club B' },
+      ],
+    ],
+  ])
+  expect(build([data], { service: 'COACH' }, clubs).rows[0].clubId).toBe(
+    'club-a',
+  )
+  expect(build([data], { service: 'COACH' }, clubs).summary.totalAmount).toBe(
+    150000,
+  )
+  clubs.set('staff-coach', [])
+  expect(
+    build([data], { service: 'COACH', clubId: 'unassigned' }, clubs).rows[0],
+  ).toMatchObject({ clubId: null, clubName: 'Tanpa Club' })
+})
+
+it('uses the current group for coach income recorded only in reschedule charges', async () => {
+  const data: any = invoice()
+  data.booking.coaches = []
+  data.booking.ballboys = []
+  data.payment = {
+    meta: {
+      source: 'ADMIN_COURT_RESCHEDULE',
+      detailId: 'detail',
+      courtBookingId: 'original',
+      courtAmount: 0,
+      services: [
+        {
+          serviceId: 'service',
+          kind: 'COACH',
+          amount: 50000,
+          staffId: 'staff-coach',
+          staffName: 'Petugas coach',
+          clubId: 'club-a',
+          clubName: 'Club A',
+          startAt: '2026-11-10T12:00:00Z',
+          endAt: '2026-11-10T13:00:00Z',
+        },
+      ],
+    },
+  }
+  mocks.invoices.mockResolvedValue([data])
+  mocks.coaches.mockResolvedValue([
+    {
+      id: 'staff-coach',
+      coachingGroups: [{ group: { id: 'club-b', name: 'Club B' } }],
+    },
+  ])
+  const report = await getServiceIncome(
+    new Date('2026-11-01'),
+    new Date('2026-11-30'),
+    { clubId: 'club-b' },
+  )
+  expect(report.rows).toEqual([
+    expect.objectContaining({
+      clubId: 'club-b',
+      clubName: 'Club B',
+      amount: 50000,
+      hours: 0,
+    }),
+  ])
+  expect(mocks.coaches).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: { id: { in: ['staff-coach'] }, role: 'COACH' },
+    }),
+  )
+})
 it('exports zero-price coach bookings for the selected club at zero income', async () => {
   mocks.invoices.mockResolvedValue([invoice(), zeroCoachInvoice()])
   const response = await request(
