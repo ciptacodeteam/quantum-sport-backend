@@ -6,4 +6,6 @@ ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementValidUntil" DATE;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementAssignedBy" TEXT;
 ALTER TABLE "tariff_periods" ADD COLUMN IF NOT EXISTS "managementCourtHourlyPrice" INTEGER;
 ALTER TABLE "tariff_periods" ADD COLUMN IF NOT EXISTS "managementCoachHourlyPrice" INTEGER;
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementCourtHourlyPrice" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementCoachHourlyPrice" INTEGER NOT NULL DEFAULT 0;
 COMMIT;

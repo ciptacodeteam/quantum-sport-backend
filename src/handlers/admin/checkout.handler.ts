@@ -4,7 +4,6 @@ import {
   managementInHouseRate,
   type ManagementCustomer,
 } from '@/lib/management-pricing'
-import { resolveTariffPeriod } from '@/lib/tariff-period'
 import { redeemInHouseSelections } from '@/services/inhouse-coaching.service'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
 import { assertCoachingSport } from '@/lib/coaching-policy'
@@ -407,6 +406,8 @@ export const adminCheckoutHandler = factory.createHandlers(
               isManagement: true,
               managementValidFrom: true,
               managementValidUntil: true,
+              managementCourtHourlyPrice: true,
+              managementCoachHourlyPrice: true,
             },
           })
           if (!user) {
@@ -622,23 +623,16 @@ export const adminCheckoutHandler = factory.createHandlers(
                 (choice) => choice.courtSlotId === slot.id,
               )
                 ? null
-                : managementInHouseRate(
-                    managementCustomer,
-                    slot.startAt,
-                    resolveTariffPeriod(
-                      membershipTariffRules,
-                      slot.startAt,
-                      slot.branchId,
-                      slot.court?.sport ?? 'PADEL',
-                    ),
+                : managementInHouseRate(managementCustomer, slot.startAt)
+            const discountedPrice =
+              managementRate?.court != null
+                ? Math.round(
+                    managementRate.court *
+                      Math.max(0, (+slot.endAt - +slot.startAt) / 3600000),
                   )
-            const discountedPrice = managementRate
-              ? Math.round(
-                  managementRate.court *
-                    Math.max(0, (+slot.endAt - +slot.startAt) / 3600000),
-                )
-              : regularPrice
-            if (managementRate) managementCourtSlotIds.add(slot.id)
+                : regularPrice
+            if (managementRate?.court != null)
+              managementCourtSlotIds.add(slot.id)
             courtNormalPrice += normalPrice
             courtDiscountPrice += discountedPrice
 

@@ -18,9 +18,12 @@ const date = z
   }, 'Tanggal tidak valid.')
   .nullable()
   .optional()
+const price = z.number().int().min(0).max(2147483647).optional()
 export const managementCustomerSchema = z
   .object({
     isManagement: z.boolean(),
+    managementCourtHourlyPrice: price,
+    managementCoachHourlyPrice: price,
     managementValidFrom: date,
     managementValidUntil: date,
   })
@@ -31,6 +34,12 @@ export const managementCustomerSchema = z
       !value.managementValidUntil ||
       value.managementValidFrom <= value.managementValidUntil,
     'Tanggal berakhir harus sama atau setelah tanggal mulai.',
+  )
+  .refine(
+    (value) =>
+      value.isManagement ||
+      !(value.managementCourtHourlyPrice || value.managementCoachHourlyPrice),
+    'Tarif khusus hanya untuk pelanggan Management.',
   )
 const createSchema = z
   .object({
@@ -52,6 +61,8 @@ const fields = (
     isManagement?: boolean
     managementValidFrom?: string | null
     managementValidUntil?: string | null
+    managementCourtHourlyPrice?: number
+    managementCoachHourlyPrice?: number
   },
   actor: string,
 ) => ({
@@ -62,6 +73,10 @@ const fields = (
   managementValidUntil: input.managementValidUntil
     ? new Date(`${input.managementValidUntil}T00:00:00Z`)
     : null,
+  managementCourtHourlyPrice:
+    input.isManagement === false ? 0 : input.managementCourtHourlyPrice,
+  managementCoachHourlyPrice:
+    input.isManagement === false ? 0 : input.managementCoachHourlyPrice,
   managementAssignedBy: actor,
 })
 export const createManagementCustomerHandler = factory.createHandlers(

@@ -888,6 +888,8 @@ it.each([1, 2])(
       managementCustomer: {
         isManagement: true,
         managementValidUntil: '2040-11-03',
+        managementCourtHourlyPrice: 200000,
+        managementCoachHourlyPrice: 600000,
       },
       selections: [
         {
@@ -926,7 +928,11 @@ it.each([1, 2])(
 it('keeps prepaid package terms even when a Management rate exists', async () => {
   const result = await redeemInHouseSelections(tx, {
     ...input(),
-    managementCustomer: { isManagement: true },
+    managementCustomer: {
+      isManagement: true,
+      managementCourtHourlyPrice: 1,
+      managementCoachHourlyPrice: 1,
+    },
     tariffRules: [
       {
         ...separateRule,
@@ -940,3 +946,64 @@ it('keeps prepaid package terms even when a Management rate exists', async () =>
     tx.bookingCoach.create.mock.calls[0][0].data.description,
   ).not.toContain('Management')
 })
+
+it.each([
+  [0, 0, 150000, 750000],
+  [200000, 0, 200000, 750000],
+  [0, 600000, 150000, 600000],
+  [200000, 600000, 200000, 600000],
+])(
+  'prices account court=%s coach=%s independently, with zero using normal rates',
+  async (courtRate, coachRate, courtDue, coachDue) => {
+    const coach = {
+      id: 'coach-slot',
+      staffId: 'andi',
+      branchId: 'cemara',
+      price: 750000,
+      ...range,
+      staff: {
+        isActive: true,
+        role: 'COACH',
+        coachType: 'PADEL',
+        isInHouseCoach: true,
+      },
+    }
+    tx.slot.findMany = vi.fn().mockResolvedValue([coach])
+    tx.slot.findFirst.mockResolvedValue(coach)
+    tx.bookingDetail.findFirst.mockResolvedValue({
+      id: 'detail',
+      slotId: 'court-slot',
+      discountPrice: 150000,
+      slot: { ...range, branchId: 'cemara', court: { sport: 'PADEL' } },
+    })
+    const result = await redeemInHouseSelections(tx, {
+      ...input(),
+      selections: [
+        {
+          staffId: 'andi',
+          courtSlotId: 'court-slot',
+          coachSlotId: 'coach-slot',
+          participants: 2,
+        },
+      ],
+      managementCustomer: {
+        isManagement: true,
+        managementCourtHourlyPrice: courtRate,
+        managementCoachHourlyPrice: coachRate,
+      },
+      tariffRules: [],
+    })
+    expect(result).toEqual({
+      coveredCourtAmount: 150000 - courtDue,
+      courtPriceAdjustment: 150000 - courtDue,
+      extraAmount: coachDue + 100000,
+    })
+    expect(tx.bookingDetail.update).toHaveBeenCalledWith({
+      where: { id: 'detail' },
+      data: { discountPrice: courtDue },
+    })
+    expect(tx.bookingCoach.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ price: coachDue + 100000 }),
+    })
+  },
+)

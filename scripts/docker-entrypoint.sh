@@ -111,6 +111,7 @@ FEATURE_PSQL_URL="$(bun -e '
 ')"
 for sql in \
   /app/prisma/tariff-periods.sql \
+  /app/prisma/management-customers.sql \
   /app/prisma/rolling-booking-window.sql \
   /app/prisma/recurring-bookings.sql \
   /app/prisma/membership-renewal.sql \

@@ -1,5 +1,4 @@
 import { managementInHouseRate } from '@/lib/management-pricing'
-import { resolveTariffPeriod } from '@/lib/tariff-period'
 import { readRescheduleCharge } from '@/lib/reschedule-charge'
 import { recordRescheduleCharge } from '@/services/reschedule-charge.service'
 import {
@@ -1124,12 +1123,6 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
           const managementRate = managementInHouseRate(
             bookingDetail.booking.user,
             newSlot.startAt,
-            resolveTariffPeriod(
-              rules,
-              newSlot.startAt,
-              bookingDetail.booking.branchId,
-              newSlot.court.sport,
-            ),
           )
           const serviceQuote = await rescheduleCourtServices(
             tx,
@@ -1140,7 +1133,7 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             {
               preview: true,
               previousCharges,
-              targetInHouseCoachPrice: managementRate?.coach,
+              targetInHouseCoachPrice: managementRate?.coach ?? undefined,
             },
           )
           const oldCashPrice =

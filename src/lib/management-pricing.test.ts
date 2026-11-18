@@ -1,57 +1,58 @@
 import { expect, it } from 'vitest'
 import { managementInHouseRate } from './management-pricing'
-import { tariffPeriodSchema } from './tariff-period'
-const tariff = {
+const prices = {
   managementCourtHourlyPrice: 200000,
   managementCoachHourlyPrice: 600000,
 }
 const customer = {
+  ...prices,
   isManagement: true,
   managementValidFrom: '2026-11-12',
   managementValidUntil: '2026-11-13',
 }
-it('uses inclusive playing dates for the approved customer only', () => {
+it('uses the account prices and inclusive playing dates', () => {
   expect(
-    managementInHouseRate(customer, new Date('2026-11-12T01:00:00Z'), tariff),
+    managementInHouseRate(customer, new Date('2026-11-12T01:00:00Z')),
   ).toEqual({ court: 200000, coach: 600000 })
-  expect(managementInHouseRate(customer, '2026-11-13', tariff)).not.toBeNull()
+  expect(managementInHouseRate(customer, '2026-11-13')).not.toBeNull()
   for (const date of ['2026-11-11', '2026-11-14'])
-    expect(managementInHouseRate(customer, date, tariff)).toBeNull()
-  expect(managementInHouseRate(undefined, '2026-11-12', tariff)).toBeNull()
+    expect(managementInHouseRate(customer, date)).toBeNull()
+  expect(managementInHouseRate(undefined, '2026-11-12')).toBeNull()
   expect(
-    managementInHouseRate({ isManagement: false }, '2026-11-12', tariff),
+    managementInHouseRate({ ...customer, isManagement: false }, '2026-11-12'),
   ).toBeNull()
-  expect(managementInHouseRate(customer, '2026-11-12', {})).toBeNull()
 })
-it('requires both tariff components while allowing explicit free components', () => {
-  const input = {
-    sport: 'PADEL',
-    effectiveFrom: '2026-11-12',
-    happyStart: 6,
-    happyEnd: 15,
-    peakStart: 15,
-    peakEnd: 24,
-  }
-  expect(tariffPeriodSchema.safeParse({ ...input, ...tariff }).success).toBe(
-    true,
-  )
+it('uses normal pricing independently for each zero or unset account price', () => {
+  expect(managementInHouseRate({ isManagement: true }, '2026-11-12')).toBeNull()
   expect(
-    tariffPeriodSchema.safeParse({
-      ...input,
-      managementCourtHourlyPrice: 200000,
-    }).success,
-  ).toBe(false)
+    managementInHouseRate(
+      { ...customer, managementCourtHourlyPrice: 0 },
+      '2026-11-12',
+    ),
+  ).toEqual({ court: null, coach: 600000 })
   expect(
-    tariffPeriodSchema.safeParse({
-      ...input,
-      managementCourtHourlyPrice: -1,
-      managementCoachHourlyPrice: 0,
-    }).success,
-  ).toBe(false)
+    managementInHouseRate(
+      { ...customer, managementCoachHourlyPrice: 0 },
+      '2026-11-12',
+    ),
+  ).toEqual({ court: 200000, coach: null })
   expect(
-    managementInHouseRate(customer, '2026-11-12', {
-      managementCourtHourlyPrice: 0,
-      managementCoachHourlyPrice: 0,
-    }),
-  ).toEqual({ court: 0, coach: 0 })
+    managementInHouseRate(
+      {
+        isManagement: true,
+        managementCourtHourlyPrice: 0,
+        managementCoachHourlyPrice: 0,
+      },
+      '2026-11-12',
+    ),
+  ).toBeNull()
+})
+it('keeps prices isolated between accounts instead of reading the legacy global tariff', () => {
+  expect(
+    managementInHouseRate(
+      { ...customer, managementCourtHourlyPrice: 120000 },
+      '2026-11-12',
+    )?.court,
+  ).toBe(120000)
+  expect(managementInHouseRate(customer, '2026-11-12')?.court).toBe(200000)
 })

@@ -2,7 +2,6 @@ import {
   managementInHouseRate,
   type ManagementCustomer,
 } from '@/lib/management-pricing'
-import { resolveTariffPeriod } from '@/lib/tariff-period'
 import type { Prisma } from '@prisma/client'
 import { db } from '@/lib/prisma'
 import { BadRequestException, NotFoundException } from '@/exceptions'
@@ -362,18 +361,9 @@ export async function redeemInHouseSelections(
     }
     const managementRate = prepaid
       ? null
-      : managementInHouseRate(
-          input.managementCustomer,
-          court.slot.startAt,
-          resolveTariffPeriod(
-            input.tariffRules ?? [],
-            court.slot.startAt,
-            court.slot.branchId,
-            court.slot.court?.sport ?? 'PADEL',
-          ),
-        )
+      : managementInHouseRate(input.managementCustomer, court.slot.startAt)
     const price = priceInHouseHour(
-      managementRate
+      managementRate?.coach != null
         ? { ...terms, hourlyPrice: managementRate.coach, courtHourlyShare: 0 }
         : terms,
       selection.participants,
@@ -398,7 +388,7 @@ export async function redeemInHouseSelections(
         : Math.max(0, court.discountPrice - discount))
     const coachDue = prepaid
       ? 0
-      : fixedCourtPrice !== null
+      : managementRate?.coach != null || fixedCourtPrice !== null
         ? price.coachAmount
         : discount === null
           ? terms.hourlyPrice

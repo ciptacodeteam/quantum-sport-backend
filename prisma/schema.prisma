@@ -125,6 +125,8 @@ enum NotificationType {
 // ------------------------------
 model User {
   isManagement Boolean @default(false)
+  managementCourtHourlyPrice Int @default(0)
+  managementCoachHourlyPrice Int @default(0)
   managementValidFrom DateTime? @db.Date
   managementValidUntil DateTime? @db.Date
   managementAssignedBy String?

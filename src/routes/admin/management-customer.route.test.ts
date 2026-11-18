@@ -109,3 +109,30 @@ it('rejects invalid or reversed dates, duplicate phone and privilege fields', as
   expect((await request('ADMIN')).status).toBe(400)
   expect(mocks.create).not.toHaveBeenCalled()
 })
+
+it('saves account prices only for a Management classification and validates rupiah values', async () => {
+  mocks.find.mockResolvedValue({ id: 'user-1' })
+  const prices = {
+    managementCourtHourlyPrice: 100000,
+    managementCoachHourlyPrice: 0,
+  }
+  expect(
+    (await request('ADMIN', 'PUT', { isManagement: true, ...prices })).status,
+  ).toBe(200)
+  expect(mocks.update).toHaveBeenCalledWith({
+    where: { id: 'user-1' },
+    data: expect.objectContaining(prices),
+  })
+  for (const body of [
+    { isManagement: false, ...prices },
+    { isManagement: true, managementCourtHourlyPrice: -1 },
+    { isManagement: true, managementCoachHourlyPrice: 0.5 },
+    { isManagement: true, managementCourtHourlyPrice: 2147483648 },
+  ])
+    expect((await request('ADMIN', 'PUT', body)).status).toBe(422)
+  mocks.update.mockClear()
+  expect(
+    (await request('CASHIER', 'PUT', { isManagement: true, ...prices })).status,
+  ).toBe(403)
+  expect(mocks.update).not.toHaveBeenCalled()
+})
