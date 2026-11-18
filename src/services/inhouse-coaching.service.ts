@@ -101,7 +101,8 @@ export async function sellInHousePlan(
       if (!/^\+\d{5,15}$/.test(phone))
         throw new BadRequestException('Nomor WhatsApp tidak valid.')
       // Serialize walk-in creation by normalized phone, including simultaneous sales.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${phone}))`
+      // PostgreSQL returns void for this lock; Prisma can deserialize its text cast.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${phone}))::text AS locked`
       customer = await tx.user.findUnique({
         where: { phone },
         select: { id: true },

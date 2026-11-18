@@ -6,6 +6,7 @@ const run = url ? describe : describe.skip
 run('in-house coaching transactions', () => {
   const raw = new PrismaClient({ datasourceUrl: url })
   const prefix = `inhouse-${Date.now()}`
+  const customerPhone = `+6281${Date.now().toString().slice(-10)}`
   const branch = prefix,
     userId = `${prefix}-customer`,
     staffId = `${prefix}-andi`
@@ -23,7 +24,7 @@ run('in-house coaching transactions', () => {
       data: { id: branch, name: prefix, address: 'test' },
     })
     await raw.user.create({
-      data: { id: userId, name: 'Customer', phone: `${Date.now()}` },
+      data: { id: userId, name: 'Customer', phone: customerPhone },
     })
     await raw.staff.create({
       data: {
@@ -172,6 +173,28 @@ run('in-house coaching transactions', () => {
         })
       }),
     )
+  it('buys a walk-in package with a real PostgreSQL advisory lock and reuses the customer on retry', async () => {
+    const requestId = crypto.randomUUID()
+    const input = {
+      packageId: planId,
+      name: 'Walk-in Customer',
+      phone: customerPhone,
+      paymentMethodId,
+      requestId,
+    }
+    const first = await context(() => service.sellInHousePlan(input, 'cashier'))
+    const retry = await context(() => service.sellInHousePlan(input, 'cashier'))
+    expect(first.userId).toBe(userId)
+    expect(first.remainingMinutes).toBe(60)
+    expect(first.invoice?.status).toBe('PAID')
+    expect(retry.id).toBe(first.id)
+    expect(
+      await raw.inHouseWallet.count({ where: { saleRequestId: requestId } }),
+    ).toBe(1)
+    expect(
+      await raw.invoice.count({ where: { inHouseWalletId: first.id } }),
+    ).toBe(1)
+  })
   it('serializes concurrent sale retries into one paid invoice and one wallet', async () => {
     const [a, b] = await Promise.all([
       sale(`${prefix}-sale-retry`),
