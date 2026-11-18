@@ -1,4 +1,7 @@
-import { managementInHouseRate } from '@/lib/management-pricing'
+import {
+  managementInHouseRate,
+  managementCourtRate,
+} from '@/lib/management-pricing'
 import { readRescheduleCharge } from '@/lib/reschedule-charge'
 import { recordRescheduleCharge } from '@/services/reschedule-charge.service'
 import {
@@ -1124,6 +1127,11 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             bookingDetail.booking.user,
             newSlot.startAt,
           )
+          const managementBookingCourtRate = managementCourtRate(
+            bookingDetail.booking.user,
+            { ...newSlot, branchId: bookingDetail.booking.branchId },
+            rules,
+          )
           const serviceQuote = await rescheduleCourtServices(
             tx,
             bookingDetail.booking.id,
@@ -1155,6 +1163,12 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
                 rules,
               ) ??
               baseTarget
+          else if (managementBookingCourtRate != null)
+            targetCourtPrice = Math.round(
+              (managementBookingCourtRate *
+                (+newSlot.endAt - +newSlot.startAt)) /
+                3600000,
+            )
           else if (serviceQuote.hasClubCoach)
             targetCourtPrice = Math.max(
               0,

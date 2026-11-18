@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest'
-import { managementInHouseRate } from './management-pricing'
+import {
+  managementInHouseRate,
+  managementCourtRate,
+} from './management-pricing'
 const prices = {
   managementCourtHourlyPrice: 200000,
   managementCoachHourlyPrice: 600000,
@@ -15,7 +18,8 @@ it('uses the account prices and inclusive playing dates', () => {
     managementInHouseRate(customer, new Date('2026-11-12T01:00:00Z')),
   ).toEqual({ court: 200000, coach: 600000 })
   expect(managementInHouseRate(customer, '2026-11-13')).not.toBeNull()
-  for (const date of ['2026-11-11', '2026-11-14'])
+  expect(managementInHouseRate(customer, '2030-11-14')).not.toBeNull()
+  for (const date of ['2026-11-11'])
     expect(managementInHouseRate(customer, date)).toBeNull()
   expect(managementInHouseRate(undefined, '2026-11-12')).toBeNull()
   expect(
@@ -55,4 +59,94 @@ it('keeps prices isolated between accounts instead of reading the legacy global 
     )?.court,
   ).toBe(120000)
   expect(managementInHouseRate(customer, '2026-11-12')?.court).toBe(200000)
+})
+
+it.each([
+  ['PADEL', '10:00', 100000],
+  ['PADEL', '18:00', 150000],
+  ['TENNIS', '10:00', 80000],
+  ['TENNIS', '18:00', 120000],
+])(
+  'uses the standalone %s %s tariff independently of coaching',
+  (sport, time, expected) => {
+    const account = {
+      ...customer,
+      managementPadelHappyHourlyPrice: 100000,
+      managementPadelPeakHourlyPrice: 150000,
+      managementTennisHappyHourlyPrice: 80000,
+      managementTennisPeakHourlyPrice: 120000,
+    }
+    const startAt = new Date(`2026-11-16T${time}:00Z`)
+    const slot = {
+      startAt,
+      endAt: new Date(+startAt + 3600000),
+      branchId: 'cemara',
+      court: { sport },
+    }
+    expect(managementCourtRate(account, slot, [])).toBe(expected)
+    expect(managementInHouseRate(account, startAt)).toEqual({
+      court: 200000,
+      coach: 600000,
+    })
+    expect(
+      managementCourtRate({ ...account, isManagement: false }, slot, []),
+    ).toBeNull()
+    expect(
+      managementCourtRate(
+        { ...account, managementValidFrom: '2026-11-17' },
+        slot,
+        [],
+      ),
+    ).toBeNull()
+  },
+)
+it('resolves branch, sport, effective date and full-day tariff rules and ignores the removed end date', () => {
+  const account = {
+    ...customer,
+    managementPadelHappyHourlyPrice: 100000,
+    managementPadelPeakHourlyPrice: 150000,
+  }
+  const slot = {
+    startAt: new Date('2026-11-16T15:00:00Z'),
+    endAt: new Date('2026-11-16T16:00:00Z'),
+    branchId: 'cemara',
+    court: { sport: 'PADEL' },
+  }
+  const rule = {
+    branchId: 'cemara',
+    sport: 'PADEL',
+    effectiveFrom: '2026-11-01',
+    happyStart: 6,
+    happyEnd: 16,
+    peakStart: 16,
+    peakEnd: 24,
+  }
+  expect(managementCourtRate(account, slot, [rule])).toBe(100000)
+  expect(
+    managementCourtRate(account, slot, [{ ...rule, branchId: 'other' }]),
+  ).toBe(150000)
+  expect(
+    managementCourtRate(account, slot, [
+      { ...rule, effectiveFrom: '2026-12-01' },
+    ]),
+  ).toBe(150000)
+  expect(
+    managementCourtRate(
+      account,
+      {
+        ...slot,
+        startAt: new Date('2026-11-16T18:00:00Z'),
+        endAt: new Date('2026-11-16T19:00:00Z'),
+      },
+      [{ ...rule, happyAllDayDays: [1] }],
+    ),
+  ).toBe(100000)
+  expect(
+    managementCourtRate(
+      { ...account, managementPadelPeakHourlyPrice: 0 },
+      slot,
+      [],
+    ),
+  ).toBeNull()
+  expect(managementCourtRate(customer, slot, [])).toBeNull()
 })

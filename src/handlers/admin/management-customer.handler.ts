@@ -24,21 +24,25 @@ export const managementCustomerSchema = z
     isManagement: z.boolean(),
     managementCourtHourlyPrice: price,
     managementCoachHourlyPrice: price,
+    managementPadelHappyHourlyPrice: price,
+    managementPadelPeakHourlyPrice: price,
+    managementTennisHappyHourlyPrice: price,
+    managementTennisPeakHourlyPrice: price,
     managementValidFrom: date,
     managementValidUntil: date,
   })
   .strict()
   .refine(
     (value) =>
-      !value.managementValidFrom ||
-      !value.managementValidUntil ||
-      value.managementValidFrom <= value.managementValidUntil,
-    'Tanggal berakhir harus sama atau setelah tanggal mulai.',
-  )
-  .refine(
-    (value) =>
       value.isManagement ||
-      !(value.managementCourtHourlyPrice || value.managementCoachHourlyPrice),
+      !(
+        value.managementCourtHourlyPrice ||
+        value.managementCoachHourlyPrice ||
+        value.managementPadelHappyHourlyPrice ||
+        value.managementPadelPeakHourlyPrice ||
+        value.managementTennisHappyHourlyPrice ||
+        value.managementTennisPeakHourlyPrice
+      ),
     'Tarif khusus hanya untuk pelanggan Management.',
   )
 const createSchema = z
@@ -49,13 +53,6 @@ const createSchema = z
     managementValidUntil: date,
   })
   .strict()
-  .refine(
-    (value) =>
-      !value.managementValidFrom ||
-      !value.managementValidUntil ||
-      value.managementValidFrom <= value.managementValidUntil,
-    'Tanggal berakhir harus sama atau setelah tanggal mulai.',
-  )
 const fields = (
   input: {
     isManagement?: boolean
@@ -63,6 +60,10 @@ const fields = (
     managementValidUntil?: string | null
     managementCourtHourlyPrice?: number
     managementCoachHourlyPrice?: number
+    managementPadelHappyHourlyPrice?: number
+    managementPadelPeakHourlyPrice?: number
+    managementTennisHappyHourlyPrice?: number
+    managementTennisPeakHourlyPrice?: number
   },
   actor: string,
 ) => ({
@@ -70,13 +71,19 @@ const fields = (
   managementValidFrom: input.managementValidFrom
     ? new Date(`${input.managementValidFrom}T00:00:00Z`)
     : null,
-  managementValidUntil: input.managementValidUntil
-    ? new Date(`${input.managementValidUntil}T00:00:00Z`)
-    : null,
+  managementValidUntil: null,
   managementCourtHourlyPrice:
     input.isManagement === false ? 0 : input.managementCourtHourlyPrice,
   managementCoachHourlyPrice:
     input.isManagement === false ? 0 : input.managementCoachHourlyPrice,
+  managementPadelHappyHourlyPrice:
+    input.isManagement === false ? 0 : input.managementPadelHappyHourlyPrice,
+  managementPadelPeakHourlyPrice:
+    input.isManagement === false ? 0 : input.managementPadelPeakHourlyPrice,
+  managementTennisHappyHourlyPrice:
+    input.isManagement === false ? 0 : input.managementTennisHappyHourlyPrice,
+  managementTennisPeakHourlyPrice:
+    input.isManagement === false ? 0 : input.managementTennisPeakHourlyPrice,
   managementAssignedBy: actor,
 })
 export const createManagementCustomerHandler = factory.createHandlers(

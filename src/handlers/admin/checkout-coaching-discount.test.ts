@@ -654,6 +654,10 @@ it('loads Management eligibility from the database and records its court and coa
       managementValidUntil: true,
       managementCourtHourlyPrice: true,
       managementCoachHourlyPrice: true,
+      managementPadelHappyHourlyPrice: true,
+      managementPadelPeakHourlyPrice: true,
+      managementTennisHappyHourlyPrice: true,
+      managementTennisPeakHourlyPrice: true,
     },
   })
   expect(mocks.tx.booking.update).toHaveBeenCalledWith(
@@ -817,13 +821,13 @@ it.each(['ADMIN', 'CASHIER'])(
     mocks.payload.coachSlots = []
     mocks.payload.expectedTotal = 100000
     Object.assign(mocks.rules[0], {
-      managementCourtHourlyPrice: 100000,
+      managementPadelHappyHourlyPrice: 100000,
       managementCoachHourlyPrice: 0,
     })
     mocks.tx.user.findUnique.mockResolvedValue({
       id: 'customer',
       isManagement: true,
-      managementCourtHourlyPrice: 100000,
+      managementPadelHappyHourlyPrice: 100000,
     })
     const json = await checkout(role)
     expect(json).toHaveBeenCalledWith(
@@ -842,13 +846,13 @@ it.each(['ADMIN', 'CASHIER'])(
 )
 it('does not subtract a club coach bundle discount from the fixed management court tariff', async () => {
   Object.assign(mocks.rules[0], {
-    managementCourtHourlyPrice: 100000,
+    managementPadelHappyHourlyPrice: 100000,
     managementCoachHourlyPrice: 0,
   })
   mocks.tx.user.findUnique.mockResolvedValue({
     id: 'customer',
     isManagement: true,
-    managementCourtHourlyPrice: 100000,
+    managementPadelHappyHourlyPrice: 100000,
   })
   mocks.payload.expectedTotal = 300000
   const json = await checkout()
@@ -865,22 +869,18 @@ it('does not subtract a club coach bundle discount from the fixed management cou
 })
 it.each([
   { isManagement: false },
-  {
-    isManagement: true,
-    managementValidUntil: new Date('2040-01-01T00:00:00Z'),
-  },
   { isManagement: true, managementValidFrom: new Date('2040-01-03T00:00:00Z') },
 ])(
   'retains the regular court tariff outside management eligibility %j',
   async (customer) => {
     mocks.payload.coachSlots = []
     Object.assign(mocks.rules[0], {
-      managementCourtHourlyPrice: 100000,
+      managementPadelHappyHourlyPrice: 100000,
       managementCoachHourlyPrice: 0,
     })
     mocks.tx.user.findUnique.mockResolvedValue({
       id: 'customer',
-      managementCourtHourlyPrice: 100000,
+      managementPadelHappyHourlyPrice: 100000,
       managementCoachHourlyPrice: 0,
       ...customer,
     })
@@ -978,3 +978,48 @@ it('persists the matching court slot on a regular coach checkout', async () => {
     }),
   })
 })
+
+it.each([
+  ['PADEL', 10, 100000],
+  ['PADEL', 18, 150000],
+  ['TENNIS', 10, 80000],
+  ['TENNIS', 18, 120000],
+])(
+  'persists %s at hour %s using the standalone Happy/Peak price in the invoice',
+  async (sport, hour, expected) => {
+    const [court] = await mocks.tx.slot.findMany({ where: { type: 'COURT' } })
+    const startAt = new Date(
+      `2040-01-02T${String(hour).padStart(2, '0')}:00:00Z`,
+    )
+    mocks.tx.slot.findMany.mockResolvedValue([
+      {
+        ...court,
+        startAt,
+        endAt: new Date(+startAt + 3600000),
+        court: { sport },
+      },
+    ])
+    mocks.tx.user.findUnique.mockResolvedValue({
+      id: 'customer',
+      isManagement: true,
+      managementValidUntil: new Date('2020-01-01T00:00:00Z'),
+      managementCourtHourlyPrice: 1,
+      managementCoachHourlyPrice: 1,
+      managementPadelHappyHourlyPrice: 100000,
+      managementPadelPeakHourlyPrice: 150000,
+      managementTennisHappyHourlyPrice: 80000,
+      managementTennisPeakHourlyPrice: 120000,
+    })
+    mocks.payload.coachSlots = []
+    mocks.payload.expectedTotal = expected
+    await checkout('CASHIER')
+    expect(mocks.tx.bookingDetail.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ discountPrice: expected }),
+    })
+    expect(mocks.tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ total: expected }),
+      }),
+    )
+  },
+)

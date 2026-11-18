@@ -70,7 +70,7 @@ it.each(['ADMIN', 'SUPER_ADMIN'])(
         isManagement: true,
         source: 'ADMIN_CREATED',
         managementAssignedBy: 'actor',
-        managementValidUntil: new Date('2026-12-31T00:00:00Z'),
+        managementValidUntil: null,
       }),
     })
     mocks.find.mockResolvedValue({ id: 'user-1' })
@@ -98,10 +98,9 @@ it.each(['CASHIER', 'ADMIN_VIEWER', 'COACH', 'BALLBOY', undefined])(
     expect(mocks.update).not.toHaveBeenCalled()
   },
 )
-it('rejects invalid or reversed dates, duplicate phone and privilege fields', async () => {
+it('rejects invalid dates, duplicate phone and privilege fields', async () => {
   for (const payload of [
     { ...input, managementValidUntil: '2026-02-30' },
-    { ...input, managementValidUntil: '2026-10-01' },
     { ...input, role: 'SUPER_ADMIN' },
   ])
     expect((await request('ADMIN', 'POST', payload)).status).toBe(422)
@@ -135,4 +134,45 @@ it('saves account prices only for a Management classification and validates rupi
     (await request('CASHIER', 'PUT', { isManagement: true, ...prices })).status,
   ).toBe(403)
   expect(mocks.update).not.toHaveBeenCalled()
+})
+
+it('stores four standalone tariffs independently of coaching and clears the removed end date', async () => {
+  mocks.find.mockResolvedValue({ id: 'user-1' })
+  const prices = {
+    managementCourtHourlyPrice: 200000,
+    managementCoachHourlyPrice: 600000,
+    managementPadelHappyHourlyPrice: 100000,
+    managementPadelPeakHourlyPrice: 150000,
+    managementTennisHappyHourlyPrice: 80000,
+    managementTennisPeakHourlyPrice: 120000,
+  }
+  expect(
+    (
+      await request('ADMIN', 'PUT', {
+        isManagement: true,
+        ...prices,
+        managementValidUntil: '2020-01-01',
+      })
+    ).status,
+  ).toBe(200)
+  expect(mocks.update).toHaveBeenCalledWith({
+    where: { id: 'user-1' },
+    data: expect.objectContaining({ ...prices, managementValidUntil: null }),
+  })
+  for (const field of [
+    'managementPadelHappyHourlyPrice',
+    'managementPadelPeakHourlyPrice',
+    'managementTennisHappyHourlyPrice',
+    'managementTennisPeakHourlyPrice',
+  ]) {
+    for (const value of [-1, 0.5, 2147483648])
+      expect(
+        (await request('ADMIN', 'PUT', { isManagement: true, [field]: value }))
+          .status,
+      ).toBe(422)
+    expect(
+      (await request('ADMIN', 'PUT', { isManagement: false, [field]: 100000 }))
+        .status,
+    ).toBe(422)
+  }
 })

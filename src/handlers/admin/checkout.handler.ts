@@ -1,7 +1,7 @@
 import { findCoachingCourt } from '@/lib/coaching-court'
 import { inHouseSelectionSchema } from '@/lib/inhouse-coaching'
 import {
-  managementInHouseRate,
+  managementCourtRate,
   type ManagementCustomer,
 } from '@/lib/management-pricing'
 import { redeemInHouseSelections } from '@/services/inhouse-coaching.service'
@@ -408,6 +408,10 @@ export const adminCheckoutHandler = factory.createHandlers(
               managementValidUntil: true,
               managementCourtHourlyPrice: true,
               managementCoachHourlyPrice: true,
+              managementPadelHappyHourlyPrice: true,
+              managementPadelPeakHourlyPrice: true,
+              managementTennisHappyHourlyPrice: true,
+              managementTennisPeakHourlyPrice: true,
             },
           })
           if (!user) {
@@ -623,16 +627,19 @@ export const adminCheckoutHandler = factory.createHandlers(
                 (choice) => choice.courtSlotId === slot.id,
               )
                 ? null
-                : managementInHouseRate(managementCustomer, slot.startAt)
+                : managementCourtRate(
+                    managementCustomer,
+                    slot,
+                    membershipTariffRules,
+                  )
             const discountedPrice =
-              managementRate?.court != null
+              managementRate != null
                 ? Math.round(
-                    managementRate.court *
+                    managementRate *
                       Math.max(0, (+slot.endAt - +slot.startAt) / 3600000),
                   )
                 : regularPrice
-            if (managementRate?.court != null)
-              managementCourtSlotIds.add(slot.id)
+            if (managementRate != null) managementCourtSlotIds.add(slot.id)
             courtNormalPrice += normalPrice
             courtDiscountPrice += discountedPrice
 
