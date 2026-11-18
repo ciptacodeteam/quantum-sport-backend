@@ -27,12 +27,12 @@ const plan = {
   hourlyPrice: 900000,
   courtHourlyShare: 250000,
 }
-const sale = {
+const saleFields = {
   packageId: 'plan',
-  userId: 'customer',
   paymentMethodId: 'cash',
   requestId: '550e8400-e29b-41d4-a716-446655440000',
 }
+const sale = { ...saleFields, userId: 'customer' }
 function request(
   path: string,
   role?: string,
@@ -106,6 +106,27 @@ it('does not accept customer-provided prices or balances at sale', async () => {
   ).toBe(422)
   expect(mocks.sell).not.toHaveBeenCalled()
 })
+it('accepts walk-in names and phones without an existing customer ID', async () => {
+  const input = { ...saleFields, name: ' Budi ', phone: '081234567890' }
+  expect((await request('sales', 'CASHIER', input)).status).toBe(201)
+  expect(mocks.sell).toHaveBeenCalledWith({ ...input, name: 'Budi' }, 'actor')
+})
+it.each([
+  { name: 'Budi' },
+  { phone: '081234567890' },
+  { name: ' ', phone: '081234567890' },
+  { name: 'Budi', phone: 'abcde' },
+  { name: 'Budi', phone: '081234567890', userId: 'customer' },
+])(
+  'rejects incomplete or ambiguous walk-in customer details: %j',
+  async (customer) => {
+    expect(
+      (await request('sales', 'CASHIER', { ...saleFields, ...customer }))
+        .status,
+    ).toBe(422)
+    expect(mocks.sell).not.toHaveBeenCalled()
+  },
+)
 
 it.each(['ADMIN', 'SUPER_ADMIN', 'CASHIER'])(
   'allows %s to delete unused quota',

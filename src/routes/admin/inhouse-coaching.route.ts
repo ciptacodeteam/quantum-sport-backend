@@ -5,7 +5,7 @@ import { validateHook } from '@/helpers/validate-hook'
 import { z } from 'zod'
 import { db } from '@/lib/prisma'
 import { ok } from '@/lib/response'
-import { inHousePlanSchema } from '@/lib/inhouse-coaching'
+import { inHousePlanSchema, inHouseSaleSchema } from '@/lib/inhouse-coaching'
 import {
   saveInHousePlan,
   cancelUnusedInHouseWallet,
@@ -108,18 +108,7 @@ export default createRouter()
   .post(
     '/sales',
     sell,
-    zValidator(
-      'json',
-      z
-        .object({
-          packageId: z.string().min(1),
-          userId: z.string().min(1),
-          paymentMethodId: z.string().min(1),
-          requestId: z.string().uuid(),
-        })
-        .strict(),
-      validateHook,
-    ),
+    zValidator('json', inHouseSaleSchema, validateHook),
     async (c) =>
       c.json(
         ok(await sellInHousePlan(c.req.valid('json'), c.get('admin')!.id)),

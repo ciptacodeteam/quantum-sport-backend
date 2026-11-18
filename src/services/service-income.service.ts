@@ -167,7 +167,12 @@ export function buildServiceIncome(
     )
     services.forEach((item, index) => {
       const settled = item.service === 'COACH' && item.isClubSettled === true
-      if (item.status !== 'CONFIRMED' || (amounts[index] <= 0 && !settled))
+      // Zero-value coach bookings still belong in operational tracking and club
+      // filters. Keep their actual zero allocation without creating club income.
+      if (
+        item.status !== 'CONFIRMED' ||
+        (amounts[index] <= 0 && item.service !== 'COACH')
+      )
         return
       if (
         item.service === 'COACH' &&

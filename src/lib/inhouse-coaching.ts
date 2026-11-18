@@ -2,6 +2,27 @@ import { z } from 'zod'
 import { BadRequestException } from '@/exceptions'
 
 const money = z.number().int().min(0).max(100000000)
+const saleFields = {
+  packageId: z.string().min(1),
+  paymentMethodId: z.string().min(1),
+  requestId: z.string().uuid(),
+}
+export const inHouseSaleSchema = z.union([
+  z.object({ ...saleFields, userId: z.string().min(1) }).strict(),
+  z
+    .object({
+      ...saleFields,
+      name: z.string().trim().min(1).max(100),
+      phone: z
+        .string()
+        .trim()
+        .min(5)
+        .max(30)
+        .regex(/^[+\d\s()-]+$/),
+    })
+    .strict(),
+])
+export type InHouseSaleInput = z.infer<typeof inHouseSaleSchema>
 export const inHousePlanSchema = z
   .object({
     staffId: z.string().min(1),

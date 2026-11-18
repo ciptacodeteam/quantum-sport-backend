@@ -18,6 +18,7 @@ import {
 } from '@/handlers/admin/booking.handler'
 import { cancelBookingHandler } from '@/handlers/admin/booked-court.handler'
 import { createInternalCourtBookingHandler } from '@/handlers/admin/internal-court-booking.handler'
+import { updateBookingDescriptionHandler } from '@/handlers/admin/booking-description.handler'
 
 const adminBookingRoute = createRouter()
   .basePath('/bookings')
@@ -32,6 +33,7 @@ const adminBookingRoute = createRouter()
   .get('/recurring', ...listRecurringBookingsHandler)
   .put('/recurring/:id/stop', ...stopRecurringBookingHandler)
   .get('/:id', ...getBookingTransactionDetailHandler)
+  .put('/:id/description', ...updateBookingDescriptionHandler)
   .put('/:id/approve', ...approveBookingTransactionHandler)
   .put('/:id/cancel', requireAnyAdminRole(['ADMIN']), ...cancelBookingHandler)
   .put(

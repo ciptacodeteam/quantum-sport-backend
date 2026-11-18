@@ -11,8 +11,9 @@ import {
   INHOUSE_COACH_TYPE,
   priceInHouseHour,
   type InHouseSelection,
+  type InHouseSaleInput,
 } from '@/lib/inhouse-coaching'
-import { generateInvoiceNumber } from '@/lib/utils'
+import { generateInvoiceNumber, formatPhone } from '@/lib/utils'
 import { lockCustomerWallet } from './membership-renewal.service'
 import { claimSlotsAtomically } from './slot-claim.service'
 import { assertCoachingSport } from '@/lib/coaching-policy'
@@ -88,27 +89,44 @@ export async function cancelUnusedInHouseWallet(id: string, actorId: string) {
 }
 
 export async function sellInHousePlan(
-  input: {
-    packageId: string
-    userId: string
-    paymentMethodId: string
-    requestId: string
-  },
+  input: InHouseSaleInput,
   actorId: string,
 ) {
   return db.$transaction(async (tx) => {
-    const customer = await tx.user.findUnique({ where: { id: input.userId } })
+    let customer: { id: string } | null
+    if ('userId' in input) {
+      customer = await tx.user.findUnique({ where: { id: input.userId } })
+    } else {
+      const phone = await formatPhone(input.phone)
+      if (!/^\+\d{5,15}$/.test(phone))
+        throw new BadRequestException('Nomor WhatsApp tidak valid.')
+      // Serialize walk-in creation by normalized phone, including simultaneous sales.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${phone}))`
+      customer = await tx.user.findUnique({
+        where: { phone },
+        select: { id: true },
+      })
+      if (!customer) {
+        customer = await tx.user.create({
+          data: {
+            name: input.name.trim(),
+            phone,
+            password: null,
+            source: 'WALK_IN',
+          },
+          select: { id: true },
+        })
+      }
+    }
     if (!customer) throw new NotFoundException('Customer tidak ditemukan.')
-    await lockCustomerWallet(tx, input.userId)
+    const userId = customer.id
+    await lockCustomerWallet(tx, userId)
     const previous = await tx.inHouseWallet.findFirst({
       where: { saleRequestId: input.requestId },
       include: { invoice: true },
     })
     if (previous) {
-      if (
-        previous.userId !== input.userId ||
-        previous.packageId !== input.packageId
-      )
+      if (previous.userId !== userId || previous.packageId !== input.packageId)
         throw new BadRequestException('Referensi pembayaran telah dipakai.')
       if (previous.deletedAt)
         throw new BadRequestException(
@@ -147,7 +165,7 @@ export async function sellInHousePlan(
         branchId: plan.branchId,
         packageId: plan.id,
         staffId: plan.staffId,
-        userId: input.userId,
+        userId,
         saleRequestId: input.requestId,
         packageName: plan.name,
         totalMinutes: plan.hours * 60,
@@ -178,7 +196,7 @@ export async function sellInHousePlan(
     const invoice = await tx.invoice.create({
       data: {
         branchId: plan.branchId,
-        userId: input.userId,
+        userId,
         inHouseWalletId: wallet.id,
         paymentId: payment.id,
         number: await generateInvoiceNumber(),

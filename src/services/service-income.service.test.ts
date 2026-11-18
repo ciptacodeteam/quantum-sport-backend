@@ -136,11 +136,8 @@ it.each(['PENDING', 'REFUNDED', 'CANCELLED', 'EXPIRED'])(
     expect(build([{ ...invoice(), status }]).summary.totalAmount).toBe(0)
   },
 )
-it('excludes cancelled bookings, internal bookings, missing paid date and free services', () => {
+it('excludes cancelled bookings, internal bookings and missing paid date', () => {
   const original = invoice()
-  const free = invoice()
-  free.booking.coaches[0].price = 0
-  free.booking.ballboys[0].price = 0
   expect(
     build([
       { ...original, booking: { ...original.booking, status: 'CANCELLED' } },
@@ -149,9 +146,83 @@ it('excludes cancelled bookings, internal bookings, missing paid date and free s
         booking: { ...original.booking, purpose: 'COACH_TRAINING' },
       },
       { ...original, paidAt: null },
-      free,
     ]).rows,
   ).toEqual([])
+})
+
+const zeroCoachInvoice = () => {
+  const data = invoice()
+  data.total = 0
+  data.processingFee = 0
+  data.booking.totalPrice = 0
+  data.booking.coaches = [item('free-coach', 0, 'club-b')]
+  data.booking.ballboys = []
+  return data
+}
+
+it('shows zero-price coaches and their clubs without adding income', () => {
+  const report = build([zeroCoachInvoice()])
+  expect(report.rows).toEqual([
+    expect.objectContaining({
+      id: 'COACH:free-coach',
+      clubId: 'club-b',
+      clubName: 'Club B',
+      servicePrice: 0,
+      discount: 0,
+      amount: 0,
+      hours: 1,
+      isClubSettled: false,
+    }),
+  ])
+  expect(report.summary).toMatchObject({
+    totalAmount: 0,
+    coachAmount: 0,
+    sessions: 1,
+    clubCount: 1,
+  })
+  expect(report.clubs).toEqual([
+    expect.objectContaining({
+      id: 'club-b',
+      totalAmount: 0,
+      sessions: 1,
+      hours: 1,
+    }),
+  ])
+  expect(report.staff).toEqual([
+    expect.objectContaining({
+      name: 'Petugas free-coach',
+      amount: 0,
+      sessions: 1,
+    }),
+  ])
+  expect(report.options.clubs).toEqual([{ id: 'club-b', name: 'Club B' }])
+})
+
+it('filters zero-price coaches by recorded club and staff while keeping paid totals unchanged', () => {
+  const data = invoice()
+  data.booking.coaches.push(item('free-coach', 0, 'club-b'))
+  expect(build([data]).summary.totalAmount).toBe(200000)
+  const report = build([data], {
+    service: 'COACH',
+    clubId: 'club-b',
+    staffId: 'staff-free-coach',
+  })
+  expect(report.rows.map((row) => row.id)).toEqual(['COACH:free-coach'])
+  expect(report.summary).toMatchObject({ totalAmount: 0, sessions: 1 })
+  expect(report.options.clubs).toContainEqual({ id: 'club-a', name: 'Club A' })
+  expect(report.options.clubs).toContainEqual({ id: 'club-b', name: 'Club B' })
+  expect(build([data], { service: 'BALLBOY', clubId: 'club-b' }).rows).toEqual(
+    [],
+  )
+  expect(build([data], { staffId: 'other', clubId: 'club-b' }).rows).toEqual([])
+})
+
+it('excludes cancelled zero-price coaches and keeps free ballboy behavior unchanged', () => {
+  const data = zeroCoachInvoice()
+  data.booking.coaches[0].status = 'CANCELLED'
+  data.booking.ballboys = [item('free-ballboy', 0)]
+  expect(build([data]).rows).toEqual([])
+  expect(build([data]).options.clubs).toEqual([])
 })
 
 it('preserves the recorded club even after its record is removed', () => {
@@ -232,6 +303,32 @@ const request = (query: string, role?: string, exportFile = false) => {
   return app.request(`/report?${query}`)
 }
 const valid = 'startDate=2026-11-05T17:00:00Z&endDate=2026-11-06T16:59:59.999Z'
+it('exports zero-price coach bookings for the selected club at zero income', async () => {
+  mocks.invoices.mockResolvedValue([invoice(), zeroCoachInvoice()])
+  const response = await request(
+    `${valid}&clubId=club-b&service=COACH`,
+    'ADMIN',
+    true,
+  )
+  expect(response.status).toBe(200)
+  const book = XLSX.read(Buffer.from(await response.arrayBuffer()))
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Detail transaksi'])).toEqual([
+    expect.objectContaining({
+      Club: 'Club B',
+      Nama: 'Petugas free-coach',
+      'Biaya jasa': 0,
+      'Hak club (100%)': 0,
+    }),
+  ])
+  expect(XLSX.utils.sheet_to_json(book.Sheets['Per club'])).toEqual([
+    expect.objectContaining({
+      Club: 'Club B',
+      'Total hak': 0,
+      Sesi: 1,
+      Jam: 1,
+    }),
+  ])
+})
 it.each(['ADMIN', 'SUPER_ADMIN', 'ADMIN_VIEWER'])(
   'allows %s to read financial report',
   async (role) => {

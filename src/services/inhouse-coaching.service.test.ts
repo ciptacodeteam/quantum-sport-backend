@@ -11,7 +11,8 @@ vi.mock('./slot-claim.service', () => ({ claimSlotsAtomically: mocks.claim }))
 vi.mock('./membership-renewal.service', () => ({
   lockCustomerWallet: mocks.lock,
 }))
-vi.mock('@/lib/utils', () => ({
+vi.mock('@/lib/utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/utils')>()),
   generateInvoiceNumber: async () => 'INV-INHOUSE',
 }))
 import {
@@ -53,7 +54,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   tx = {
     $queryRaw: vi.fn(),
-    user: { findUnique: vi.fn().mockResolvedValue({ id: 'customer' }) },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'customer' }),
+      create: vi.fn().mockResolvedValue({ id: 'walkin' }),
+    },
     staff: {
       findFirst: vi.fn().mockResolvedValue({
         id: 'andi',
@@ -334,6 +338,57 @@ it('a retried sale does not issue another invoice or create more quota', async (
       )
     ).id,
   ).toBe('existing')
+  expect(tx.inHouseWallet.create).not.toHaveBeenCalled()
+  expect(tx.payment.create).not.toHaveBeenCalled()
+})
+it('creates a walk-in and sells quota in the same transaction with a normalized phone', async () => {
+  tx.user.findUnique.mockResolvedValue(null)
+  tx.inHouseWallet.findFirst.mockResolvedValue(null)
+  await sellInHousePlan(
+    {
+      name: 'Pelanggan Baru',
+      phone: '0812 3456 7890',
+      packageId: 'plan',
+      paymentMethodId: 'cash',
+      requestId: 'request',
+    },
+    'cashier',
+  )
+  expect(tx.user.create).toHaveBeenCalledWith({
+    data: {
+      name: 'Pelanggan Baru',
+      phone: '+6281234567890',
+      password: null,
+      source: 'WALK_IN',
+    },
+    select: { id: true },
+  })
+  expect(tx.inHouseWallet.create.mock.lastCall[0].data.userId).toBe('walkin')
+  expect(tx.invoice.create.mock.lastCall[0].data.userId).toBe('walkin')
+  expect(mocks.lock).toHaveBeenCalledWith(tx, 'walkin')
+})
+it('reuses an existing customer by normalized phone and keeps retries idempotent', async () => {
+  tx.inHouseWallet.findFirst.mockResolvedValue({
+    id: 'existing',
+    userId: 'customer',
+    packageId: 'plan',
+  })
+  const result = await sellInHousePlan(
+    {
+      name: 'Nama walk-in',
+      phone: '081234567890',
+      packageId: 'plan',
+      paymentMethodId: 'cash',
+      requestId: 'request',
+    },
+    'cashier',
+  )
+  expect(tx.user.findUnique).toHaveBeenCalledWith({
+    where: { phone: '+6281234567890' },
+    select: { id: true },
+  })
+  expect(tx.user.create).not.toHaveBeenCalled()
+  expect(result.id).toBe('existing')
   expect(tx.inHouseWallet.create).not.toHaveBeenCalled()
   expect(tx.payment.create).not.toHaveBeenCalled()
 })
