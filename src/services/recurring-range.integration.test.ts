@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db } from '@/lib/prisma'
 import dayjs, { toClubWallDate, clubWallDateString } from '@/lib/club-time'
@@ -76,6 +77,9 @@ run('weekly ranges, separate invoices and Jakarta usage time', () => {
     })
     await db.membershipUser.create({
       data: {
+        ...snapshotMembership(
+          await db.membership.findUniqueOrThrow({ where: { id: packId } }),
+        ),
         id: walletId,
         userId,
         membershipId: packId,

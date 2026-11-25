@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { branchScopedClient } from './branch-scope'
@@ -72,6 +73,11 @@ run('branch isolation against PostgreSQL', () => {
     })
     await raw.membershipUser.create({
       data: {
+        ...snapshotMembership(
+          await raw.membership.findUniqueOrThrow({
+            where: { id: membershipId },
+          }),
+        ),
         id: walletId,
         userId,
         membershipId,

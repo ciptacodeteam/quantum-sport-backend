@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import {
   paymentDeadline,
   PAYMENT_WINDOW_MINUTES,
@@ -98,6 +99,7 @@ export const membershipCheckoutHandler = factory.createHandlers(
           data: {
             userId: user.id,
             membershipId: membership.id,
+            ...snapshotMembership(membership),
             startDate,
             endDate,
             remainingSessions: membership.sessions,

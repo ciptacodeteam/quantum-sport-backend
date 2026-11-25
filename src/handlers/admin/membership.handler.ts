@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { applyPaidMembershipRenewal } from '@/services/membership-renewal.service'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -142,6 +143,33 @@ export const updateMembershipHandler = factory.createHandlers(
 
       if (!existingMembership) {
         throw new NotFoundException('Membership item not found')
+      }
+
+      const changesPurchaseTerms = [
+        'price',
+        'sessions',
+        'duration',
+        'type',
+      ].some(
+        (key) =>
+          membershipData[key as keyof UpdateMembershipSchema] !== undefined,
+      )
+      if (changesPurchaseTerms) {
+        const unresolved = await db.membershipUser.count({
+          where: {
+            membershipId: id,
+            OR: [
+              { purchasedPrice: null },
+              { purchasedSessions: null },
+              { purchasedDuration: null },
+              { purchasedType: null },
+            ],
+          },
+        })
+        if (unresolved > 0)
+          throw new BadRequestException(
+            'Ketentuan pembelian Value Pack lama perlu diverifikasi sebelum harga atau ketentuan paket diubah.',
+          )
       }
 
       if (Array.isArray(membershipData.benefits)) {
@@ -353,6 +381,7 @@ export const adminMembershipCheckoutHandler = factory.createHandlers(
           data: {
             userId: resolvedUserId!,
             membershipId: membership.id,
+            ...snapshotMembership(membership),
             startDate: membershipStart.toDate(),
             endDate: membershipEnd.toDate(),
             remainingSessions: membership.sessions,

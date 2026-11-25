@@ -8,6 +8,7 @@ const candidate = () => ({
   id: 'pack',
   userId: 'customer',
   remainingSessions: 10,
+  purchasedSessions: 10,
   debtSettledSessions: 0,
   membership: { sessions: 10 },
   invoice: { id: 'invoice', status: 'PAID', payment: { id: 'payment' } },
@@ -21,6 +22,9 @@ const candidate = () => ({
 })
 it('allows unused paid and pending purchases only', () => {
   expect(canCancelMembership(candidate())).toBe(true)
+  expect(
+    canCancelMembership({ ...candidate(), membership: { sessions: 100 } }),
+  ).toBe(true)
   expect(
     canCancelMembership({ ...candidate(), invoice: { status: 'PENDING' } }),
   ).toBe(true)

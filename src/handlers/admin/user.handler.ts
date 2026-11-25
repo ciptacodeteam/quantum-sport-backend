@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import { USER_PROFILE_SUBDIR } from '@/config'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
@@ -192,9 +193,10 @@ export const searchCustomersHandler = factory.createHandlers(
                 membership: {
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
-                  price: activeMembership.membership.price,
+                  price:
+                    membershipAtPurchase(activeMembership).membership.price,
                   sport: activeMembership.membership.sport,
-                  type: activeMembership.membership.type,
+                  type: membershipAtPurchase(activeMembership).membership.type,
                 },
               }
             : null, // Always include activeMembership field, set to null if no active membership
@@ -788,9 +790,10 @@ export const getCustomerMembershipDetailsHandler = factory.createHandlers(
                 membership: {
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
-                  price: activeMembership.membership.price,
+                  price:
+                    membershipAtPurchase(activeMembership).membership.price,
                   sport: activeMembership.membership.sport,
-                  type: activeMembership.membership.type,
+                  type: membershipAtPurchase(activeMembership).membership.type,
                 },
               }
             : null,

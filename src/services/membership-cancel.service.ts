@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import type { Prisma } from '@prisma/client'
 import { BadRequestException, NotFoundException } from '@/exceptions'
 import {
@@ -18,6 +19,7 @@ export const membershipCancellationInclude = {
 } satisfies Prisma.MembershipUserInclude
 
 type CancellationCandidate = {
+  purchasedSessions?: number | null
   remainingSessions: number
   debtSettledSessions: number
   membership: { sessions: number }
@@ -35,7 +37,7 @@ export function canCancelMembership(pack: CancellationCandidate) {
   return (
     !!pack.invoice &&
     ['PAID', 'PENDING'].includes(pack.invoice.status) &&
-    pack.remainingSessions === pack.membership.sessions &&
+    pack.remainingSessions === membershipAtPurchase(pack).membership.sessions &&
     pack.debtSettledSessions === 0 &&
     Object.values(pack._count).every((count) => count === 0)
   )

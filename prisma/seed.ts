@@ -1,3 +1,4 @@
+import { snapshotMembership } from '../src/lib/membership-purchase'
 import { PrismaClient } from '@prisma/client'
 import { hashPassword } from '../src/lib/password'
 import dayjs from 'dayjs'
@@ -1024,6 +1025,8 @@ async function seedMemberships(users: any[], paymentMethods: any[]) {
     data: {
       userId: users[0].id,
       membershipId: createdMemberships[1].id,
+      ...snapshotMembership(createdMemberships[1]),
+      purchasedPrice: 1000000,
       startDate: dayjs().subtract(10, 'days').toDate(),
       endDate: dayjs().add(50, 'days').toDate(),
       remainingSessions: 20,
@@ -1064,6 +1067,7 @@ async function seedMemberships(users: any[], paymentMethods: any[]) {
     data: {
       userId: users[1].id,
       membershipId: createdMemberships[0].id,
+      ...snapshotMembership(createdMemberships[0]),
       startDate: dayjs().subtract(60, 'days').toDate(),
       endDate: dayjs().subtract(30, 'days').toDate(),
       remainingSessions: 0,
@@ -1078,6 +1082,7 @@ async function seedMemberships(users: any[], paymentMethods: any[]) {
     data: {
       userId: users[2].id,
       membershipId: createdMemberships[2].id,
+      ...snapshotMembership(createdMemberships[2]),
       startDate: dayjs().subtract(20, 'days').toDate(),
       endDate: dayjs().add(70, 'days').toDate(),
       remainingSessions: 45,

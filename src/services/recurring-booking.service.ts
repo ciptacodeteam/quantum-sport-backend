@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import {
   lockCustomerWallet,
   withCustomerWallet,
@@ -240,7 +241,7 @@ async function extendRecurringBookingTx(
     horizon,
     series.weekdays,
     now,
-    membership.membership.type,
+    membershipAtPurchase(membership).membership.type,
   )
   for (const session of plan) {
     if (existingDates.has(session.date)) continue

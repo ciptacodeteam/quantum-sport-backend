@@ -1,3 +1,4 @@
+import { snapshotMembership } from '../src/lib/membership-purchase'
 import assert from 'node:assert/strict'
 import { PrismaClient, PaymentStatus } from '@prisma/client'
 import clubTime from '../src/lib/club-time'
@@ -76,6 +77,7 @@ async function main() {
           id,
           userId: user.id,
           membershipId: pack.id,
+          ...snapshotMembership(pack),
           startDate: start.toDate(),
           endDate: end.toDate(),
           remainingSessions: remaining,

@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 const url = process.env.TEST_BRANCH_DATABASE_URL
@@ -103,6 +104,11 @@ run('branch booking HTTP integration', () => {
     })
     await raw.membershipUser.create({
       data: {
+        ...snapshotMembership(
+          await raw.membership.findUniqueOrThrow({
+            where: { id: membershipId },
+          }),
+        ),
         id: wallet,
         membershipId,
         userId,

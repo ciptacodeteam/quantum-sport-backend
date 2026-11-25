@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import type { Prisma } from '@prisma/client'
 import {
   creditMembershipIncludingTransferredDebt,
@@ -38,6 +39,7 @@ type MembershipBookingTransaction = Partial<
     }) => Promise<{
       id: string
       remainingSessions: number
+      purchasedSessions?: number | null
       endDate: Date
       membership: {
         sessions: number
@@ -96,7 +98,12 @@ export async function restoreMembershipSessionsForCancelledBooking(
   // Hold expiry can refund a normal booking while a new package is being paid.
   if (tx.$queryRaw) {
     const walletTx = tx as unknown as Prisma.TransactionClient
-    const identity = await withCustomerWallet(() => walletTx.membershipUser.findUnique({ where: { id: booking.membershipUserId! }, select: { userId: true } }))
+    const identity = await withCustomerWallet(() =>
+      walletTx.membershipUser.findUnique({
+        where: { id: booking.membershipUserId! },
+        select: { userId: true },
+      }),
+    )
     if (identity) await lockCustomerWallet(walletTx, identity.userId)
   }
 
@@ -130,7 +137,7 @@ export async function restoreMembershipSessionsForCancelledBooking(
     sessionsToRestore,
     Math.max(
       0,
-      membershipUser.membership.sessions -
+      membershipAtPurchase(membershipUser).membership.sessions -
         membershipUser.remainingSessions +
         outstandingDebt,
     ),

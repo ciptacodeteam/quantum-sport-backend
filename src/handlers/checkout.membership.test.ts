@@ -68,6 +68,7 @@ let tx: any
 let booking: any
 const membership = {
   id: 'membership-user',
+  purchasedType: 'ALL_HOUR',
   remainingSessions: 5,
   membership: { type: 'ALL_HOUR', sport: 'PADEL' },
 }
@@ -424,6 +425,7 @@ it('checks package hours only on selected membership slots in a mixed order', as
   tx.membershipUser.findMany.mockResolvedValue([
     {
       ...membership,
+      purchasedType: 'HAPPY_HOUR',
       membership: { ...membership.membership, type: 'HAPPY_HOUR' },
     },
   ])
@@ -444,6 +446,7 @@ it('rejects out-of-hours membership slots before consuming quota or requesting p
   tx.membershipUser.findMany.mockResolvedValue([
     {
       ...membership,
+      purchasedType: 'HAPPY_HOUR',
       membership: { ...membership.membership, type: 'HAPPY_HOUR' },
     },
   ])
@@ -479,6 +482,7 @@ it('uses the effective branch tariff instead of the old 15:00 boundary at custom
   tx.membershipUser.findMany.mockResolvedValue([
     {
       ...membership,
+      purchasedType: 'HAPPY_HOUR',
       membership: { ...membership.membership, type: 'HAPPY_HOUR' },
     },
   ])
@@ -773,4 +777,19 @@ it('rejects a linked Padel ballboy whose hour does not match the court', async (
     }),
   ).rejects.toThrow('must match selected court booking times')
   expect(mocks.gateway.charge).not.toHaveBeenCalled()
+})
+
+it('keeps all-hour eligibility for an old pack when the catalogue switches to happy-hour', async () => {
+  tx.membershipUser.findMany.mockResolvedValue([
+    {
+      ...membership,
+      purchasedType: 'ALL_HOUR',
+      membership: { ...membership.membership, type: 'HAPPY_HOUR' },
+    },
+  ])
+  const response = await checkout({
+    courtSlots: ['court-slot'],
+    useMembership: true,
+  })
+  expect(response.data).toMatchObject({ status: 'CONFIRMED', total: 0 })
 })

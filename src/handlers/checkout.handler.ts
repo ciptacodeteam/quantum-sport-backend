@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import { findCoachingCourt } from '@/lib/coaching-court'
 import { clubNowAsWallDate } from '@/lib/club-time'
 import { priceCoachSessions } from '@/lib/coach-session-pricing'
@@ -829,7 +830,7 @@ export const checkoutHandler = factory.createHandlers(
               membershipCandidates.find((candidate) =>
                 membershipSlots.every((slot) =>
                   isSlotAllowedForMembershipType(
-                    candidate.membership.type,
+                    membershipAtPurchase(candidate).membership.type,
                     slot.startAt,
                     {
                       rules: membershipTariffRules,

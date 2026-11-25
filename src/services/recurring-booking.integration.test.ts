@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { adminCheckoutHandler } from '@/handlers/admin/checkout.handler'
 import { createRouter } from '@/lib/create-app'
@@ -50,6 +51,11 @@ run('recurring membership reservations against PostgreSQL', () => {
     })
     await db.membershipUser.create({
       data: {
+        ...snapshotMembership(
+          await db.membership.findUniqueOrThrow({
+            where: { id: membershipId },
+          }),
+        ),
         id: packId,
         userId,
         membershipId,

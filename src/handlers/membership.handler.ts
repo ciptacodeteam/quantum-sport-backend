@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import { NotFoundException } from '@/exceptions'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
@@ -117,9 +118,9 @@ export const getUserMembershipsHandler = factory.createHandlers(async (c) => {
     )
 
     const response = {
-      active: activeMemberships,
-      expired: expiredMemberships,
-      suspended: suspendedMemberships,
+      active: activeMemberships.map(membershipAtPurchase),
+      expired: expiredMemberships.map(membershipAtPurchase),
+      suspended: suspendedMemberships.map(membershipAtPurchase),
       total: userMemberships.length,
     }
 
@@ -192,10 +193,12 @@ export const getMyActiveMembershipHandler = factory.createHandlers(
                 membership: {
                   id: activeMembership.membership.id,
                   name: activeMembership.membership.name,
-                  price: activeMembership.membership.price,
-                  sessions: activeMembership.membership.sessions,
+                  price:
+                    membershipAtPurchase(activeMembership).membership.price,
+                  sessions:
+                    membershipAtPurchase(activeMembership).membership.sessions,
                   sport: activeMembership.membership.sport,
-                  type: activeMembership.membership.type,
+                  type: membershipAtPurchase(activeMembership).membership.type,
                 },
               }
             : null,

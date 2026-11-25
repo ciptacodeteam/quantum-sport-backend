@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import { db } from '@/lib/prisma'
 
 type PackageState = {
@@ -37,6 +38,9 @@ export async function getMembershipTracking(
     },
     orderBy: { createdAt: 'desc' },
     select: {
+      purchasedSessions: true,
+      purchasedDuration: true,
+      purchasedType: true,
       id: true,
       startDate: true,
       endDate: true,
@@ -154,9 +158,9 @@ export async function getMembershipTracking(
           id: pack.id,
           name: pack.membership.name,
           sport: pack.membership.sport,
-          type: pack.membership.type,
+          type: membershipAtPurchase(pack).membership.type,
           status: getTrackedPackageStatus(pack, now),
-          totalHours: pack.membership.sessions,
+          totalHours: membershipAtPurchase(pack).membership.sessions,
           remainingHours: pack.remainingSessions,
           debtSettledHours: pack.debtSettledSessions ?? 0,
           debtTransferredHours: (pack.debtsTransferred ?? []).reduce(

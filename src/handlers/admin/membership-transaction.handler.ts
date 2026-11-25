@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import {
   cancelUnusedMembership,
   canCancelMembership,
@@ -150,7 +151,7 @@ export const getAllMembershipTransactionsHandler = factory.createHandlers(
       return c.json(
         ok(
           membershipTransactions.map((pack) => ({
-            ...pack,
+            ...membershipAtPurchase(pack),
             canCancel: canCancelMembership(pack),
           })),
         ),
@@ -230,7 +231,7 @@ export const getMembershipTransactionDetailHandler = factory.createHandlers(
 
       return c.json(
         ok({
-          ...membershipTransaction,
+          ...membershipAtPurchase(membershipTransaction),
           canCancel: canCancelMembership(membershipTransaction),
         }),
         status.OK,
@@ -536,9 +537,12 @@ export const exportMembershipTransactionsToExcelHandler =
             'Membership Sport': transaction.membership.sport,
             'Membership Description':
               transaction.membership.description || 'N/A',
-            'Membership Price': transaction.membership.price,
-            'Total Sessions': transaction.membership.sessions,
-            'Duration (Days)': transaction.membership.duration,
+            'Membership Price':
+              membershipAtPurchase(transaction).membership.price,
+            'Total Sessions':
+              membershipAtPurchase(transaction).membership.sessions,
+            'Duration (Days)':
+              membershipAtPurchase(transaction).membership.duration,
             Benefits: benefits,
             'Start Date': dayjs(transaction.startDate).format('YYYY-MM-DD'),
             'End Date': dayjs(transaction.endDate).format('YYYY-MM-DD'),
@@ -554,7 +558,8 @@ export const exportMembershipTransactionsToExcelHandler =
             'Payment Method':
               transaction.invoice?.payment?.method.name || 'N/A',
             'Total Paid':
-              transaction.invoice?.total || transaction.membership.price,
+              transaction.invoice?.total ??
+              membershipAtPurchase(transaction).membership.price,
             'Created At': dayjs(transaction.createdAt).format(
               'YYYY-MM-DD HH:mm:ss',
             ),

@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import { findCoachingCourt } from '@/lib/coaching-court'
 import { inHouseSelectionSchema } from '@/lib/inhouse-coaching'
 import {
@@ -580,7 +581,7 @@ export const adminCheckoutHandler = factory.createHandlers(
                 (slot) =>
                   candidate.membership.sport === slot.court?.sport &&
                   isSlotAllowedForMembershipType(
-                    candidate.membership.type,
+                    membershipAtPurchase(candidate).membership.type,
                     slot.startAt,
                     {
                       rules: membershipTariffRules,

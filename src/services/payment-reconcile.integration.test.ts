@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient, type Inventory } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -54,6 +55,11 @@ run('late payment resource recovery against PostgreSQL', () => {
   async function fixture(quantities: number[], remainingSessions = 5) {
     const wallet = await db.membershipUser.create({
       data: {
+        ...snapshotMembership(
+          await db.membership.findUniqueOrThrow({
+            where: { id: membershipId },
+          }),
+        ),
         userId,
         membershipId,
         startDate: new Date(),

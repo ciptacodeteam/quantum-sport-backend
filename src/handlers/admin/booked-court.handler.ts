@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import {
   managementInHouseRate,
   managementCourtRate,
@@ -1077,7 +1078,8 @@ export const rescheduleCourtBookingHandler = factory.createHandlers(
             usesMembership &&
             (!bookingDetail.booking.membershipUser ||
               !isSlotAllowedForMembershipType(
-                bookingDetail.booking.membershipUser.membership.type,
+                membershipAtPurchase(bookingDetail.booking.membershipUser)
+                  .membership.type,
                 newSlot.startAt,
                 {
                   rules: membershipTariffRules,

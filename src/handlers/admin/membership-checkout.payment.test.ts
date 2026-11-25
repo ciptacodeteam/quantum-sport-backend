@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
+  count: vi.fn(),
+  update: vi.fn(),
   method: vi.fn(),
   payment: vi.fn(),
   invoice: vi.fn(),
@@ -11,13 +13,16 @@ vi.mock('@/lib/create-app', () => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   db: {
+    membershipUser: { count: mocks.count },
     membership: {
+      update: mocks.update,
       findUnique: async () => ({
         id: 'product',
         isActive: true,
         price: 100000,
         sessions: 10,
         duration: 30,
+        type: 'ALL_HOUR',
       }),
     },
     user: { findUnique: async () => ({ id: 'customer' }) },
@@ -31,7 +36,10 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/services/membership-renewal.service', () => ({
   applyPaidMembershipRenewal: async () => null,
 }))
-import { adminMembershipCheckoutHandler } from './membership.handler'
+import {
+  adminMembershipCheckoutHandler,
+  updateMembershipHandler,
+} from './membership.handler'
 const run = (paymentMethodId?: string) =>
   (adminMembershipCheckoutHandler.at(-1) as any)({
     get: () => ({ id: 'cashier' }),
@@ -85,6 +93,14 @@ it('rejects unavailable, inactive, or online payment IDs', async () => {
 })
 it('records the offline payment with cashier audit data and links it to the paid invoice', async () => {
   await run('cash')
+  expect(mocks.createPack).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      purchasedPrice: 100000,
+      purchasedSessions: 10,
+      purchasedDuration: 30,
+      purchasedType: 'ALL_HOUR',
+    }),
+  })
   expect(mocks.payment).toHaveBeenCalledWith({
     data: expect.objectContaining({
       paymentMethodId: 'cash',
@@ -106,4 +122,20 @@ it('records the offline payment with cashier audit data and links it to the paid
       total: 100000,
     }),
   })
+})
+
+it('blocks catalogue edits until unresolved original purchase terms are reconciled', async () => {
+  mocks.count.mockResolvedValue(1)
+  const context = {
+    req: {
+      valid: (part: string) =>
+        part === 'param' ? { id: 'product' } : { price: 12500000 },
+    },
+    var: { logger: { fatal: vi.fn() } },
+    json: vi.fn(),
+  }
+  await expect(
+    (updateMembershipHandler.at(-1) as any)(context),
+  ).rejects.toThrow('perlu diverifikasi')
+  expect(mocks.update).not.toHaveBeenCalled()
 })

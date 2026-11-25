@@ -190,7 +190,7 @@ it('limits creation-date hours to the selected court and includes the final WIB 
   })
 })
 
-it('allocates paid package purchase value and keeps cash revenue separate', async () => {
+it('keeps the original invoice value and purchased quota when catalogue price and quota change', async () => {
   mocks.bookings.mockResolvedValue([
     booking({
       membershipUserId: 'mu',
@@ -198,7 +198,8 @@ it('allocates paid package purchase value and keeps cash revenue separate', asyn
       totalPrice: 0,
       membershipUser: {
         membershipId: 'pack',
-        membership: { name: '50-hour', sessions: 50 },
+        purchasedSessions: 50,
+        membership: { name: '50-hour', sessions: 100, price: 12500000 },
         invoice: { status: 'PAID', total: 5100000, processingFee: 100000 },
       },
     }),
@@ -255,6 +256,7 @@ it('separates membership and regular details in the same booking without countin
       membershipUserId: 'mu',
       membershipUser: {
         membershipId: 'pack',
+        purchasedSessions: 50,
         membership: { name: 'Pack', sessions: 50 },
         invoice: { status: 'PAID', total: 5000000, processingFee: 0 },
       },
@@ -286,6 +288,7 @@ it('surfaces membership hours without a paid purchase instead of inventing a rat
       totalPrice: 0,
       membershipUser: {
         membershipId: 'pack',
+        purchasedSessions: 50,
         membership: { name: 'Pack', sessions: 50 },
         invoice: null,
       },
@@ -385,6 +388,7 @@ it('compares branches using playing location and weighted capacity, including cr
       totalPrice: 0,
       membershipUser: {
         membershipId: 'pack',
+        purchasedSessions: 50,
         membership: { name: '50-hour', sessions: 50 },
         invoice: {
           branchId: 'cemara',
@@ -448,6 +452,7 @@ it('excludes event and training reservations from every performance metric, cate
             courtDiscountPrice: 0,
             membershipUser: {
               membershipId: 'internal-pack',
+              purchasedSessions: 10,
               membership: { name: 'Internal pack', sessions: 10 },
               invoice: { status: 'PAID', total: 10000000, processingFee: 0 },
             },
@@ -509,3 +514,25 @@ it.each(['EVENT', 'COACH_TRAINING'] as const)(
     ).toBe(true)
   },
 )
+
+it('flags an unknown historical quota rather than valuing hours using the edited catalogue', async () => {
+  mocks.bookings.mockResolvedValue([
+    booking({
+      membershipUserId: 'mu',
+      courtDiscountPrice: 0,
+      totalPrice: 0,
+      membershipUser: {
+        membershipId: 'pack',
+        purchasedSessions: null,
+        membership: { name: 'Edited pack', sessions: 100, price: 12500000 },
+        invoice: { status: 'PAID', total: 10000000, processingFee: 0 },
+      },
+    }),
+  ])
+  const report = await getCourtPerformance('2026-10-01', '2026-10-01')
+  expect(report.summary).toMatchObject({
+    membershipHours: 1,
+    membershipAllocation: 0,
+    unvaluedMembershipHours: 1,
+  })
+})

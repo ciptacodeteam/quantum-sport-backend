@@ -1,3 +1,4 @@
+import { snapshotMembership } from '@/lib/membership-purchase'
 import { adminMembershipCheckoutHandler } from '@/handlers/admin/membership.handler'
 import { approveMembershipTransactionHandler } from '@/handlers/admin/membership-transaction.handler'
 import { createRouter } from '@/lib/create-app'
@@ -65,6 +66,11 @@ run('paid package renewal against PostgreSQL', () => {
     })
     await db.membershipUser.create({
       data: {
+        ...snapshotMembership(
+          await db.membership.findUniqueOrThrow({
+            where: { id: `${id}-product` },
+          }),
+        ),
         id,
         userId: owner,
         membershipId: `${id}-product`,

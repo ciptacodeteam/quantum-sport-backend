@@ -746,6 +746,10 @@ model MembershipBenefit {
 }
 
 model MembershipUser {
+  purchasedPrice    Int?
+  purchasedSessions Int?
+  purchasedDuration Int?
+  purchasedType     MembershipType?
   renewalAppliedAt DateTime?
   debtSettledSessions Int @default(0)
   debtsTransferred MembershipDebtTransfer[] @relation("DebtSource")

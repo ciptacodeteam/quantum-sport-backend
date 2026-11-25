@@ -281,7 +281,10 @@ it('rejects a target outside the membership package hours', async () => {
     booking: {
       ...detail.booking,
       membershipUserId: 'pack-user',
-      membershipUser: { membership: { type: 'HAPPY_HOUR' } },
+      membershipUser: {
+        purchasedType: 'HAPPY_HOUR',
+        membership: { type: 'HAPPY_HOUR' },
+      },
     },
   })
   mocks.slot.mockResolvedValue({
@@ -323,7 +326,10 @@ it('allows an eligible membership move without changing a paid invoice total', a
       courtDiscountPrice: 0,
       totalPrice: 0,
       invoice: { id: 'invoice', status: 'PAID', total: 0 },
-      membershipUser: { membership: { type: 'ALL_HOUR' } },
+      membershipUser: {
+        purchasedType: 'ALL_HOUR',
+        membership: { type: 'ALL_HOUR' },
+      },
     },
   })
   mocks.slot.mockResolvedValue({ ...target, price: 200000 })
@@ -332,10 +338,7 @@ it('allows an eligible membership move without changing a paid invoice total', a
   expect(result.body.data.updatedBooking.totalPrice).toBe(0)
 })
 
-it.each([
-  '2040-01-04T02:00:00+07:00',
-  '2040-01-05T02:29:59.999+07:00',
-])(
+it.each(['2040-01-04T02:00:00+07:00', '2040-01-05T02:29:59.999+07:00'])(
   'allows only super admin to bypass the original booking deadline at %s',
   async (now) => {
     setup('PADEL', 'PADEL')
@@ -351,7 +354,11 @@ it.each([
     }
   },
 )
-it.each(['2040-01-05T02:30:00+07:00', '2040-01-05T02:30:00.001+07:00', '2040-01-05T04:00:00+07:00'])(
+it.each([
+  '2040-01-05T02:30:00+07:00',
+  '2040-01-05T02:30:00.001+07:00',
+  '2040-01-05T04:00:00+07:00',
+])(
   'rejects super-admin rescheduling at or after 30 minutes at %s',
   async (now) => {
     setup('PADEL', 'PADEL')
@@ -390,7 +397,11 @@ it('still forbids a past replacement slot for super admin', async () => {
   setup('PADEL', 'PADEL')
   vi.useFakeTimers({ toFake: ['Date'] })
   const target = await mocks.slot()
-  mocks.slot.mockResolvedValue({ ...target, startAt: new Date('2040-01-04T01:00:00Z'), endAt: new Date('2040-01-04T02:00:00Z') })
+  mocks.slot.mockResolvedValue({
+    ...target,
+    startAt: new Date('2040-01-04T01:00:00Z'),
+    endAt: new Date('2040-01-04T02:00:00Z'),
+  })
   vi.setSystemTime(new Date('2040-01-05T02:29:00+07:00'))
   try {
     await expect(execute('SUPER_ADMIN')).rejects.toThrow('already passed')

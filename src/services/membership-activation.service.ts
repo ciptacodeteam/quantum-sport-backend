@@ -1,3 +1,4 @@
+import { membershipAtPurchase } from '@/lib/membership-purchase'
 import {
   applyPaidMembershipRenewal,
   lockCustomerWallet,
@@ -57,7 +58,7 @@ export async function activateMembershipAfterPayment(
     }
     const startDate = now
     const endDate = dayjs(now)
-      .add(membershipUser.membership.duration, 'days')
+      .add(membershipAtPurchase(membershipUser).membership.duration, 'days')
       .toDate()
 
     await tx.membershipUser.update({
@@ -65,7 +66,8 @@ export async function activateMembershipAfterPayment(
       data: {
         startDate,
         endDate,
-        remainingDuration: membershipUser.membership.duration,
+        remainingDuration:
+          membershipAtPurchase(membershipUser).membership.duration,
         isExpired: false,
         isSuspended: false,
         suspensionReason: null,

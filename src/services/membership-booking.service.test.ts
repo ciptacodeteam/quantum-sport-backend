@@ -8,26 +8,35 @@ function createTx(
   membershipUser: {
     id: string
     remainingSessions: number
+    purchasedSessions?: number
     endDate: Date
     membership: { sessions: number }
   } | null,
 ) {
   return {
     membershipUser: {
-      findUnique: vi.fn().mockResolvedValue(membershipUser),
+      findUnique: vi.fn().mockResolvedValue(
+        membershipUser && {
+          ...membershipUser,
+          purchasedSessions:
+            membershipUser.purchasedSessions ??
+            membershipUser.membership.sessions,
+        },
+      ),
       update: vi.fn().mockResolvedValue(membershipUser),
     },
   }
 }
 
 describe('restoreMembershipSessionsForCancelledBooking', () => {
-  it('restores used booking sessions without exceeding package sessions', async () => {
+  it('caps refunded sessions at the purchased quota after the catalogue quota changes', async () => {
     const futureEndDate = new Date(Date.now() + 86_400_000)
     const tx = createTx({
       id: 'membership-user-1',
       remainingSessions: 8,
       endDate: futureEndDate,
-      membership: { sessions: 10 },
+      purchasedSessions: 10,
+      membership: { sessions: 100 },
     })
 
     const restored = await restoreMembershipSessionsForCancelledBooking(tx, {

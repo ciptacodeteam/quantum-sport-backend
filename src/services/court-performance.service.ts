@@ -184,9 +184,11 @@ export async function getCourtPerformance(
         // remain unvalued and are surfaced explicitly instead of inventing revenue.
         const sale = pack?.invoice
         const rate =
-          sale?.status === 'PAID' && pack && pack.membership.sessions > 0
+          sale?.status === 'PAID' &&
+          pack?.purchasedSessions != null &&
+          pack.purchasedSessions > 0
             ? Math.max(0, sale.total - sale.processingFee) /
-              pack.membership.sessions
+              pack.purchasedSessions
             : null
         const fullHours = (+slot.endAt - +slot.startAt) / 3_600_000
         const paid = isMembership

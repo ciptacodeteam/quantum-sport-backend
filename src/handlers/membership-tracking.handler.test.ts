@@ -32,6 +32,8 @@ it('scopes packages to the signed-in customer and separates confirmed usage from
   mocks.findMany.mockResolvedValue([
     {
       ...state,
+      purchasedSessions: 10,
+      purchasedType: 'ALL_HOUR',
       id: 'pack-user',
       membership: {
         name: 'Silver Member',
@@ -126,6 +128,8 @@ it('reports recurring usage per charged package, separately from debt paid by a 
   mocks.findMany.mockResolvedValue([
     {
       ...state,
+      purchasedSessions: 10,
+      purchasedType: 'ALL_HOUR',
       id: 'new-package',
       debtSettledSessions: 2,
       membership: {
@@ -164,6 +168,8 @@ it.each(['PENDING', 'CANCELLED', 'FAILED', 'EXPIRED', 'REFUNDED'])(
     mocks.findMany.mockResolvedValue([
       {
         ...state,
+        purchasedSessions: 10,
+        purchasedType: 'ALL_HOUR',
         id: 'unpaid',
         invoice: { number: 'INCOMPLETE', status: paymentStatus },
       },

@@ -83,6 +83,8 @@ it.each(['PADEL', 'TENNIS'])(
       endDate: new Date('2099-01-01'),
       remainingSessions: 78,
       remainingDuration: 30,
+      purchasedPrice: 1000000,
+      purchasedType: 'ALL_HOUR',
       isExpired: false,
       isSuspended: false,
       membership: {
