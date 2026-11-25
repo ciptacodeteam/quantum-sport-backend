@@ -102,7 +102,7 @@ else
 fi
 
 # Additive feature schema is also needed by databases managed without a Prisma
-# migration history. These scripts only ADD columns/tables (IF NOT EXISTS).
+# migration history. These repeatable scripts add schema and backfill known data.
 echo "🔄 Preparing additive feature schemas..."
 FEATURE_PSQL_URL="$(bun -e '
   const url = new URL(process.env.DATABASE_URL);
@@ -115,6 +115,8 @@ for sql in \
   /app/prisma/rolling-booking-window.sql \
   /app/prisma/recurring-bookings.sql \
   /app/prisma/membership-renewal.sql \
+  /app/prisma/membership-purchase-snapshot.sql \
+  /app/prisma/membership-visibility.sql \
   /app/prisma/coaching-admin.sql \
   /app/prisma/inhouse-coaching.sql \
   /app/prisma/inhouse-coach-profiles.sql \
