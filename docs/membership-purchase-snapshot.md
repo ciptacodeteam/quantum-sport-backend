@@ -34,3 +34,17 @@ estimated revenue until corrected.
 SQL was checked against an isolated PostgreSQL instance for known originals,
 unknown historical terms, zero-price invoices and repeat execution after a master
 change. The application database was not changed during implementation.
+
+## Confirmed legacy repair (2026-11-25)
+
+The owner confirmed that existing catalogue price, sessions, duration and hour
+type have never changed. Before editing those terms, run
+`bun run db:membership-confirmed-legacy-snapshot` against the intended database,
+after the standard snapshot SQL above. This one-time SQL fills only missing
+snapshot fields on purchases made through 2026-11-25 WIB. Existing snapshots,
+remaining balances, expiry dates and payments are preserved. Invoice subtotal
+takes priority over catalogue price, including complimentary purchases.
+
+This repair is intentionally excluded from recurring Docker startup. Do not
+reuse it after changing catalogue terms. Run its final SELECT in a SQL client
+to verify `unresolved_purchases = 0`; Prisma db execute does not print the result.

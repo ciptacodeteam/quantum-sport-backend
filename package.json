@@ -53,6 +53,7 @@
     "db:reconcile-membership-debt": "bun scripts/reconcile-membership-debt.ts",
     "db:membership-visibility": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-visibility.sql",
     "db:membership-purchase-snapshot": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-purchase-snapshot.sql",
+    "db:membership-confirmed-legacy-snapshot": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-confirmed-legacy-snapshot.sql",
     "db:membership-renewal": "prisma db execute --schema prisma/schema.prisma --file prisma/membership-renewal.sql",
     "db:staff-password-reset": "prisma db execute --schema prisma/schema.prisma --file prisma/staff-password-reset.sql",
     "db:coaching-groups": "prisma db execute --schema prisma/schema.prisma --file prisma/coaching-groups.sql",

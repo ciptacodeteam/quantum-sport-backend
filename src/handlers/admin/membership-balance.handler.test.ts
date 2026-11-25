@@ -39,6 +39,29 @@ it('keeps all purchases visible regardless of their current remaining quota', as
   expect(mocks.find.mock.calls[0][0].where.AND[1]).toEqual({})
   expect(mocks.contexts).toEqual(['cemara'])
 })
+it('identifies unverified historical terms as a bad request, even with balance=all', async () => {
+  mocks.find.mockResolvedValueOnce([
+    {
+      id: 'legacy-purchase',
+      purchasedPrice: 100000,
+      purchasedSessions: null,
+      purchasedDuration: null,
+      membership: { price: 150000, sessions: 100, duration: 30 },
+    },
+  ])
+  const handler = getAllMembershipTransactionsHandler.at(-1) as any
+  await expect(
+    handler({
+      req: { valid: () => ({ balance: 'all' }) },
+      var: { logger: { fatal: vi.fn() } },
+      json: vi.fn(),
+    }),
+  ).rejects.toMatchObject({
+    status: 400,
+    message:
+      expect.stringContaining('Ketentuan pembelian Value Pack lama belum terverifikasi'),
+  })
+})
 it('shows the shared negative wallet separately across purchase branches', async () => {
   const r = await withBranchContext(
     { branchId: 's-parman', isAdmin: true, isSuperAdmin: false },
