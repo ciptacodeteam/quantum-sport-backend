@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: async () => ({
         id: 'product',
         isActive: true,
+        isPublic: false,
         price: 100000,
         sessions: 10,
         duration: 30,
@@ -138,4 +139,31 @@ it('blocks catalogue edits until unresolved original purchase terms are reconcil
     (updateMembershipHandler.at(-1) as any)(context),
   ).rejects.toThrow('perlu diverifikasi')
   expect(mocks.update).not.toHaveBeenCalled()
+})
+
+it('updates visibility without modifying or requiring verification of purchase terms', async () => {
+  mocks.update.mockResolvedValue({ id: 'product', isPublic: false })
+  const context = {
+    req: {
+      valid: (part: string) =>
+        part === 'param'
+          ? { id: 'product' }
+          : {
+              isPublic: false,
+              price: 100000,
+              sessions: 10,
+              duration: 30,
+              type: 'ALL_HOUR',
+            },
+    },
+    var: { logger: { fatal: vi.fn() } },
+    json: vi.fn(),
+  }
+  await (updateMembershipHandler.at(-1) as any)(context)
+  expect(mocks.update).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ isPublic: false }),
+    }),
+  )
+  expect(mocks.count).not.toHaveBeenCalled()
 })

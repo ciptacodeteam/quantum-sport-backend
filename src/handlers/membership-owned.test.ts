@@ -63,6 +63,7 @@ it('returns the original purchase terms in active and owned package APIs after c
     membership: {
       id: 'product',
       name: 'Club',
+      isPublic: false,
       price: 12500000,
       sessions: 100,
       duration: 30,

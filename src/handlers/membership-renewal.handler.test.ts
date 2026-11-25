@@ -37,6 +37,11 @@ beforeEach(() => {
 })
 it('quotes only the signed-in customer and same sport, without changing balances', async () => {
   const result = await preview()
+  expect(mocks.findUnique).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: { id: 'product', isActive: true, isPublic: true },
+    }),
+  )
   expect(mocks.findMany.mock.calls[0][0].where).toEqual({
     userId: 'customer',
     membership: { sport: 'PADEL' },

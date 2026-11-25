@@ -62,6 +62,12 @@ export const membershipCheckoutHandler = factory.createHandlers(
         throw new BadRequestException('Membership is not active')
       }
 
+      if (!membership.isPublic) {
+        throw new BadRequestException(
+          'Value Pack ini hanya dapat dipesan melalui admin.',
+        )
+      }
+
       // Validate payment method
       const paymentMethod = await db.paymentMethod.findUnique({
         where: { id: paymentMethodId },

@@ -6,7 +6,7 @@ vi.mock('@/lib/create-app', () => ({
 vi.mock('@/lib/prisma', () => ({
   db: {
     membership: {
-      findUnique: async () => ({ id: 'membership', isActive: true }),
+      findUnique: async () => ({ id: 'membership', isActive: true, isPublic: true }),
     },
     paymentMethod: {
       findUnique: async () => ({

@@ -721,6 +721,7 @@ model Membership {
   duration    Int // how many days valid after applying membership in days
   sequence    Int            @default(0)
   isActive    Boolean        @default(true)
+  isPublic    Boolean        @default(true)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @default(now()) @updatedAt
 

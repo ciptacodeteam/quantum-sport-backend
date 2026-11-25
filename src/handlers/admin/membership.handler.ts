@@ -108,6 +108,7 @@ export const createMembershipHandler = factory.createHandlers(
           duration: membershipData.duration,
           sequence: membershipData.sequence,
           isActive: membershipData.isActive,
+          isPublic: membershipData.isPublic,
           benefits: {
             createMany: {
               data: (membershipData.benefits || []).map((benefit) => ({
@@ -152,7 +153,9 @@ export const updateMembershipHandler = factory.createHandlers(
         'type',
       ].some(
         (key) =>
-          membershipData[key as keyof UpdateMembershipSchema] !== undefined,
+          membershipData[key as keyof UpdateMembershipSchema] !== undefined &&
+          membershipData[key as keyof UpdateMembershipSchema] !==
+            existingMembership[key as keyof typeof existingMembership],
       )
       if (changesPurchaseTerms) {
         const unresolved = await db.membershipUser.count({
@@ -203,6 +206,7 @@ export const updateMembershipHandler = factory.createHandlers(
           sessions: membershipData.sessions,
           duration: membershipData.duration,
           sequence: membershipData.sequence,
+          isPublic: membershipData.isPublic,
           isActive:
             membershipData.isActive !== undefined
               ? Boolean(membershipData.isActive)

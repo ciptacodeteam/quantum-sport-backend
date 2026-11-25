@@ -15,7 +15,7 @@ export const membershipRenewalPreviewHandler = factory.createHandlers(
     const user = c.get('user')!
     // The product and renewal debt belong to the shared customer wallet.
     const membership = await db.membership.findUnique({
-      where: { id, isActive: true },
+      where: { id, isActive: true, isPublic: true },
       select: { sport: true, sessions: true },
     })
     if (!membership) throw new NotFoundException('Paket tidak tersedia.')
