@@ -117,6 +117,20 @@ export function scopeRelations(
       const field = fields.find((f) => f.name === key && f.kind === 'object')
       if (!field) continue
       const nested = value === true ? {} : (value as Args)
+      // Booking attribution must survive staff branch/role filters; expose identity fields only.
+      if (
+        context.isAdmin &&
+        model === 'Booking' &&
+        key === 'cashier' &&
+        nested.select &&
+        !nested.include &&
+        Object.entries(nested.select).every(
+          ([name, enabled]) =>
+            enabled === false ||
+            (enabled === true && ['id', 'name', 'email', 'role'].includes(name)),
+        )
+      )
+        continue
       const filter = branchWhere(field.type, context)
       if (filter && (field.isList || !field.isRequired))
         nested.where = andWhere(nested.where, filter)
