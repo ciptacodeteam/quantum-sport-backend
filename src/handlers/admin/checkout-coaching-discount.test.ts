@@ -654,6 +654,7 @@ it('loads Management eligibility from the database and records its court and coa
       managementValidUntil: true,
       managementCourtHourlyPrice: true,
       managementCoachHourlyPrice: true,
+      managementExtraParticipantHourlyPrice: true,
       managementPadelHappyHourlyPrice: true,
       managementPadelPeakHourlyPrice: true,
       managementTennisHappyHourlyPrice: true,

@@ -8,6 +8,7 @@ ALTER TABLE "tariff_periods" ADD COLUMN IF NOT EXISTS "managementCourtHourlyPric
 ALTER TABLE "tariff_periods" ADD COLUMN IF NOT EXISTS "managementCoachHourlyPrice" INTEGER;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementCourtHourlyPrice" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementCoachHourlyPrice" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementExtraParticipantHourlyPrice" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementPadelHappyHourlyPrice" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementPadelPeakHourlyPrice" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "managementTennisHappyHourlyPrice" INTEGER NOT NULL DEFAULT 0;

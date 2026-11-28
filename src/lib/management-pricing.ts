@@ -8,6 +8,7 @@ export type ManagementCustomer = {
   isManagement?: boolean
   managementCourtHourlyPrice?: number | null
   managementCoachHourlyPrice?: number | null
+  managementExtraParticipantHourlyPrice?: number | null
   managementPadelHappyHourlyPrice?: number | null
   managementPadelPeakHourlyPrice?: number | null
   managementTennisHappyHourlyPrice?: number | null
@@ -44,8 +45,13 @@ export function managementInHouseRate(
     (customer.managementCoachHourlyPrice ?? 0) > 0
       ? customer.managementCoachHourlyPrice!
       : null
-  if (court === null && coach === null) return null
-  return { court, coach }
+  const extraParticipantHourlyPrice =
+    (customer.managementExtraParticipantHourlyPrice ?? 0) > 0
+      ? customer.managementExtraParticipantHourlyPrice!
+      : null
+  if (court === null && coach === null && extraParticipantHourlyPrice === null)
+    return null
+  return { court, coach, extraParticipantHourlyPrice }
 }
 
 /** Court-only/club sessions use their sport and the playing-date tariff band. */

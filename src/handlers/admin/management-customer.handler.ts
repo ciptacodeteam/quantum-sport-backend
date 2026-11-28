@@ -24,6 +24,7 @@ export const managementCustomerSchema = z
     isManagement: z.boolean(),
     managementCourtHourlyPrice: price,
     managementCoachHourlyPrice: price,
+    managementExtraParticipantHourlyPrice: price,
     managementPadelHappyHourlyPrice: price,
     managementPadelPeakHourlyPrice: price,
     managementTennisHappyHourlyPrice: price,
@@ -38,6 +39,7 @@ export const managementCustomerSchema = z
       !(
         value.managementCourtHourlyPrice ||
         value.managementCoachHourlyPrice ||
+        value.managementExtraParticipantHourlyPrice ||
         value.managementPadelHappyHourlyPrice ||
         value.managementPadelPeakHourlyPrice ||
         value.managementTennisHappyHourlyPrice ||
@@ -60,6 +62,7 @@ const fields = (
     managementValidUntil?: string | null
     managementCourtHourlyPrice?: number
     managementCoachHourlyPrice?: number
+    managementExtraParticipantHourlyPrice?: number
     managementPadelHappyHourlyPrice?: number
     managementPadelPeakHourlyPrice?: number
     managementTennisHappyHourlyPrice?: number
@@ -76,6 +79,10 @@ const fields = (
     input.isManagement === false ? 0 : input.managementCourtHourlyPrice,
   managementCoachHourlyPrice:
     input.isManagement === false ? 0 : input.managementCoachHourlyPrice,
+  managementExtraParticipantHourlyPrice:
+    input.isManagement === false
+      ? 0
+      : input.managementExtraParticipantHourlyPrice,
   managementPadelHappyHourlyPrice:
     input.isManagement === false ? 0 : input.managementPadelHappyHourlyPrice,
   managementPadelPeakHourlyPrice:

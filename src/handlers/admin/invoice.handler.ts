@@ -129,6 +129,7 @@ export const getInvoiceDetailAdminHandler = factory.createHandlers(
             courtNormalPrice: true,
             courtDiscountPrice: true,
             membershipUserId: true,
+            adminNote: true,
             createdAt: true,
             updatedAt: true,
             user: {

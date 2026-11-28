@@ -859,9 +859,13 @@ it('accepts a scheduled coach identity but rejects browser prices and mixed pack
   ).toBe(false)
 })
 
-it.each([1, 2])(
-  'charges the approved Management rate for %s participants and records its source',
-  async (participants) => {
+it.each([
+  [1, 0],
+  [2, 0],
+  [3, 50000],
+])(
+  'charges the approved Management rate for %s participants with extra rate %s and records its source',
+  async (participants, extraRate) => {
     const coach = {
       id: 'coach-slot',
       staffId: 'andi',
@@ -890,6 +894,7 @@ it.each([1, 2])(
         managementValidUntil: '2040-11-03',
         managementCourtHourlyPrice: 200000,
         managementCoachHourlyPrice: 600000,
+        managementExtraParticipantHourlyPrice: extraRate,
       },
       selections: [
         {
@@ -911,7 +916,7 @@ it.each([1, 2])(
     expect(result).toEqual({
       coveredCourtAmount: -50000,
       courtPriceAdjustment: -50000,
-      extraAmount: 600000 + (participants - 1) * 100000,
+      extraAmount: 600000 + (participants - 1) * (extraRate || 100000),
     })
     expect(tx.bookingDetail.update).toHaveBeenCalledWith({
       where: { id: 'detail' },
@@ -919,7 +924,7 @@ it.each([1, 2])(
     })
     expect(tx.bookingCoach.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        price: 600000 + (participants - 1) * 100000,
+        price: 600000 + (participants - 1) * (extraRate || 100000),
         description: expect.stringContaining('Management'),
       }),
     })
@@ -932,6 +937,7 @@ it('keeps prepaid package terms even when a Management rate exists', async () =>
       isManagement: true,
       managementCourtHourlyPrice: 1,
       managementCoachHourlyPrice: 1,
+      managementExtraParticipantHourlyPrice: 1,
     },
     tariffRules: [
       {

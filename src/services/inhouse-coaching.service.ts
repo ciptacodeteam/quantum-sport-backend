@@ -363,9 +363,15 @@ export async function redeemInHouseSelections(
       ? null
       : managementInHouseRate(input.managementCustomer, court.slot.startAt)
     const price = priceInHouseHour(
-      managementRate?.coach != null
-        ? { ...terms, hourlyPrice: managementRate.coach, courtHourlyShare: 0 }
-        : terms,
+      {
+        ...terms,
+        ...(managementRate?.coach != null
+          ? { hourlyPrice: managementRate.coach, courtHourlyShare: 0 }
+          : {}),
+        extraParticipantHourlyPrice:
+          managementRate?.extraParticipantHourlyPrice ??
+          terms.extraParticipantHourlyPrice,
+      },
       selection.participants,
     )
     // Tariff discounts apply only to direct hourly coaching; prepaid terms stay frozen.

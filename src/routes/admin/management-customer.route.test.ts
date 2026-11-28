@@ -114,6 +114,7 @@ it('saves account prices only for a Management classification and validates rupi
   const prices = {
     managementCourtHourlyPrice: 100000,
     managementCoachHourlyPrice: 0,
+    managementExtraParticipantHourlyPrice: 50000,
   }
   expect(
     (await request('ADMIN', 'PUT', { isManagement: true, ...prices })).status,
@@ -127,6 +128,9 @@ it('saves account prices only for a Management classification and validates rupi
     { isManagement: true, managementCourtHourlyPrice: -1 },
     { isManagement: true, managementCoachHourlyPrice: 0.5 },
     { isManagement: true, managementCourtHourlyPrice: 2147483648 },
+    { isManagement: true, managementExtraParticipantHourlyPrice: -1 },
+    { isManagement: true, managementExtraParticipantHourlyPrice: 0.5 },
+    { isManagement: true, managementExtraParticipantHourlyPrice: 2147483648 },
   ])
     expect((await request('ADMIN', 'PUT', body)).status).toBe(422)
   mocks.update.mockClear()

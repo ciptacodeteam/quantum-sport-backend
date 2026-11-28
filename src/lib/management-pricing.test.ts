@@ -13,10 +13,32 @@ const customer = {
   managementValidFrom: '2026-11-12',
   managementValidUntil: '2026-11-13',
 }
+it('supports an extra-participant override independently of court and coach rates', () => {
+  const account = {
+    isManagement: true,
+    managementExtraParticipantHourlyPrice: 50000,
+    managementValidFrom: '2026-11-12',
+  }
+  expect(managementInHouseRate(account, '2026-11-12')).toEqual({
+    court: null,
+    coach: null,
+    extraParticipantHourlyPrice: 50000,
+  })
+  expect(managementInHouseRate(account, '2026-11-11')).toBeNull()
+  expect(
+    managementInHouseRate({ ...account, isManagement: false }, '2026-11-12'),
+  ).toBeNull()
+  expect(
+    managementInHouseRate(
+      { ...account, managementExtraParticipantHourlyPrice: 0 },
+      '2026-11-12',
+    ),
+  ).toBeNull()
+})
 it('uses the account prices and inclusive playing dates', () => {
   expect(
     managementInHouseRate(customer, new Date('2026-11-12T01:00:00Z')),
-  ).toEqual({ court: 200000, coach: 600000 })
+  ).toEqual({ court: 200000, coach: 600000, extraParticipantHourlyPrice: null })
   expect(managementInHouseRate(customer, '2026-11-13')).not.toBeNull()
   expect(managementInHouseRate(customer, '2030-11-14')).not.toBeNull()
   for (const date of ['2026-11-11'])
@@ -33,13 +55,13 @@ it('uses normal pricing independently for each zero or unset account price', () 
       { ...customer, managementCourtHourlyPrice: 0 },
       '2026-11-12',
     ),
-  ).toEqual({ court: null, coach: 600000 })
+  ).toEqual({ court: null, coach: 600000, extraParticipantHourlyPrice: null })
   expect(
     managementInHouseRate(
       { ...customer, managementCoachHourlyPrice: 0 },
       '2026-11-12',
     ),
-  ).toEqual({ court: 200000, coach: null })
+  ).toEqual({ court: 200000, coach: null, extraParticipantHourlyPrice: null })
   expect(
     managementInHouseRate(
       {
@@ -87,6 +109,7 @@ it.each([
     expect(managementInHouseRate(account, startAt)).toEqual({
       court: 200000,
       coach: 600000,
+      extraParticipantHourlyPrice: null,
     })
     expect(
       managementCourtRate({ ...account, isManagement: false }, slot, []),

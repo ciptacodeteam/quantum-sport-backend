@@ -409,6 +409,7 @@ export const adminCheckoutHandler = factory.createHandlers(
               managementValidUntil: true,
               managementCourtHourlyPrice: true,
               managementCoachHourlyPrice: true,
+              managementExtraParticipantHourlyPrice: true,
               managementPadelHappyHourlyPrice: true,
               managementPadelPeakHourlyPrice: true,
               managementTennisHappyHourlyPrice: true,

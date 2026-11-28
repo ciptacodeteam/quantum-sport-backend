@@ -30,6 +30,7 @@ beforeEach(() => {
     booking: {
       id: 'booking',
       status: 'CONFIRMED',
+      adminNote: 'Latihan bersama tim\nPeserta 4 orang',
       details: [
         {
           court: { name: 'Court 1 Tennis' },
@@ -46,6 +47,14 @@ beforeEach(() => {
   })
 })
 afterEach(() => vi.unstubAllEnvs())
+
+it('selects and returns the booking description for admin transaction details', async () => {
+  const response = await app.request('/invoices/invoice')
+  expect(response.status).toBe(200)
+  expect(mocks.find.mock.lastCall?.[0].include.booking.select.adminNote).toBe(true)
+  const body = (await response.json()) as any
+  expect(body.data.booking.adminNote).toBe('Latihan bersama tim\nPeserta 4 orang')
+})
 
 it.each(['UTC', 'Asia/Jakarta'])(
   'serializes all invoice slot times like the schedule on a %s host',

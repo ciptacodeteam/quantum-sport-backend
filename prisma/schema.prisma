@@ -127,6 +127,7 @@ model User {
   isManagement Boolean @default(false)
   managementCourtHourlyPrice Int @default(0)
   managementCoachHourlyPrice Int @default(0)
+  managementExtraParticipantHourlyPrice Int @default(0)
   managementPadelHappyHourlyPrice Int @default(0)
   managementPadelPeakHourlyPrice Int @default(0)
   managementTennisHappyHourlyPrice Int @default(0)
