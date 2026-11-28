@@ -15,10 +15,12 @@ export async function ensureServiceScheduleRange(
   startAt: Date,
   endAt: Date,
   now = new Date(),
+  role?: 'COACH' | 'BALLBOY',
 ) {
   const peopleWhere = {
     branchId,
     isActive: true,
+    ...(role ? { role } : {}),
     rollingServiceSchedule: { not: Prisma.AnyNull },
     OR: [
       {

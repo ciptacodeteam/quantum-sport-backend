@@ -1,4 +1,6 @@
 import { ensureServiceSchedules } from '@/services/service-schedule-maintenance.service'
+import { ensureServiceScheduleRange } from '@/services/service-schedule-range.service'
+import { branchContext } from '@/lib/branch-context'
 import { validateHook } from '@/helpers/validate-hook'
 import { factory } from '@/lib/create-app'
 import { db } from '@/lib/prisma'
@@ -54,7 +56,6 @@ export const getAvailableCoachesHandler = factory.createHandlers(
   zValidator('query', availableCoachesQuerySchema, validateHook),
   async (c) => {
     try {
-      await ensureServiceSchedules('COACH')
       const { startAt, endAt, courtSport } = c.req.valid('query') as {
         startAt: string
         endAt: string
@@ -63,6 +64,26 @@ export const getAvailableCoachesHandler = factory.createHandlers(
 
       const startDateTime = toClubWallDate(startAt)
       const endDateTime = toClubWallDate(endAt)
+      const branchId = branchContext.getStore()?.branchId
+      let excludedStaffIds: string[] = []
+      // The booking picker needs one hour, not reconciliation of every future coach slot.
+      if (
+        c.req.path.startsWith('/admin/') &&
+        branchId &&
+        courtSport &&
+        +endDateTime - +startDateTime === 3_600_000
+      ) {
+        excludedStaffIds = await ensureServiceScheduleRange(
+          branchId,
+          courtSport,
+          startDateTime,
+          endDateTime,
+          new Date(),
+          'COACH',
+        )
+      } else {
+        await ensureServiceSchedules('COACH')
+      }
       const coachTypes =
         courtSport === CourtSport.PADEL
           ? [CoachType.PADEL, CoachType.PADEL_TENNIS]
@@ -76,6 +97,9 @@ export const getAvailableCoachesHandler = factory.createHandlers(
         where: {
           type: SlotType.COACH,
           scheduleClosed: false,
+          ...(excludedStaffIds.length
+            ? { staffId: { notIn: excludedStaffIds } }
+            : {}),
           AND: [
             {
               startAt: {

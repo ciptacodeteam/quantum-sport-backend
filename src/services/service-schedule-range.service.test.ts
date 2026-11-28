@@ -106,6 +106,18 @@ it('does no maintenance when existing slots include manually closed or booked ro
   expect(mocks.court).toHaveBeenCalledTimes(1)
   expect(mocks.create).not.toHaveBeenCalled()
 })
+it('limits both profile reads to coaches when called by the coach picker', async () => {
+  await ensureServiceScheduleRange(
+    'cemara',
+    'PADEL',
+    startAt,
+    endAt,
+    now,
+    'COACH',
+  )
+  expect(mocks.people.mock.calls[0][0].where.role).toBe('COACH')
+  expect(mocks.fresh.mock.calls[0][0].where.role).toBe('COACH')
+})
 it('does not generate schedules without a matching open court in its booking window', async () => {
   mocks.court.mockResolvedValue(null)
   await run()
